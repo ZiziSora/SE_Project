@@ -1,8 +1,43 @@
 import { GraduationCap } from "lucide-react";
 import hcmus from "../assets/hcmus.png";
-import { Link } from "react-router-dom"
+import { Link, useNavigate } from "react-router-dom";
+import { login } from "../api/authApi";
+import InputField from "../components/InputField";
+import { useState } from "react";
+import { Mail, Lock } from "lucide-react";
+import { toast } from "react-toastify";
 
 const LoginPage = () => {
+  const navigate = useNavigate();
+  const [data, setData] = useState({
+    email: "",
+    password: "",
+  });
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    if (!data.email || !data.password) {
+      toast.error("Please fill in all fields");
+      return;
+    }
+
+    try {
+      const result = await login(data);
+
+      console.log(result);
+      toast.success("Log in successfully");
+
+      localStorage.setItem("access_token", result.access_token);
+      localStorage.setItem("refresh_token", result.refresh_token);
+
+      setTimeout(() => {
+        navigate("/landingPage");
+      }, 2000);
+    } catch (error) {
+      console.log(error.response.data);
+      toast.error(error.response?.data?.detail || "Something went wrong");
+    }
+  };
   return (
     <div className="flex h-screen w-screen">
       <div
@@ -37,34 +72,49 @@ const LoginPage = () => {
             Sign in to your account
           </p>
 
-          <div className="w-full px-8 space-y-3">
-            <label htmlFor="email" className="font-inter text-gray-600">
-              Email
-            </label>
-            <input
-              className="w-full h-10.25 border-gray-400 border rounded-lg p-4"
+          <form className="w-full px-8 space-y-3" onSubmit={handleSubmit}>
+            <InputField
+              label="Email"
               id="email"
+              type="email"
               placeholder="abcd@gmail.com"
-            ></input>
-
-            <label htmlFor="password" className="font-inter text-gray-600">
-              Password
-            </label>
-            <input
-              className="w-full h-10.25 border-gray-400 border rounded-lg p-4"
+              bgColor="bg-white"
+              icon={Mail}
+              value={data.email}
+              onChange={(e) =>
+                setData({
+                  ...data,
+                  email: e.target.value,
+                })
+              }
+            />
+            <InputField
+              label="Password"
               id="password"
-              placeholder="abcd@gmail.com"
-            ></input>
-
+              type="password"
+              placeholder="******"
+              bgColor="bg-white"
+              icon={Lock}
+              value={data.password}
+              onChange={(e) =>
+                setData({
+                  ...data,
+                  password: e.target.value,
+                })
+              }
+            />
             <div className="flex justify-end ">
               <p className="font-inter text-sm text-purple-800 transition-all duration-200 hover:-translate-y-1 cursor-pointer">
                 Forgot password?
               </p>
             </div>
 
-            <div className="bg-purple-800 h-12 rounded-lg hover:bg-purple-950 flex justify-center items-center">
+            <button
+              type="submit"
+              className="bg-purple-800 w-full h-12 rounded-lg hover:bg-purple-950 flex justify-center items-center"
+            >
               <p className="text-white font-inter">Login</p>
-            </div>
+            </button>
 
             <div className="flex items-center gap-3 my-6">
               <div className="flex-1 border-t border-gray-500"></div>
@@ -74,10 +124,13 @@ const LoginPage = () => {
               <div className="flex-1 border-t border-gray-500"></div>
             </div>
 
-            <Link to="/signup" className="border-purple-500 border-2 h-12 rounded-lg transition-all duration-200 hover:-translate-y-1 flex justify-center items-center mb-6">
+            <Link
+              to="/signup"
+              className="border-purple-500 border-2 h-12 rounded-lg transition-all duration-200 hover:-translate-y-1 flex justify-center items-center mb-6"
+            >
               <p className="text-purple-800 font-inter">Create an account</p>
             </Link>
-          </div>
+          </form>
         </div>
       </div>
     </div>
