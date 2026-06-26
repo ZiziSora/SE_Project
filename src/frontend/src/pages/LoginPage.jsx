@@ -1,17 +1,20 @@
 import { GraduationCap } from "lucide-react";
 import hcmus from "../assets/hcmus.png";
+import { Link } from "react-router-dom"
 
 const LoginPage = () => {
   return (
-    <div className="flex flex-row h-screen w-screen">
+    <div className="flex h-screen w-screen">
       <div
-        className="relative bg-cover bg-center bg-no-repeat h-full w-full"
+        className="flex-1 relative bg-cover bg-center bg-no-repeat h-full w-full"
         style={{ backgroundImage: `url(${hcmus})` }}
       >
         <div className="absolute inset-0 bg-linear-to-t from-black/70 to-transparent"></div>
 
         <div className="absolute bottom-30 left-17 text-white">
-          <h1 className="text-5xl font-bold mb-4 font-manrope">Structured Discovery</h1>
+          <h1 className="text-5xl font-bold mb-4 font-manrope">
+            Structured Discovery
+          </h1>
 
           <p className="text-xl max-w-md font-inter">
             Unlock your university experience. Connect, participate, and lead
@@ -20,7 +23,7 @@ const LoginPage = () => {
         </div>
       </div>
 
-      <div className="bg-white h-full w-full flex items-center justify-center relative overflow-hidden">
+      <div className="flex-1 bg-white h-full w-full flex items-center justify-center relative overflow-hidden">
         <div className="absolute top-0 right-0 w-96 h-96 bg-purple-200 rounded-full blur-3xl opacity-20"></div>
         <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-175 h-75 bg-violet-300 rounded-full blur-3xl opacity-30"></div>
 
@@ -71,9 +74,9 @@ const LoginPage = () => {
               <div className="flex-1 border-t border-gray-500"></div>
             </div>
 
-            <div className="border-purple-500 border-2 h-12 rounded-lg transition-all duration-200 hover:-translate-y-1 flex justify-center items-center mb-6">
+            <Link to="/signup" className="border-purple-500 border-2 h-12 rounded-lg transition-all duration-200 hover:-translate-y-1 flex justify-center items-center mb-6">
               <p className="text-purple-800 font-inter">Create an account</p>
-            </div>
+            </Link>
           </div>
         </div>
       </div>
