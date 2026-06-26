@@ -1,9 +1,27 @@
-import { Telescope, User, Mail, Lock, GraduationCap } from "lucide-react";
+import {
+  Telescope,
+  User,
+  Mail,
+  Lock,
+  GraduationCap,
+  BadgeCheck,
+} from "lucide-react";
 import hcmus from "../assets/hcmus.png";
 import InputField from "../components/InputField";
+import SelectedField from "../components/SelectedField";
 import { Link } from "react-router-dom";
 
 const SignupPage = () => {
+  const roleOptions = [
+    {
+      value: "student",
+      label: "Student",
+    },
+    {
+      value: "organizer",
+      label: "Organizer",
+    },
+  ];
   return (
     <div className="flex h-screen w-screen">
       <div
@@ -47,11 +65,13 @@ const SignupPage = () => {
               type="email"
             />
 
-            <InputField
-              label="Major"
-              id="major"
-              placeholder="Select your department"
-              icon={GraduationCap}
+            <SelectedField
+              label="Role"
+              id="role"
+              placeholder="Choose your suitable role"
+              icon={BadgeCheck}
+              options={roleOptions}
+              bgColor="bg-[#F8F9FF]"
             />
 
             <InputField

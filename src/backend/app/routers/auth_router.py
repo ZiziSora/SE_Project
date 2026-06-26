@@ -50,10 +50,6 @@ def signup(data: SignUpRequest, db: Session = Depends(get_db)):
 
 @router.post("/login", response_model=LoginResponse, summary="Log in")
 def login(body: LoginRequest):
-    """
-    Đăng nhập bằng email + password thông qua Supabase Auth.
-    Trả về access_token (JWT) và refresh_token.
-    """
     try:
         response = supabase.auth.sign_in_with_password({
             "email": body.email,
