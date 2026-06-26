@@ -39,31 +39,31 @@ const LoginPage = () => {
     }
   };
   return (
-    <div className="flex h-screen w-screen">
+    <div className="flex min-h-screen w-screen">
       <div
-        className="flex-1 relative bg-cover bg-center bg-no-repeat h-full w-full"
+        className="hidden md:flex flex-1 relative bg-cover bg-center bg-no-repeat"
         style={{ backgroundImage: `url(${hcmus})` }}
       >
         <div className="absolute inset-0 bg-linear-to-t from-black/70 to-transparent"></div>
 
-        <div className="absolute bottom-30 left-17 text-white">
-          <h1 className="text-5xl font-bold mb-4 font-manrope">
+        <div className="absolute bottom-16 left-10 lg:bottom-30 lg:left-17 text-white">
+          <h1 className="text-3xl lg:text-5xl font-bold mb-4 font-manrope">
             Structured Discovery
           </h1>
 
-          <p className="text-xl max-w-md font-inter">
+          <p className="text-base lg:text-xl max-w-md font-inter">
             Unlock your university experience. Connect, participate, and lead
             with UniEvent.
           </p>
         </div>
       </div>
 
-      <div className="flex-1 bg-white h-full w-full flex items-center justify-center relative overflow-hidden">
+      <div className="flex-1 bg-white min-h-screen flex items-center justify-center relative overflow-hidden px-4 py-10 md:px-0 md:py-0">
         <div className="absolute top-0 right-0 w-96 h-96 bg-purple-200 rounded-full blur-3xl opacity-20"></div>
-        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-175 h-75 bg-violet-300 rounded-full blur-3xl opacity-30"></div>
+        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-96 md:w-175 h-75 bg-violet-300 rounded-full blur-3xl opacity-30"></div>
 
-        <div className="bg-white shadow-xl h-130 w-md rounded-lg flex flex-col justify-center items-center relative z-10">
-          <div className="flex flex-row gap-1 items-center text-[#630ED4] text-2xl font-semibold">
+        <div className="bg-white shadow-xl w-full max-w-md rounded-2xl flex flex-col justify-center items-center relative z-10 py-10 px-2">
+          <div className="flex flex-row gap-1 items-center text-[#630ED4] text-2xl font-semibold mb-2">
             <GraduationCap />
             <p className="font-manrope">UniEvent</p>
           </div>
@@ -72,7 +72,7 @@ const LoginPage = () => {
             Sign in to your account
           </p>
 
-          <form className="w-full px-8 space-y-3" onSubmit={handleSubmit}>
+          <form className="w-full px-6 md:px-8 space-y-3" onSubmit={handleSubmit}>
             <InputField
               label="Email"
               id="email"
@@ -103,7 +103,7 @@ const LoginPage = () => {
                 })
               }
             />
-            <div className="flex justify-end ">
+            <div className="flex justify-end">
               <p className="font-inter text-sm text-purple-800 transition-all duration-200 hover:-translate-y-1 cursor-pointer">
                 Forgot password?
               </p>
@@ -111,22 +111,20 @@ const LoginPage = () => {
 
             <button
               type="submit"
-              className="bg-purple-800 w-full h-12 rounded-lg hover:bg-purple-950 flex justify-center items-center"
+              className="bg-purple-800 w-full h-12 rounded-lg hover:bg-purple-950 flex justify-center items-center transition-colors duration-200"
             >
               <p className="text-white font-inter">Login</p>
             </button>
 
-            <div className="flex items-center gap-3 my-6">
-              <div className="flex-1 border-t border-gray-500"></div>
-
+            <div className="flex items-center gap-3 my-4">
+              <div className="flex-1 border-t border-gray-300"></div>
               <p className="text-[#4A4455] text-sm">Or continue with</p>
-
-              <div className="flex-1 border-t border-gray-500"></div>
+              <div className="flex-1 border-t border-gray-300"></div>
             </div>
 
             <Link
               to="/signup"
-              className="border-purple-500 border-2 h-12 rounded-lg transition-all duration-200 hover:-translate-y-1 flex justify-center items-center mb-6"
+              className="border-purple-500 border-2 h-12 rounded-lg transition-all duration-200 hover:-translate-y-1 flex justify-center items-center mb-4"
             >
               <p className="text-purple-800 font-inter">Create an account</p>
             </Link>

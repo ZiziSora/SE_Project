@@ -60,28 +60,33 @@ const SignupPage = () => {
     }
   };
   return (
-    <div className="flex h-screen w-screen">
+    <div className="flex min-h-screen w-screen">
       <div
-        className="flex-1 relative bg-cover bg-center bg-no-repeat"
+        className="hidden md:flex flex-1 relative bg-cover bg-center bg-no-repeat"
         style={{ backgroundImage: `url(${hcmus})` }}
       >
         <div className="absolute inset-0 bg-linear-to-t from-black/70 to-transparent"></div>
 
-        <div className="absolute bottom-30 left-17 bg-white/70 h-49 w-lg rounded-lg shadow-sm p-6">
-          <div className="flex flex-row gap-2 text-4xl items-center font-manrope text-purple-900 font-bold mb-5">
-            <Telescope className="size-10" />
+        <div className="absolute bottom-16 left-8 lg:bottom-30 lg:left-17 bg-white/70 rounded-lg shadow-sm p-5 lg:p-6 max-w-xs lg:max-w-lg">
+          <div className="flex flex-row gap-2 text-3xl lg:text-4xl items-center font-manrope text-purple-900 font-bold mb-4">
+            <Telescope className="size-8 lg:size-10" />
             <span>UniEvent</span>
           </div>
-          <span className="text-gray-600">
+          <span className="text-gray-600 text-sm lg:text-base">
             Structured Discovery for your academic journey. Connect with clubs,
             manage schedules, and explore events tailored to your major.
           </span>
         </div>
       </div>
 
-      <div className="flex-1 bg-white flex items-center justify-center">
+      <div className="flex-1 bg-white min-h-screen flex items-center justify-center px-4 py-10 md:px-6 md:py-0">
         <div className="w-full max-w-lg">
-          <p className="text-3xl font-bold font-manrope">Create account</p>
+          <div className="flex md:hidden flex-row gap-2 items-center text-[#630ED4] text-xl font-semibold mb-6">
+            <Telescope className="size-6" />
+            <span className="font-manrope font-bold">UniEvent</span>
+          </div>
+
+          <p className="text-2xl md:text-3xl font-bold font-manrope">Create account</p>
 
           <p className="text-[#4A4455] text-sm font-inter mt-2 mb-8">
             Enter your details to get started
@@ -150,12 +155,12 @@ const SignupPage = () => {
               type="submit"
               className="w-full h-12 rounded-lg bg-purple-800 text-white
              transition-all duration-200 hover:-translate-y-1 hover:bg-purple-950
-             mt-10"
+             mt-8 md:mt-10"
             >
               Create account
             </button>
 
-            <div className="flex justify-center items-center mt-8 text-gray-600">
+            <div className="flex justify-center items-center mt-6 md:mt-8 text-gray-600">
               <span>Already have an account?</span>
 
               <Link
