@@ -14,6 +14,7 @@ import { useState } from "react";
 import { signup } from "../api/authApi";
 import { toast } from "react-toastify";
 const SignupPage = () => {
+  const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
   const roleOptions = [
     {
@@ -36,11 +37,7 @@ const SignupPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (
-      !formData.full_name ||
-      !formData.email ||
-      !formData.password
-    ) {
+    if (!formData.full_name || !formData.email || !formData.password) {
       toast.error("Please fill in all fields");
       return;
     }
@@ -86,7 +83,9 @@ const SignupPage = () => {
             <span className="font-manrope font-bold">UniEvent</span>
           </div>
 
-          <p className="text-2xl md:text-3xl font-bold font-manrope">Create account</p>
+          <p className="text-2xl md:text-3xl font-bold font-manrope">
+            Create account
+          </p>
 
           <p className="text-[#4A4455] text-sm font-inter mt-2 mb-8">
             Enter your details to get started
@@ -139,9 +138,9 @@ const SignupPage = () => {
             <InputField
               label="Password"
               id="password"
-              placeholder="******"
+              placeholder="At least 6 characters"
               icon={Lock}
-              type="password"
+              type={showPassword ? "text" : "password"}
               value={formData.password}
               onChange={(e) =>
                 setFormData({
@@ -149,6 +148,8 @@ const SignupPage = () => {
                   password: e.target.value,
                 })
               }
+              showPassword={showPassword}
+              setShowPassword={setShowPassword}
             />
 
             <button

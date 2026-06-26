@@ -1,3 +1,4 @@
+import { Eye, EyeClosed } from "lucide-react"
 const InputField = ({
   label,
   id,
@@ -7,6 +8,8 @@ const InputField = ({
   bgColor = "bg-[#F8F9FF]",
   value,
   onChange,
+  showPassword,
+  setShowPassword,
 }) => {
   return (
     <div className="space-y-2">
@@ -25,6 +28,16 @@ const InputField = ({
           value={value}
           onChange={onChange}
         />
+
+        {setShowPassword && (
+          <button
+            type="button"
+            onClick={() => setShowPassword(!showPassword)}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500"
+          >
+            {showPassword ? <EyeClosed size={18} /> : <Eye size={18} />}
+          </button>
+        )}
       </div>
     </div>
   );

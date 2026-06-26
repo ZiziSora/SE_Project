@@ -13,6 +13,8 @@ const LoginPage = () => {
     email: "",
     password: "",
   });
+
+  const [showPassword, setShowPassword] = useState(false)
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -91,8 +93,8 @@ const LoginPage = () => {
             <InputField
               label="Password"
               id="password"
-              type="password"
-              placeholder="******"
+              type={showPassword ? "text" : "password"}
+              placeholder="At least 6 characters"
               bgColor="bg-white"
               icon={Lock}
               value={data.password}
@@ -102,6 +104,8 @@ const LoginPage = () => {
                   password: e.target.value,
                 })
               }
+              showPassword={showPassword}
+              setShowPassword={setShowPassword}
             />
             <div className="flex justify-end">
               <p className="font-inter text-sm text-purple-800 transition-all duration-200 hover:-translate-y-1 cursor-pointer">
