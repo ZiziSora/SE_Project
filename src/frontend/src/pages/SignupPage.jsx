@@ -9,9 +9,12 @@ import {
 import hcmus from "../assets/hcmus.png";
 import InputField from "../components/InputField";
 import SelectedField from "../components/SelectedField";
-import { Link } from "react-router-dom";
-
+import { Link, useNavigate } from "react-router-dom";
+import { useState } from "react";
+import { signup } from "../api/authApi";
+import { toast } from "react-toastify";
 const SignupPage = () => {
+  const navigate = useNavigate();
   const roleOptions = [
     {
       value: "student",
@@ -22,6 +25,40 @@ const SignupPage = () => {
       label: "Organizer",
     },
   ];
+
+  const [formData, setFormData] = useState({
+    full_name: "",
+    email: "",
+    role: "",
+    password: "",
+  });
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    if (
+      !formData.full_name ||
+      !formData.email ||
+      !formData.password
+    ) {
+      toast.error("Please fill in all fields");
+      return;
+    }
+
+    try {
+      const result = await signup(formData);
+
+      console.log(result);
+
+      toast.success("Create account successfully!");
+      setTimeout(() => {
+        navigate("/login");
+      }, 2000);
+    } catch (error) {
+      console.log(error.response.data);
+      toast.error(error.response?.data?.detail || "Something went wrong");
+    }
+  };
   return (
     <div className="flex h-screen w-screen">
       <div
@@ -49,12 +86,19 @@ const SignupPage = () => {
           <p className="text-[#4A4455] text-sm font-inter mt-2 mb-8">
             Enter your details to get started
           </p>
-          <form className="space-y-4">
+          <form className="space-y-4" onSubmit={handleSubmit}>
             <InputField
               label="Full name"
               id="fullname"
               placeholder="Nguyen Van A"
               icon={User}
+              value={formData.full_name}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  full_name: e.target.value,
+                })
+              }
             />
 
             <InputField
@@ -63,15 +107,28 @@ const SignupPage = () => {
               placeholder="abcd@gmail.com"
               icon={Mail}
               type="email"
+              value={formData.email}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  email: e.target.value,
+                })
+              }
             />
 
             <SelectedField
               label="Role"
               id="role"
-              placeholder="Choose your suitable role"
               icon={BadgeCheck}
               options={roleOptions}
               bgColor="bg-[#F8F9FF]"
+              value={formData.role}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  role: e.target.value,
+                })
+              }
             />
 
             <InputField
@@ -80,6 +137,13 @@ const SignupPage = () => {
               placeholder="******"
               icon={Lock}
               type="password"
+              value={formData.password}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  password: e.target.value,
+                })
+              }
             />
 
             <button

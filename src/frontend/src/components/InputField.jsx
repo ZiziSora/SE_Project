@@ -4,7 +4,9 @@ const InputField = ({
   type = "text",
   placeholder,
   icon: Icon,
-  bgColor = "bg-[#F8F9FF]"
+  bgColor = "bg-[#F8F9FF]",
+  value,
+  onChange,
 }) => {
   return (
     <div className="space-y-2">
@@ -20,6 +22,8 @@ const InputField = ({
           type={type}
           placeholder={placeholder}
           className={`w-full h-12 border border-gray-400 rounded-lg pl-12 pr-4 ${bgColor}`}
+          value={value}
+          onChange={onChange}
         />
       </div>
     </div>

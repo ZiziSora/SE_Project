@@ -16,6 +16,7 @@ class SignUpRequest(BaseModel):
     email: EmailStr
     password: str
     full_name: str
+    role: str = "student"
 
 class SignUpResponse(BaseModel):
     message: str

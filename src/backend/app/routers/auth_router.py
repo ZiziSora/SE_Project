@@ -31,7 +31,7 @@ def signup(data: SignUpRequest, db: Session = Depends(get_db)):
         user_id = supabase_user.id, 
         email = data.email, 
         full_name = data.full_name, 
-        role = "attendee"
+        role = data.role
     )
 
     try:

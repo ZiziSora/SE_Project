@@ -5,8 +5,9 @@ const SelectedField = ({
   label,
   icon: Icon,
   options,
-  placeholder,
   bgColor = "bg-white",
+  value,
+  onChange,
 }) => {
   return (
     <div className="space-y-2">
@@ -21,7 +22,8 @@ const SelectedField = ({
           className={`w-full h-10 border border-gray-400 rounded-lg pl-12 pr-10
                     appearance-none focus:outline-none
                     focus:ring-2 focus:ring-purple-500 ${bgColor}`}
-          placeholder={placeholder}
+          value={value}
+          onChange={onChange}
         >
           {options.map((option) => (
             <option key={option.value} value={option.value}>
