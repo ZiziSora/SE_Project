@@ -4,6 +4,48 @@ import InputField from "../components/InputField";
 import { Link } from "react-router-dom";
 
 const SignupPage = () => {
+  const [showPassword, setShowPassword] = useState(false);
+  const navigate = useNavigate();
+  const roleOptions = [
+    {
+      value: "student",
+      label: "Student",
+    },
+    {
+      value: "organizer",
+      label: "Organizer",
+    },
+  ];
+
+  const [formData, setFormData] = useState({
+    full_name: "",
+    email: "",
+    role: "student",
+    password: "",
+  });
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    if (!formData.full_name || !formData.email || !formData.password) {
+      toast.error("Please fill in all fields");
+      return;
+    }
+
+    try {
+      const result = await signup(formData);
+
+      console.log(result);
+
+      toast.success("Create account successfully!");
+      setTimeout(() => {
+        navigate("/login");
+      }, 2000);
+    } catch (error) {
+      console.log(error.response.data);
+      toast.error(error.response?.data?.detail || "Something went wrong");
+    }
+  };
   return (
     <div className="flex h-screen w-screen">
       <div
