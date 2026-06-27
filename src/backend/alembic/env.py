@@ -27,15 +27,7 @@ config.set_main_option(
 )
 
 from app.database import Base
-from app.models.user import User
-from app.models.checkin_qr import EventCheckinQR
-from app.models.event import Event
-from app.models.event_category import EventCategory
-from app.models.notfication import Notification
-from app.models.organizer_request import OrganizerRequest
-from app.models.registration import EventRegistration
-from app.models.saved_event import SavedEvent
-from app.models.waiting_list import WaitingList
+from app.models import User
 
 target_metadata = Base.metadata
 

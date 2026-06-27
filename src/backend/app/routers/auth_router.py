@@ -3,7 +3,7 @@ from fastapi.security import HTTPAuthorizationCredentials
 from app.database import supabase, get_db
 from app.core.auth import security
 from app.schemas.auth import LoginResponse, LoginRequest, SignUpRequest, SignUpResponse
-from backend.app.models.user import User
+from app.models import User
 from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
