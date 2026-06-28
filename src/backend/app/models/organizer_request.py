@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, ForeignKey, Enum
+from sqlalchemy import Column, String, ForeignKey, Enum, DateTime
 from sqlalchemy.dialects.postgresql import UUID
 
 from app.database import Base
@@ -16,3 +16,5 @@ class OrganizerRequest(Base):
     reviewed_by = Column(UUID(as_uuid=True),
         ForeignKey("users.user_id"),
         nullable=True)
+    create_at = Column(DateTime)
+    
