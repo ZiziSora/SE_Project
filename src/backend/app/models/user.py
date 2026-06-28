@@ -16,6 +16,7 @@ class User(Base):
     status = Column(Enum(UserStatus), default=UserStatus.PENDING.value)
     student_code = Column(String, unique=True)
     avatar_url = Column(String, nullable=True)
+    department_name = Column(String)
 
     organized_events = relationship(
         "Event",

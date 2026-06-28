@@ -20,7 +20,6 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     """Upgrade schema."""
-    # Tạo enum types trước khi dùng trong các cột (PostgreSQL yêu cầu)
     userstatus_enum = sa.Enum('pending', 'active', 'rejected', name='userstatus')
     userstatus_enum.create(op.get_bind(), checkfirst=True)
 

@@ -127,7 +127,7 @@ const LoginPage = () => {
             </div>
 
             <Link
-              to="/signup"
+              to="/auth/signup"
               className="border-purple-500 border-2 h-12 rounded-lg transition-all duration-200 hover:-translate-y-1 flex justify-center items-center mb-4"
             >
               <p className="text-purple-800 font-inter">Create an account</p>

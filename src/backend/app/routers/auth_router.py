@@ -31,6 +31,7 @@ def signup(data: SignUpRequest, db: Session = Depends(get_db)):
         user_id = supabase_user.id, 
         email = data.email, 
         full_name = data.full_name, 
+        department_name = data.department_name,
         role = data.role
     )
 
@@ -80,12 +81,8 @@ def login(body: LoginRequest):
 
 @router.post("/logout", summary="Log out", status_code=status.HTTP_204_NO_CONTENT)
 def logout(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    """
-    Đăng xuất người dùng hiện tại — thu hồi session trên Supabase.
-    Yêu cầu header: Authorization: Bearer <access_token>
-    """
+   
     try:
-        # Đặt session cho client với token của user, rồi sign out
         supabase.auth.sign_out()
     except Exception as e:
         raise HTTPException(

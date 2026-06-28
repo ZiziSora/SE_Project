@@ -11,7 +11,7 @@ const SelectedField = ({
 }) => {
   return (
     <div className="space-y-2">
-      <label htmlFor={id} className="font-inter text-gray-600">
+      <label htmlFor={id} className="font-inter text-gray-600 font-bold">
         {label}
       </label>
       <div className="relative">
@@ -19,15 +19,15 @@ const SelectedField = ({
 
         <select
           id={id}
-          className={`w-full h-10 border border-gray-400 rounded-lg pl-12 pr-10
-                    appearance-none focus:outline-none
-                    focus:ring-2 focus:ring-purple-500 ${bgColor}`}
+          className={`w-full h-10 text-gray-500 border border-gray-400 rounded-lg pl-12 pr-10
+                    appearance-none  ${bgColor}`}
           value={value}
           onChange={onChange}
         >
+          <option>Choose your option</option>
           {options.map((option) => (
-            <option key={option.value} value={option.value}>
-              {option.label}
+            <option key={option} value={option}>
+              {option}
             </option>
           ))}
         </select>

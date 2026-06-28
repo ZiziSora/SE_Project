@@ -4,7 +4,7 @@ import {
   Mail,
   Lock,
   GraduationCap,
-  BadgeCheck,
+  School,
 } from "lucide-react";
 import hcmus from "../assets/hcmus.png";
 import InputField from "../components/InputField";
@@ -16,21 +16,23 @@ import { toast } from "react-toastify";
 const SignupPage = () => {
   const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
-  const roleOptions = [
-    {
-      value: "student",
-      label: "Student",
-    },
-    {
-      value: "organizer",
-      label: "Organizer",
-    },
+  const departmentOptions = [
+    "Information Technology",
+    "Chemistry",
+    "Mathematics and Computer Science",
+    "Physics and Engineering Physics",
+    "Biology and Biotechnology",
+    "Environment",
+    "Geology",
+    "Materials Science and Technology",
+    "Electronics and Telecommunications",
+    "Interdisciplinary Science",
   ];
-
+ 
   const [formData, setFormData] = useState({
     full_name: "",
     email: "",
-    role: "",
+    role: localStorage.getItem("role") || "student",
     password: "",
   });
 
@@ -48,8 +50,9 @@ const SignupPage = () => {
       console.log(result);
 
       toast.success("Create account successfully!");
+      localStorage.removeItem("role");
       setTimeout(() => {
-        navigate("/login");
+        navigate("/auth/login");
       }, 2000);
     } catch (error) {
       console.log(error.response.data);
@@ -121,18 +124,11 @@ const SignupPage = () => {
             />
 
             <SelectedField
-              label="Role"
-              id="role"
-              icon={BadgeCheck}
-              options={roleOptions}
+              label="Department"
+              id="department"
+              icon={School}
+              options={departmentOptions}
               bgColor="bg-[#F8F9FF]"
-              value={formData.role}
-              onChange={(e) =>
-                setFormData({
-                  ...formData,
-                  role: e.target.value,
-                })
-              }
             />
 
             <InputField
@@ -165,7 +161,7 @@ const SignupPage = () => {
               <span>Already have an account?</span>
 
               <Link
-                to="/login"
+                to="/auth/login"
                 className="ml-1 text-[#630ED4] font-medium hover:underline transition-colors"
               >
                 Login
