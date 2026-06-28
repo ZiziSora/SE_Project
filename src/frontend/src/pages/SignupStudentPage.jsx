@@ -28,11 +28,12 @@ const SignupPage = () => {
     "Electronics and Telecommunications",
     "Interdisciplinary Science",
   ];
- 
+
   const [formData, setFormData] = useState({
     full_name: "",
     email: "",
     role: localStorage.getItem("role") || "student",
+    department_name: "",
     password: "",
   });
 
@@ -95,7 +96,7 @@ const SignupPage = () => {
           </p>
           <form className="space-y-4" onSubmit={handleSubmit}>
             <InputField
-              label="Full name"
+              label="Full name *"
               id="fullname"
               placeholder="Nguyen Van A"
               icon={User}
@@ -109,7 +110,7 @@ const SignupPage = () => {
             />
 
             <InputField
-              label="Email"
+              label="Email *"
               id="email"
               placeholder="abcd@gmail.com"
               icon={Mail}
@@ -123,16 +124,8 @@ const SignupPage = () => {
               }
             />
 
-            <SelectedField
-              label="Department"
-              id="department"
-              icon={School}
-              options={departmentOptions}
-              bgColor="bg-[#F8F9FF]"
-            />
-
             <InputField
-              label="Password"
+              label="Password *"
               id="password"
               placeholder="At least 6 characters"
               icon={Lock}
@@ -146,6 +139,20 @@ const SignupPage = () => {
               }
               showPassword={showPassword}
               setShowPassword={setShowPassword}
+            />
+
+            <SelectedField
+              label="Department"
+              id="department"
+              icon={School}
+              options={departmentOptions}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  department_name: e.target.value,
+                })
+              }
+              bgColor="bg-[#F8F9FF]"
             />
 
             <button

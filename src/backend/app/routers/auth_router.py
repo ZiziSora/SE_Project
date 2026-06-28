@@ -3,7 +3,8 @@ from fastapi.security import HTTPAuthorizationCredentials
 from app.database import supabase, get_db
 from app.core.auth import security
 from app.schemas.auth import LoginResponse, LoginRequest, SignUpRequest, SignUpResponse
-from app.models import User
+from app.models.user import User
+from app.models.enum import UserRole, UserStatus
 from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
@@ -32,7 +33,8 @@ def signup(data: SignUpRequest, db: Session = Depends(get_db)):
         email = data.email, 
         full_name = data.full_name, 
         department_name = data.department_name,
-        role = data.role
+        role = UserRole(data.role),
+        status = UserStatus.PENDING
     )
 
     try:

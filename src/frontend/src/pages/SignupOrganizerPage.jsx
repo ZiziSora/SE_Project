@@ -92,16 +92,13 @@ const SignupPage = () => {
         </div>
       </div>
 
-      {/* ── Right panel ── */}
       <div className="flex-1 bg-[#FAFAFA] min-h-screen flex items-center justify-center px-4 py-10 md:px-8 md:py-10">
         <div className="w-full max-w-lg">
-          {/* Mobile logo */}
           <div className="flex md:hidden flex-row gap-2 items-center text-[#630ED4] text-xl font-semibold mb-6">
             <Telescope className="size-6" />
             <span className="font-manrope font-bold">UniEvent</span>
           </div>
 
-          {/* Header */}
           <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-purple-700 bg-purple-100 rounded-full px-3 py-1 mb-3 md:hidden">
             <BadgeCheck className="size-3.5" />
             Organizer Account
@@ -115,14 +112,13 @@ const SignupPage = () => {
           </p>
 
           <form className="space-y-4" onSubmit={handleSubmit}>
-            {/* ── Section 1: Personal info ── */}
             <div>
               <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-3">
                 Personal Information
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <InputField
-                  label="Full name"
+                  label="Full name *"
                   id="fullname"
                   placeholder="Nguyen Van A"
                   icon={User}
@@ -132,7 +128,7 @@ const SignupPage = () => {
                   }
                 />
                 <InputField
-                  label="Email"
+                  label="Email *"
                   id="email"
                   placeholder="abcd@gmail.com"
                   icon={Mail}
@@ -145,7 +141,6 @@ const SignupPage = () => {
               </div>
             </div>
 
-            {/* ── Section 2: Account setup ── */}
             <div>
               <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-3">
                 Account Setup
@@ -159,7 +154,7 @@ const SignupPage = () => {
                   bgColor="bg-[#F8F9FF]"
                 />
                 <InputField
-                  label="Password"
+                  label="Password *"
                   id="password"
                   placeholder="At least 6 characters"
                   icon={Lock}
@@ -174,7 +169,6 @@ const SignupPage = () => {
               </div>
             </div>
 
-            {/* ── Section 3: Verification ── */}
             <div>
               <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-3">
                 Verification

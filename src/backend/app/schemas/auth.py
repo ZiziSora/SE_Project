@@ -1,4 +1,5 @@
 from pydantic import BaseModel, EmailStr
+from typing import Literal
 
 class LoginRequest(BaseModel):
     email: EmailStr
@@ -16,7 +17,8 @@ class SignUpRequest(BaseModel):
     email: EmailStr
     password: str
     full_name: str
-    role: str = "student"
+    role: Literal["student", "organizer", "admin"] = "student"
+    department_name: str = ""
 
 class SignUpResponse(BaseModel):
     message: str
