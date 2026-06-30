@@ -14,7 +14,7 @@ const LoginPage = () => {
     password: "",
   });
 
-  const [showPassword, setShowPassword] = useState(false)
+  const [showPassword, setShowPassword] = useState(false);
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -26,7 +26,8 @@ const LoginPage = () => {
     try {
       const result = await login(data);
 
-      console.log(result);
+      console.log(result); /* nho xoa */
+
       toast.success("Log in successfully");
 
       localStorage.setItem("access_token", result.access_token);
@@ -74,7 +75,10 @@ const LoginPage = () => {
             Sign in to your account
           </p>
 
-          <form className="w-full px-6 md:px-8 space-y-3" onSubmit={handleSubmit}>
+          <form
+            className="w-full px-6 md:px-8 space-y-3"
+            onSubmit={handleSubmit}
+          >
             <InputField
               label="Email"
               id="email"

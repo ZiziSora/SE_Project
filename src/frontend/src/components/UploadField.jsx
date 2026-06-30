@@ -1,25 +1,36 @@
 import { UploadCloud, X, FileText } from "lucide-react";
 import { useState } from "react";
 
-const UploadField = ({ label }) => {
+const UploadField = ({ label, onFilesChange }) => {
   const [files, setFiles] = useState([]);
 
   const handleUpload = (e) => {
     const selectedFiles = Array.from(e.target.files);
+
     if (selectedFiles.length === 0) return;
-    setFiles((prev) => [...prev, ...selectedFiles]);
+
+    const updatedFiles = [...files, ...selectedFiles];
+    setFiles(updatedFiles);
+
+    if (onFilesChange) {
+      onFilesChange(updatedFiles);
+    }
     e.target.value = "";
   };
 
   const handleRemove = (index) => {
-    setFiles((prev) => prev.filter((_, i) => i !== index));
+    const updatedFiles = files.filter((_, i) => i !== index);
+    setFiles(updatedFiles);
+
+    if (onFilesChange) {
+      onFilesChange(updatedFiles);
+    }
   };
 
   return (
     <div className="space-y-2">
       <label className="text-gray-500 font-bold font-inter">{label}</label>
 
-      {/* Drop zone — fixed height, never grows */}
       <label
         className="
           flex flex-col items-center justify-center
@@ -43,7 +54,6 @@ const UploadField = ({ label }) => {
         />
       </label>
 
-      {/* File list — fixed max-height with scroll so page never stretches */}
       {files.length > 0 && (
         <div className="max-h-32 overflow-y-auto space-y-1 pr-1">
           {files.map((file, index) => (
@@ -53,7 +63,9 @@ const UploadField = ({ label }) => {
             >
               <div className="flex items-center gap-2 min-w-0">
                 <FileText className="w-4 h-4 text-purple-500 shrink-0" />
-                <span className="text-sm text-gray-700 truncate">{file.name}</span>
+                <span className="text-sm text-gray-700 truncate">
+                  {file.name}
+                </span>
               </div>
               <button
                 type="button"

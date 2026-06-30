@@ -1,94 +1,30 @@
-from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi import APIRouter, status, Depends, Response, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials
-from app.database import supabase, get_db
+from app.database import get_db
 from app.core.auth import security
 from app.schemas.auth import LoginResponse, LoginRequest, SignUpRequest, SignUpResponse
-from app.models.user import User
-from app.models.enum import UserRole, UserStatus
 from sqlalchemy.orm import Session
-
+from app.services.auth_services import signup_student, signup_organizer, login_service, logout_service
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
 
 @router.post("/signup", response_model=SignUpResponse, summary="Sign up")
 def signup(data: SignUpRequest, db: Session = Depends(get_db)):
-    existing_user = (db.query(User)
-                     .filter(User.email == data.email)
-                     .first())
-    if existing_user: 
-        raise HTTPException(status_code=400, detail="Email already exists")
-    try:
-        response = supabase.auth.sign_up({
-        "email": data.email, 
-        "password": data.password
-        })
-    except Exception as e: 
-        raise HTTPException(status_code=400, detail=str(e))
-    if not response.user:
-        raise HTTPException(status_code=400, detail="Signup failed")
-    
-    supabase_user = response.user
-    user = User(
-        user_id = supabase_user.id, 
-        email = data.email, 
-        full_name = data.full_name, 
-        department_name = data.department_name,
-        role = UserRole(data.role),
-        status = UserStatus.PENDING
-    )
+    if data.role == "student":
+        return signup_student(data,db)
+    elif data.role == "organizer":
+        return signup_organizer(data,db)
+    else:
+        raise HTTPException(status_code=400, detail="Invalid role")
 
-    try:
-        db.add(user)
-        db.commit()
-    except Exception:
-        db.rollback()
-        raise
-    
-    db.refresh(user)
-
-    return {
-    "message": "Signup successful",
-    "user_id": str(user.user_id)
-    }
 
 @router.post("/login", response_model=LoginResponse, summary="Log in")
 def login(body: LoginRequest):
-    try:
-        response = supabase.auth.sign_in_with_password({
-            "email": body.email,
-            "password": body.password,
-        })
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Login failed: {str(e)}",
-        )
-
-    session = response.session
-    user = response.user
-
-    if session is None or user is None:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Email or password is incorrect.",
-        )
-
-    return LoginResponse(
-        access_token=session.access_token,
-        refresh_token=session.refresh_token,
-        user_id=str(user.id),
-        email=user.email,
-    )
+    return login_service(body)
 
 
 @router.post("/logout", summary="Log out", status_code=status.HTTP_204_NO_CONTENT)
 def logout(credentials: HTTPAuthorizationCredentials = Depends(security)):
-   
-    try:
-        supabase.auth.sign_out()
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Logout failed: {str(e)}",
-        )
-    # 204 No Content — không trả body
+    logout_service(credentials)
+    return Response(status_code=204)
+

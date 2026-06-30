@@ -17,6 +17,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { signup } from "../api/authApi";
 import { toast } from "react-toastify";
+import { supabase } from "../libs/supabaseClient";
 
 const SignupPage = () => {
   const [showPassword, setShowPassword] = useState(false);
@@ -41,19 +42,59 @@ const SignupPage = () => {
     email: "",
     role: localStorage.getItem("role") || "organizer",
     password: "",
+    department_name: "",
+    reason: "",
   });
+
+  const [selectedFiles, setSelectedFiles] = useState([]);
+
+  const handleFileUpload = async (files) => {
+    const uploadedUrls = [];
+    for (const file of files) {
+      const fileExt = file.name.split(".").pop();
+      const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+      const filePath = `proofs/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("organizer_proofs")
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from("organizer_proofs").getPublicUrl(filePath);
+
+      uploadedUrls.push(publicUrl);
+    }
+
+    return uploadedUrls;
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!formData.full_name || !formData.email || !formData.password) {
+    if (
+      !formData.full_name ||
+      !formData.email ||
+      !formData.password ||
+      !formData.reason
+    ) {
       toast.error("Please fill in all fields");
       return;
     }
 
     try {
       setLoading(true);
-      const result = await signup(formData);
+
+      let proofUrls = [];
+      if (selectedFiles.length > 0) {
+        proofUrls = await handleFileUpload(selectedFiles);
+      }
+
+      const payload = { ...formData, proof_urls: proofUrls };
+      const result = await signup(payload);
+
       console.log(result);
       toast.success("Create account successfully!");
       localStorage.removeItem("role");
@@ -75,7 +116,6 @@ const SignupPage = () => {
         <div className="absolute inset-0 bg-linear-to-t from-black/70 to-transparent" />
 
         <div className="absolute bottom-16 left-8 lg:bottom-30 lg:left-17 bg-white/70 backdrop-blur-sm rounded-xl shadow-md p-5 lg:p-6 max-w-xs lg:max-w-lg">
-          {/* Badge */}
           <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-purple-700 bg-purple-100 rounded-full px-3 py-1 mb-3">
             <BadgeCheck className="size-3.5" />
             Organizer Account
@@ -152,6 +192,12 @@ const SignupPage = () => {
                   icon={School}
                   options={departmentOptions}
                   bgColor="bg-[#F8F9FF]"
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      department_name: e.target.value,
+                    })
+                  }
                 />
                 <InputField
                   label="Password *"
@@ -181,11 +227,17 @@ const SignupPage = () => {
                   icon={SquarePen}
                   multiline
                   rows={3}
+                  onChange={(e) =>
+                    setFormData({ ...formData, reason: e.target.value })
+                  }
                 />
 
-                <UploadField label="Upload proof of affiliation" id="upload" />
+                <UploadField
+                  label="Upload proof of affiliation"
+                  id="upload"
+                  onFilesChange={(files) => setSelectedFiles(files)}
+                />
 
-                {/* Tip callout */}
                 <div className="flex items-start gap-2 bg-purple-50 border border-purple-200 rounded-lg px-3 py-2.5 text-xs text-purple-700">
                   <Info className="size-3.5 mt-0.5 shrink-0" />
                   <span>
@@ -196,11 +248,10 @@ const SignupPage = () => {
               </div>
             </div>
 
-            {/* ── Submit ── */}
             <button
               type="submit"
               disabled={loading}
-              className="w-full h-11 rounded-lg bg-gradient-to-r from-purple-700 to-purple-900
+              className="w-full h-11 rounded-lg bg-linear-to-r from-purple-700 to-purple-900
                 text-white font-semibold flex items-center justify-center gap-2
                 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-purple-200
                 disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:translate-y-0 mt-1"
