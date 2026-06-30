@@ -51,12 +51,11 @@ const LoginPage = () => {
 
         <div className="absolute bottom-16 left-10 lg:bottom-30 lg:left-17 text-white">
           <h1 className="text-3xl lg:text-5xl font-bold mb-4 font-manrope">
-            Structured Discovery
+            Khám phá thông minh
           </h1>
 
           <p className="text-base lg:text-xl max-w-md font-inter">
-            Unlock your university experience. Connect, participate, and lead
-            with UniEvent.
+            Kết nối với các câu lạc bộ, tham gia sự kiện và phát triển bản thân cùng UniEvent.
           </p>
         </div>
       </div>
@@ -67,12 +66,12 @@ const LoginPage = () => {
 
         <div className="bg-white shadow-xl w-full max-w-md rounded-2xl flex flex-col justify-center items-center relative z-10 py-10 px-2">
           <div className="flex flex-row gap-1 items-center text-[#630ED4] text-2xl font-semibold mb-2">
-            <GraduationCap />
-            <p className="font-manrope">UniEvent</p>
+            <GraduationCap className="h-7 w-7"/>
+            <p className="font-manrope font-bold text-3xl">UniEvent</p>
           </div>
 
           <p className="text-[#4A4455] text-sm font-inter mb-5">
-            Sign in to your account
+            Đăng nhập vào tài khoản
           </p>
 
           <form
@@ -95,10 +94,10 @@ const LoginPage = () => {
               }
             />
             <InputField
-              label="Password"
+              label="Mật khẩu"
               id="password"
               type={showPassword ? "text" : "password"}
-              placeholder="At least 6 characters"
+              placeholder="Gồm ít nhất 6 kí tự"
               bgColor="bg-white"
               icon={Lock}
               value={data.password}
@@ -113,7 +112,7 @@ const LoginPage = () => {
             />
             <div className="flex justify-end">
               <p className="font-inter text-sm text-purple-800 transition-all duration-200 hover:-translate-y-1 cursor-pointer">
-                Forgot password?
+                Quên mật khẩu?
               </p>
             </div>
 
@@ -121,12 +120,12 @@ const LoginPage = () => {
               type="submit"
               className="bg-purple-800 w-full h-12 rounded-lg hover:bg-purple-950 flex justify-center items-center transition-colors duration-200"
             >
-              <p className="text-white font-inter">Login</p>
+              <p className="text-white font-inter font-semibold">Đăng nhập</p>
             </button>
 
             <div className="flex items-center gap-3 my-4">
               <div className="flex-1 border-t border-gray-300"></div>
-              <p className="text-[#4A4455] text-sm">Or continue with</p>
+              <p className="text-[#4A4455] text-sm">Chưa có tài khoản?</p>
               <div className="flex-1 border-t border-gray-300"></div>
             </div>
 
@@ -134,7 +133,7 @@ const LoginPage = () => {
               to="/auth/signup"
               className="border-purple-500 border-2 h-12 rounded-lg transition-all duration-200 hover:-translate-y-1 flex justify-center items-center mb-4"
             >
-              <p className="text-purple-800 font-inter">Create an account</p>
+              <p className="text-purple-800 font-inter">Tạo tài khoản</p>
             </Link>
           </form>
         </div>

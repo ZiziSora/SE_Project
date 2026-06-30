@@ -5,28 +5,29 @@ import {
   Lock,
   GraduationCap,
   School,
+  ArrowRight,
 } from "lucide-react";
 import hcmus from "../assets/hcmus.png";
 import InputField from "../components/InputField";
 import SelectedField from "../components/SelectedField";
 import { Link, useNavigate } from "react-router-dom";
-import { useState } from "react";
+import { use, useState } from "react";
 import { signup } from "../api/authApi";
 import { toast } from "react-toastify";
 const SignupPage = () => {
   const [showPassword, setShowPassword] = useState(false);
   const navigate = useNavigate();
   const departmentOptions = [
-    "Information Technology",
-    "Chemistry",
-    "Mathematics and Computer Science",
-    "Physics and Engineering Physics",
-    "Biology and Biotechnology",
-    "Environment",
-    "Geology",
-    "Materials Science and Technology",
-    "Electronics and Telecommunications",
-    "Interdisciplinary Science",
+    "Công nghệ Thông tin",
+    "Hóa học",
+    "Toán - Tin học",
+    "Vật lý - Vật lý kỹ thuật",
+    "Sinh học và công nghệ sinh học",
+    "Môi trường",
+    "Địa chất",
+    "Khoa học và công nghệ vật liệu",
+    "Điện tử viễn thông",
+    "Khoa học liên ngành",
   ];
 
   const [formData, setFormData] = useState({
@@ -37,6 +38,8 @@ const SignupPage = () => {
     password: "",
   });
 
+  const [loading, isLoading] = useState(false);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -46,6 +49,7 @@ const SignupPage = () => {
     }
 
     try {
+      isLoading(true);
       const result = await signup(formData);
 
       console.log(result);
@@ -58,6 +62,8 @@ const SignupPage = () => {
     } catch (error) {
       console.log(error.response.data);
       toast.error(error.response?.data?.detail || "Something went wrong");
+    } finally {
+      isLoading(false);
     }
   };
   return (
@@ -74,8 +80,8 @@ const SignupPage = () => {
             <span>UniEvent</span>
           </div>
           <span className="text-gray-600 text-sm lg:text-base">
-            Structured Discovery for your academic journey. Connect with clubs,
-            manage schedules, and explore events tailored to your major.
+            Khám phá sự kiện theo cách thông minh hơn. Tìm kiếm, đăng ký và tham
+            gia các sự kiện phù hợp với sở thích và lĩnh vực học tập của bạn.
           </span>
         </div>
       </div>
@@ -87,16 +93,16 @@ const SignupPage = () => {
             <span className="font-manrope font-bold">UniEvent</span>
           </div>
 
-          <p className="text-2xl md:text-3xl font-bold font-manrope">
-            Create account
+          <p className="text-2xl md:text-4xl font-bold font-manrope">
+            Tạo tài khoản
           </p>
 
           <p className="text-[#4A4455] text-sm font-inter mt-2 mb-8">
-            Enter your details to get started
+            Điền thông tin bên dưới để tiếp tục
           </p>
           <form className="space-y-4" onSubmit={handleSubmit}>
             <InputField
-              label="Full name *"
+              label="Họ và tên *"
               id="fullname"
               placeholder="Nguyen Van A"
               icon={User}
@@ -125,7 +131,7 @@ const SignupPage = () => {
             />
 
             <InputField
-              label="Password *"
+              label="Mật khẩu *"
               id="password"
               placeholder="At least 6 characters"
               icon={Lock}
@@ -142,7 +148,7 @@ const SignupPage = () => {
             />
 
             <SelectedField
-              label="Department"
+              label="Khoa"
               id="department"
               icon={School}
               options={departmentOptions}
@@ -157,21 +163,33 @@ const SignupPage = () => {
 
             <button
               type="submit"
-              className="w-full h-12 rounded-lg bg-purple-800 text-white
-             transition-all duration-200 hover:-translate-y-1 hover:bg-purple-950
-             mt-8 md:mt-10"
+              disabled={loading}
+              className="w-full h-11 rounded-lg bg-linear-to-r from-purple-700 to-purple-900
+                text-white font-semibold flex items-center justify-center gap-2
+                transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-purple-200
+                disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:translate-y-0 mt-1"
             >
-              Create account
+              {loading ? (
+                <>
+                  <span className="size-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                  Creating account…
+                </>
+              ) : (
+                <>
+                  Tạo tài khoản
+                  <ArrowRight className="size-4" />
+                </>
+              )}
             </button>
 
             <div className="flex justify-center items-center mt-6 md:mt-8 text-gray-600">
-              <span>Already have an account?</span>
+              <span>Đã có tài khoản?</span>
 
               <Link
                 to="/auth/login"
                 className="ml-1 text-[#630ED4] font-medium hover:underline transition-colors"
               >
-                Login
+                Đăng nhập
               </Link>
             </div>
           </form>

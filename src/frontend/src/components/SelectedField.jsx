@@ -19,12 +19,12 @@ const SelectedField = ({
 
         <select
           id={id}
-          className={`w-full h-10 text-gray-500 border border-gray-400 rounded-lg pl-12 pr-10
+          className={`w-full h-12 text-gray-500 border border-gray-400 rounded-lg pl-12 pr-10
                     appearance-none  ${bgColor}`}
           value={value}
           onChange={onChange}
         >
-          <option>Choose your option</option>
+          <option>Chọn một tùy chọn</option>
           {options.map((option) => (
             <option key={option} value={option}>
               {option}

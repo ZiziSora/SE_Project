@@ -44,7 +44,7 @@ const UploadField = ({ label, onFilesChange }) => {
         "
       >
         <UploadCloud className="w-9 h-9 text-gray-400" />
-        <p className="mt-2 text-sm text-gray-500">Click or drag file here</p>
+        <p className="mt-2 text-sm text-gray-500">Nhấn vào đây để chọn tệp</p>
         <input
           type="file"
           accept="image/*,.pdf,.doc,.docx"

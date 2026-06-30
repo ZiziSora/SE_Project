@@ -25,16 +25,16 @@ const SignupPage = () => {
   const navigate = useNavigate();
 
   const departmentOptions = [
-    "Information Technology",
-    "Chemistry",
-    "Mathematics and Computer Science",
-    "Physics and Engineering Physics",
-    "Biology and Biotechnology",
-    "Environment",
-    "Geology",
-    "Materials Science and Technology",
-    "Electronics and Telecommunications",
-    "Interdisciplinary Science",
+    "Công nghệ Thông tin",
+    "Hóa học",
+    "Toán - Tin học",
+    "Vật lý - Vật lý kỹ thuật",
+    "Sinh học và công nghệ sinh học",
+    "Môi trường",
+    "Địa chất",
+    "Khoa học và công nghệ vật liệu",
+    "Điện tử viễn thông",
+    "Khoa học liên ngành",
   ];
 
   const [formData, setFormData] = useState({
@@ -116,18 +116,13 @@ const SignupPage = () => {
         <div className="absolute inset-0 bg-linear-to-t from-black/70 to-transparent" />
 
         <div className="absolute bottom-16 left-8 lg:bottom-30 lg:left-17 bg-white/70 backdrop-blur-sm rounded-xl shadow-md p-5 lg:p-6 max-w-xs lg:max-w-lg">
-          <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-purple-700 bg-purple-100 rounded-full px-3 py-1 mb-3">
-            <BadgeCheck className="size-3.5" />
-            Organizer Account
-          </span>
 
           <div className="flex flex-row gap-2 text-3xl lg:text-4xl items-center font-manrope text-purple-900 font-bold mb-3">
             <Telescope className="size-8 lg:size-10" />
             <span>UniEvent</span>
           </div>
           <span className="text-gray-600 text-sm lg:text-base">
-            Structured Discovery for your academic journey. Connect with clubs,
-            manage schedules, and explore events tailored to your major.
+            Khám phá sự kiện theo cách thông minh hơn. Tìm kiếm, đăng ký và tham gia các sự kiện phù hợp với sở thích và lĩnh vực học tập của bạn. 
           </span>
         </div>
       </div>
@@ -141,24 +136,24 @@ const SignupPage = () => {
 
           <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-purple-700 bg-purple-100 rounded-full px-3 py-1 mb-3 md:hidden">
             <BadgeCheck className="size-3.5" />
-            Organizer Account
+            Tài khoản ban tổ chức
           </span>
 
           <p className="text-2xl md:text-3xl font-bold font-manrope">
-            Create account
+            Tạo tài khoản
           </p>
           <p className="text-[#4A4455] text-sm font-inter mt-1 mb-5">
-            Fill in the details below to request organizer access
+            Điền thông tin bên dưới để gửi yêu cầu đăng ký quyền Ban tổ chức.
           </p>
 
           <form className="space-y-4" onSubmit={handleSubmit}>
             <div>
               <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-3">
-                Personal Information
+                Thông tin cơ bản
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <InputField
-                  label="Full name *"
+                  label="Họ và tên *"
                   id="fullname"
                   placeholder="Nguyen Van A"
                   icon={User}
@@ -182,12 +177,9 @@ const SignupPage = () => {
             </div>
 
             <div>
-              <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-3">
-                Account Setup
-              </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <SelectedField
-                  label="Department"
+                  label="Khoa"
                   id="department"
                   icon={School}
                   options={departmentOptions}
@@ -200,9 +192,9 @@ const SignupPage = () => {
                   }
                 />
                 <InputField
-                  label="Password *"
+                  label="Mật khẩu *"
                   id="password"
-                  placeholder="At least 6 characters"
+                  placeholder="Gồm ít nhất 6 kí tự"
                   icon={Lock}
                   type={showPassword ? "text" : "password"}
                   value={formData.password}
@@ -217,13 +209,13 @@ const SignupPage = () => {
 
             <div>
               <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 mb-3">
-                Verification
+                Thông tin xác minh
               </p>
               <div className="space-y-3">
                 <InputField
-                  label="Reason for organization access"
+                  label="Lý do đăng ký"
                   id="reason"
-                  placeholder="Describe your organization and why you need event creation permissions..."
+                  placeholder="Mô tả tổ chức của bạn và lý do đăng ký quyền tạo sự kiện..."
                   icon={SquarePen}
                   multiline
                   rows={3}
@@ -233,7 +225,7 @@ const SignupPage = () => {
                 />
 
                 <UploadField
-                  label="Upload proof of affiliation"
+                  label="Tài liệu minh chứng"
                   id="upload"
                   onFilesChange={(files) => setSelectedFiles(files)}
                 />
@@ -241,8 +233,7 @@ const SignupPage = () => {
                 <div className="flex items-start gap-2 bg-purple-50 border border-purple-200 rounded-lg px-3 py-2.5 text-xs text-purple-700">
                   <Info className="size-3.5 mt-0.5 shrink-0" />
                   <span>
-                    Your request will be reviewed by an admin. Please provide
-                    clear evidence of your affiliation for faster approval.
+                    Yêu cầu đăng ký của bạn sẽ được quản trị viên xem xét. Vui lòng đính kèm tài liệu minh chứng rõ ràng về đơn vị hoặc tổ chức mà bạn đại diện để hỗ trợ quá trình xét duyệt.
                   </span>
                 </div>
               </div>
@@ -263,19 +254,19 @@ const SignupPage = () => {
                 </>
               ) : (
                 <>
-                  Create account
+                  Tạo tài khoản
                   <ArrowRight className="size-4" />
                 </>
               )}
             </button>
 
             <div className="flex justify-center items-center mt-3 text-gray-600 text-sm">
-              <span>Already have an account?</span>
+              <span>Đã có tài khoản?</span>
               <Link
                 to="/auth/login"
                 className="ml-1 text-[#630ED4] font-semibold hover:underline transition-colors"
               >
-                Login
+                Đăng nhập
               </Link>
             </div>
           </form>
