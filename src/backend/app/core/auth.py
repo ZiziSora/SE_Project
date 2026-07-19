@@ -1,32 +1,88 @@
-from fastapi import Request, HTTPException, status, Depends
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-import jwt
-from app.database import SUPABASE_JWT_KEY
+from fastapi import Depends, HTTPException, Request, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy.orm import Session
+from supabase_auth.errors import AuthApiError
+
+from app.database import get_db, supabase
+from app.models.enum import UserRole, UserStatus
+from app.models.user import User
+
 
 security = HTTPBearer()
 
+
 async def auth_middleware(request: Request, call_next):
-    token = request.cookies.get('access_token')
-    if token and token.startswith('Bearer '):
-        token = token.split(' ')[1]
-        request.headers.__dict__['lists'].append(
-            (b"authorization", f"Bearer {token}".encode())
+    token = request.cookies.get("access_token")
+    if token and token.startswith("Bearer "):
+        request.headers.__dict__["lists"].append(
+            (b"authorization", token.encode())
         )
-    response = await call_next(request)
-    return response
+    return await call_next(request)
 
-def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
+
+def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: Session = Depends(get_db),
+) -> User:
     try:
-        token = credentials.credentials
-        if token.startswith('Bearer '):
-            token = token.split(' ')[1]
+        response = supabase.auth.get_user(credentials.credentials)
+    except AuthApiError as error:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired access token.",
+        ) from error
+    except Exception as error:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Authentication service is temporarily unavailable.",
+        ) from error
 
-        payload = jwt.decode(token, SUPABASE_JWT_KEY, algorithms=['HS256'], options={'verify_aud': False})
-        user_id = payload.get('sub')
-        if user_id is None: 
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='Invalid auth creds')
-    except jwt.ExpiredSignatureError:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='Token has expired')
-    except jwt.PyJWKError as e:     
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='Could not validate user')
+    auth_user = response.user if response else None
+    if auth_user is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired access token.",
+        )
 
+    db_user = (
+        db.query(User)
+        .filter(User.user_id == auth_user.id)
+        .first()
+    )
+    if db_user is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User profile does not exist.",
+        )
+
+    return db_user
+
+
+def require_approved_organizer(
+    user: User = Depends(get_current_user),
+) -> User:
+    if user.role != UserRole.ORGANIZER:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Organizer permission is required.",
+        )
+
+    if user.status != UserStatus.ACTIVE:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Organizer account is awaiting administrator approval.",
+        )
+
+    return user
+
+
+def require_admin(
+    user: User = Depends(get_current_user),
+) -> User:
+    if user.role != UserRole.ADMIN or user.status != UserStatus.ACTIVE:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Administrator permission is required.",
+        )
+
+    return user

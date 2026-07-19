@@ -199,7 +199,13 @@ def signup_organizer(data: OrganizerSignUpRequest, db: Session):
     try: 
         response = supabase.auth.sign_up({
             "email": data.email,
-            "password": data.password
+            "password": data.password,
+            "options": {
+                "email_redirect_to": "http://localhost:5173/auth/callback",
+                "data": {
+                    "role": UserRole.ORGANIZER.value,
+                },
+            },
         })
     except Exception as e: 
         raise HTTPException(status_code=400, detail=str(e))
@@ -321,7 +327,19 @@ def login_service(body: LoginRequest, db: Session):
             db.commit()
             db.refresh(db_user)
 
-    if db_user.status != UserStatus.ACTIVE:
+    if (
+        db_user.role == UserRole.ORGANIZER
+        and db_user.status == UserStatus.REJECTED
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Organizer account has been rejected.",
+        )
+
+    if (
+        db_user.role != UserRole.ORGANIZER
+        and db_user.status != UserStatus.ACTIVE
+    ):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Account is not active. Please verify your email or wait for approval.",
@@ -332,10 +350,16 @@ def login_service(body: LoginRequest, db: Session):
         refresh_token=session.refresh_token,
         user_id=str(user.id),
         email=user.email or email,
+        role=db_user.role.value,
+        status=db_user.status.value,
+        can_manage_events=(
+            db_user.role == UserRole.ORGANIZER
+            and db_user.status == UserStatus.ACTIVE
+        ),
     )
 
 
-def verify_student_email(
+def verify_email(
     credentials,
     db: Session,
 ) -> EmailVerificationResponse:
@@ -379,16 +403,11 @@ def verify_student_email(
             detail="User profile does not exist.",
         )
 
-    if db_user.role != UserRole.STUDENT:
+    if db_user.role not in {UserRole.STUDENT, UserRole.ORGANIZER}:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="This verification endpoint is only for student accounts.",
+            detail="This account does not use the signup email verification flow.",
         )
-
-    validate_student_identity(
-        email=auth_user.email,
-        db_user=db_user,
-    )
 
     if db_user.status == UserStatus.REJECTED:
         raise HTTPException(
@@ -396,13 +415,25 @@ def verify_student_email(
             detail="Account has been rejected.",
         )
 
-    if db_user.status != UserStatus.ACTIVE:
-        db_user.status = UserStatus.ACTIVE
-        db.commit()
-        db.refresh(db_user)
+    if db_user.role == UserRole.STUDENT:
+        validate_student_identity(
+            email=auth_user.email,
+            db_user=db_user,
+        )
+
+        if db_user.status != UserStatus.ACTIVE:
+            db_user.status = UserStatus.ACTIVE
+            db.commit()
+            db.refresh(db_user)
+
+        message = "Email verified and student account activated."
+    else:
+        message = (
+            "Email verified. The organizer account is pending administrator approval."
+        )
 
     return EmailVerificationResponse(
-        message="Email verified and student account activated.",
+        message=message,
         user_id=str(db_user.user_id),
     )
 

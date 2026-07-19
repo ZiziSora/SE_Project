@@ -13,6 +13,9 @@ class LoginResponse(BaseModel):
     token_type: str = "bearer"
     user_id: str
     email: str
+    role: Literal["student", "organizer", "admin"]
+    status: Literal["pending", "active", "rejected"]
+    can_manage_events: bool = False
 
 class StudentSignUpRequest(BaseModel):
     email: EmailStr

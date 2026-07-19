@@ -4,7 +4,7 @@ from app.database import get_db
 from app.core.auth import security
 from app.schemas.auth import EmailVerificationResponse, LoginResponse, LoginRequest, SignUpResponse, StudentSignUpRequest, OrganizerSignUpRequest
 from sqlalchemy.orm import Session
-from app.services.auth_services import signup_student, signup_organizer, login_service, logout_service, verify_student_email
+from app.services.auth_services import signup_student, signup_organizer, login_service, logout_service, verify_email
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -25,15 +25,15 @@ def login(body: LoginRequest, db: Session = Depends(get_db)):
 
 
 @router.post(
-    "/verify-email/student",
+    "/verify-email",
     response_model=EmailVerificationResponse,
-    summary="Activate a verified student account",
+    summary="Complete email verification",
 )
-def verify_student_email_route(
+def verify_email_route(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     db: Session = Depends(get_db),
 ):
-    return verify_student_email(credentials, db)
+    return verify_email(credentials, db)
 
 
 @router.post("/logout", summary="Log out", status_code=status.HTTP_204_NO_CONTENT)

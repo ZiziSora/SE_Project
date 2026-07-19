@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { GraduationCap } from "lucide-react";
 import { toast } from "react-toastify";
-import { verifyStudentEmail } from "../api/authApi";
+import { verifyEmail } from "../api/authApi";
 
 const AuthCallbackPage = () => {
   const navigate = useNavigate();
@@ -22,7 +22,7 @@ const AuthCallbackPage = () => {
       }
 
       try {
-        await verifyStudentEmail(accessToken);
+        await verifyEmail(accessToken);
 
         if (cancelled) return;
 

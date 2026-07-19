@@ -1,6 +1,8 @@
 from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.auth import get_current_user
+from app.models.enum import UserRole, UserStatus
+from app.models.user import User
 from app.routers.auth_router import router as auth_router
 
 app = FastAPI(title="Smart University Event Ecosystem API")
@@ -23,9 +25,14 @@ def read_root():
 
 
 @app.get("/me")
-def get_me(user: dict = Depends(get_current_user)):
+def get_me(user: User = Depends(get_current_user)):
     return {
-        "user_id": user.get("sub"),
-        "email": user.get("email"),
-        "role": user.get("role"),
+        "user_id": str(user.user_id),
+        "email": user.email,
+        "role": user.role.value,
+        "status": user.status.value if user.status else None,
+        "can_manage_events": (
+            user.role == UserRole.ORGANIZER
+            and user.status == UserStatus.ACTIVE
+        ),
     }

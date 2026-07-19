@@ -16,9 +16,9 @@ export const signupOrganizer = async (data) => {
     return response.data;
 }
 
-export const verifyStudentEmail = async (accessToken) => {
+export const verifyEmail = async (accessToken) => {
     const response = await api.post(
-        "/auth/verify-email/student",
+        "/auth/verify-email",
         {},
         {
             headers: {

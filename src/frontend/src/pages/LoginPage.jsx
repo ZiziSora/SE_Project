@@ -39,6 +39,12 @@ const LoginPage = () => {
 
       localStorage.setItem("access_token", result.access_token);
       localStorage.setItem("refresh_token", result.refresh_token);
+      localStorage.setItem("role", result.role);
+      localStorage.setItem("account_status", result.status);
+      localStorage.setItem(
+        "can_manage_events",
+        String(result.can_manage_events),
+      );
 
       setTimeout(() => {
         navigate("/landingPage");
