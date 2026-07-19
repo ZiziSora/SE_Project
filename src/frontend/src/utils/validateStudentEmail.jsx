@@ -8,7 +8,7 @@ export function validateStudentEmail(email) {
   if (parts.length !== 2) {
     return {
       valid: false,
-      message: "Invalid email format.",
+      message: "Định dạng email không hợp lệ.",
     };
   }
 
@@ -17,14 +17,14 @@ export function validateStudentEmail(email) {
   if (domain !== SCHOOL_DOMAIN) {
     return {
       valid: false,
-      message: `Please use your @${SCHOOL_DOMAIN} email.`,
+      message: `Vui lòng sử dụng email @${SCHOOL_DOMAIN}.`,
     };
   }
 
   if (!STUDENT_CODE_REGEX.test(studentCode)) {
     return {
       valid: false,
-      message: "Invalid student email format.",
+      message: "Định dạng email sinh viên không hợp lệ.",
     };
   }
 

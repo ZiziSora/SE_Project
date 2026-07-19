@@ -28,3 +28,23 @@ export const verifyEmail = async (accessToken) => {
     );
     return response.data;
 }
+
+
+export async function forgotPassword(email) {
+    try {
+        const response = await api.post(
+            "/auth/forgot-password",
+            {
+                email: email.trim().toLowerCase(),
+            }
+        );
+
+        return response.data;
+    } catch (error) {
+        throw new Error(
+            error.response?.data?.detail ||
+            "Không thể gửi email đặt lại mật khẩu.",
+            { cause: error },
+        );
+    }
+}

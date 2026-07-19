@@ -29,19 +29,19 @@ def get_current_user(
     except AuthApiError as error:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired access token.",
+            detail="Mã truy cập không hợp lệ hoặc đã hết hạn.",
         ) from error
     except Exception as error:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Authentication service is temporarily unavailable.",
+            detail="Dịch vụ xác thực đang tạm thời không khả dụng.",
         ) from error
 
     auth_user = response.user if response else None
     if auth_user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or expired access token.",
+            detail="Mã truy cập không hợp lệ hoặc đã hết hạn.",
         )
 
     db_user = (
@@ -52,7 +52,7 @@ def get_current_user(
     if db_user is None:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="User profile does not exist.",
+            detail="Hồ sơ người dùng không tồn tại.",
         )
 
     return db_user
@@ -64,13 +64,13 @@ def require_approved_organizer(
     if user.role != UserRole.ORGANIZER:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Organizer permission is required.",
+            detail="Bạn cần có quyền ban tổ chức.",
         )
 
     if user.status != UserStatus.ACTIVE:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Organizer account is awaiting administrator approval.",
+            detail="Tài khoản ban tổ chức đang chờ quản trị viên phê duyệt.",
         )
 
     return user
@@ -82,7 +82,7 @@ def require_admin(
     if user.role != UserRole.ADMIN or user.status != UserStatus.ACTIVE:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Administrator permission is required.",
+            detail="Bạn cần có quyền quản trị viên.",
         )
 
     return user

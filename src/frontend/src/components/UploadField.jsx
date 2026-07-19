@@ -71,7 +71,7 @@ const UploadField = ({ label, onFilesChange }) => {
                 type="button"
                 onClick={() => handleRemove(index)}
                 className="shrink-0 text-gray-400 hover:text-red-500 transition-colors"
-                aria-label="Remove file"
+                aria-label="Xóa tệp"
               >
                 <X className="w-4 h-4" />
               </button>

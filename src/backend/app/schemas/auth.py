@@ -45,3 +45,10 @@ class EmailVerificationResponse(BaseModel):
 class OrganizerRequestResponse(BaseModel):
     request_id: UUID
     status: str
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+class ForgotPasswordResponse(BaseModel):
+    message: str

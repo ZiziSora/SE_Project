@@ -11,7 +11,7 @@ const LoginPage = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const isVerified = searchParams.get("verified") === "true";
-
+  const isPasswordReset = searchParams.get("password_reset") === "success";
   const [data, setData] = useState({
     email: "",
     password: "",
@@ -24,7 +24,7 @@ const LoginPage = () => {
     e.preventDefault();
 
     if (!data.email || !data.password) {
-      toast.error("Please fill in all fields");
+      toast.error("Vui lòng nhập đầy đủ email và mật khẩu");
       return;
     }
 
@@ -35,7 +35,7 @@ const LoginPage = () => {
         email: data.email.trim().toLowerCase(),
       });
 
-      toast.success("Log in successfully");
+      toast.success("Đăng nhập thành công");
 
       localStorage.setItem("access_token", result.access_token);
       localStorage.setItem("refresh_token", result.refresh_token);
@@ -50,7 +50,7 @@ const LoginPage = () => {
         navigate("/landingPage");
       }, 2000);
     } catch (error) {
-      toast.error(error.response?.data?.detail || "Something went wrong");
+      toast.error(error.response?.data?.detail || "Đã xảy ra lỗi. Vui lòng thử lại");
     } finally {
       setLoading(false);
     }
@@ -70,7 +70,8 @@ const LoginPage = () => {
           </h1>
 
           <p className="text-base lg:text-xl max-w-md font-inter">
-            Kết nối với các câu lạc bộ, tham gia sự kiện và phát triển bản thân cùng UniEvent.
+            Kết nối với các câu lạc bộ, tham gia sự kiện và phát triển bản thân
+            cùng UniEvent.
           </p>
         </div>
       </div>
@@ -81,7 +82,7 @@ const LoginPage = () => {
 
         <div className="bg-white shadow-xl w-full max-w-md rounded-2xl flex flex-col justify-center items-center relative z-10 py-10 px-2">
           <div className="flex flex-row gap-1 items-center text-[#630ED4] text-2xl font-semibold mb-2">
-            <GraduationCap className="h-7 w-7"/>
+            <GraduationCap className="h-7 w-7" />
             <p className="font-manrope font-bold text-3xl">UniEvent</p>
           </div>
 
@@ -95,6 +96,15 @@ const LoginPage = () => {
               <CheckCircle className="size-4 text-green-600 mt-0.5 shrink-0" />
               <p className="text-sm text-green-700 font-medium">
                 Email đã được xác nhận! Hãy đăng nhập để tiếp tục.
+              </p>
+            </div>
+          )}
+
+          {isPasswordReset && (
+            <div className="mx-6 md:mx-8 mb-3 flex items-start gap-2 rounded-lg bg-green-50 border border-green-200 px-4 py-3">
+              <CheckCircle className="size-4 text-green-600 mt-0.5 shrink-0" />
+              <p className="text-sm text-green-700 font-medium">
+                Mật khẩu đã được cập nhật. Hãy đăng nhập bằng mật khẩu mới.
               </p>
             </div>
           )}
@@ -136,9 +146,11 @@ const LoginPage = () => {
               setShowPassword={setShowPassword}
             />
             <div className="flex justify-end">
-              <p className="font-inter text-sm text-purple-800 transition-all duration-200 hover:-translate-y-1 cursor-pointer">
-                Quên mật khẩu?
-              </p>
+              <Link to="/auth/forgot-password">
+                <p className="font-inter text-sm text-purple-800 transition-all duration-200 hover:-translate-y-1 cursor-pointer">
+                  Quên mật khẩu?
+                </p>
+              </Link>
             </div>
 
             <button

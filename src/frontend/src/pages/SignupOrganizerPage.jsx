@@ -21,6 +21,8 @@ import { supabase } from "../libs/supabaseClient";
 
 const SignupPage = () => {
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
@@ -78,9 +80,15 @@ const SignupPage = () => {
       !formData.full_name ||
       !formData.email ||
       !formData.password ||
+      !confirmPassword ||
       !formData.reason
     ) {
-      toast.error("Please fill in all fields");
+      toast.error("Vui lòng điền đầy đủ các trường bắt buộc");
+      return;
+    }
+
+    if (formData.password !== confirmPassword) {
+      toast.error("Mật khẩu xác nhận không khớp");
       return;
     }
 
@@ -96,12 +104,12 @@ const SignupPage = () => {
       const result = await signupOrganizer(payload);
 
       console.log(result);
-      toast.success("Create account successfully!");
+      toast.success("Đăng ký tài khoản thành công");
       localStorage.removeItem("role");
       setTimeout(() => navigate("/auth/login"), 2000);
     } catch (error) {
       console.log(error.response?.data);
-      toast.error(error.response?.data?.detail || "Something went wrong");
+      toast.error(error.response?.data?.detail || "Đã xảy ra lỗi. Vui lòng thử lại");
     } finally {
       setLoading(false);
     }
@@ -155,7 +163,7 @@ const SignupPage = () => {
                 <InputField
                   label="Họ và tên *"
                   id="fullname"
-                  placeholder="Nguyen Van A"
+                  placeholder="Nguyễn Văn A"
                   icon={User}
                   value={formData.full_name}
                   onChange={(e) =>
@@ -204,6 +212,17 @@ const SignupPage = () => {
                   showPassword={showPassword}
                   setShowPassword={setShowPassword}
                 />
+                <InputField
+                  label="Xác nhận mật khẩu *"
+                  id="confirm-password"
+                  placeholder="Nhập lại mật khẩu"
+                  icon={Lock}
+                  type={showConfirmPassword ? "text" : "password"}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  showPassword={showConfirmPassword}
+                  setShowPassword={setShowConfirmPassword}
+                />
               </div>
             </div>
 
@@ -250,7 +269,7 @@ const SignupPage = () => {
               {loading ? (
                 <>
                   <span className="size-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
-                  Creating account…
+                  Đang tạo tài khoản…
                 </>
               ) : (
                 <>

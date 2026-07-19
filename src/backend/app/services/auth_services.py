@@ -11,13 +11,20 @@ from app.schemas.auth import (
     LoginRequest,
     StudentSignUpRequest,
     OrganizerSignUpRequest,
+    ForgotPasswordRequest,
+    ForgotPasswordResponse
 )
 from sqlalchemy.orm import Session
 import uuid
 import re
+import os
+
 
 STUDENT_EMAIL_DOMAIN = "student.hcmus.edu.vn"
 STUDENT_CODE_PATTERN = re.compile(r"^\d{8}$")
+FRONTEND_URL = (
+    os.getenv("FRONTEND_URL") or "http://localhost:5173"
+).rstrip("/")
 
 def extract_student_code(email: str) -> str:
     normalized_email = email.strip().lower()
@@ -27,22 +34,22 @@ def extract_student_code(email: str) -> str:
     except ValueError:
         raise HTTPException(
             status_code=400,
-            detail="Invalid email format.",
+            detail="Định dạng email không hợp lệ.",
         )
 
     if domain != STUDENT_EMAIL_DOMAIN:
         raise HTTPException(
             status_code=400,
             detail=(
-                "Students must register using "
-                f"an @{STUDENT_EMAIL_DOMAIN} email."
+                "Sinh viên phải đăng ký bằng email "
+                f"@{STUDENT_EMAIL_DOMAIN}."
             ),
         )
 
     if not STUDENT_CODE_PATTERN.fullmatch(local_part):
         raise HTTPException(
             status_code=400,
-            detail="Invalid student email format.",
+            detail="Định dạng email sinh viên không hợp lệ.",
         )
 
     return local_part
@@ -59,7 +66,7 @@ def validate_student_identity(
     if db_user.student_code != extracted_code:
         raise HTTPException(
             status_code=403,
-            detail="Student account information is inconsistent.",
+            detail="Thông tin tài khoản sinh viên không nhất quán.",
         )
 
 
@@ -93,7 +100,7 @@ def signup_student(data: StudentSignUpRequest, db: Session):
     if existing_email:
         raise HTTPException(
             status_code=409,
-            detail="Email is already registered.",
+            detail="Email đã được đăng ký.",
         )
 
     existing_student_code = (
@@ -105,7 +112,7 @@ def signup_student(data: StudentSignUpRequest, db: Session):
     if existing_student_code:
         raise HTTPException(
             status_code=409,
-            detail="Student code is already registered.",
+            detail="Mã số sinh viên đã được đăng ký.",
         )
 
     try:
@@ -113,15 +120,15 @@ def signup_student(data: StudentSignUpRequest, db: Session):
     except Exception as error:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Unable to verify the authentication account. Please try again later.",
+            detail="Không thể kiểm tra tài khoản xác thực. Vui lòng thử lại sau.",
         ) from error
 
     if existing_auth_user:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=(
-                "Email is already registered in the authentication system. "
-                "Please verify the existing account or contact an administrator."
+                "Email đã tồn tại trong hệ thống xác thực. "
+                "Vui lòng xác minh tài khoản hiện có hoặc liên hệ quản trị viên."
             ),
         )
 
@@ -147,15 +154,15 @@ def signup_student(data: StudentSignUpRequest, db: Session):
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=(
-                "Registration timed out or the verification email could not be sent. "
-                "No active registration was kept; please try again later."
+                "Yêu cầu đăng ký đã hết thời gian chờ hoặc không thể gửi email xác minh. "
+                "Đăng ký chưa được lưu; vui lòng thử lại sau."
             ),
         ) from error
 
     if response.user is None:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail="Authentication service returned an invalid response.",
+            detail="Dịch vụ xác thực trả về dữ liệu không hợp lệ.",
         )
 
     supabase_user = response.user
@@ -181,11 +188,11 @@ def signup_student(data: StudentSignUpRequest, db: Session):
             pass
         raise HTTPException(
             status_code=500,
-            detail="Failed to save the student profile.",
+            detail="Không thể lưu hồ sơ sinh viên.",
         ) from error
 
     return {
-        "message": "Signup successful. Please check your email to verify your account.",
+        "message": "Đăng ký thành công. Vui lòng kiểm tra email để xác minh tài khoản.",
         "user_id": str(user.user_id)
     }
 
@@ -194,7 +201,7 @@ def signup_organizer(data: OrganizerSignUpRequest, db: Session):
                      .filter(User.email == data.email)
                      .first())
     if existing_user: 
-        raise HTTPException(status_code=400, detail="Email already exists")
+        raise HTTPException(status_code=400, detail="Email đã tồn tại.")
     
     try: 
         response = supabase.auth.sign_up({
@@ -207,10 +214,13 @@ def signup_organizer(data: OrganizerSignUpRequest, db: Session):
                 },
             },
         })
-    except Exception as e: 
-        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as error:
+        raise HTTPException(
+            status_code=400,
+            detail="Không thể tạo tài khoản ban tổ chức.",
+        ) from error
     if not response.user: 
-        raise HTTPException(status_code=400, detail="Cannot create account")
+        raise HTTPException(status_code=400, detail="Không thể tạo tài khoản.")
     
 
     supabase_user = response.user
@@ -247,12 +257,15 @@ def signup_organizer(data: OrganizerSignUpRequest, db: Session):
         db.commit()
         db.refresh(user)
 
-        return {"message": "Sign up successfully, please wait for approval", "user_id": str(supabase_user.id)}
-    except Exception as e: 
+        return {"message": "Đăng ký thành công. Vui lòng chờ quản trị viên phê duyệt.", "user_id": str(supabase_user.id)}
+    except Exception as error:
         db.rollback()
         supabase_admin.auth.admin.delete_user(supabase_user.id)
 
-        raise HTTPException(status_code=500, detail=f"Cannot complete sign up: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail="Không thể hoàn tất đăng ký tài khoản.",
+        ) from error
 
         
     
@@ -273,17 +286,17 @@ def login_service(body: LoginRequest, db: Session):
         if error.code == "email_not_confirmed":
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Email has not been verified. Please check your inbox.",
+                detail="Email chưa được xác minh. Vui lòng kiểm tra hộp thư.",
             ) from error
 
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Email or password is incorrect.",
+            detail="Email hoặc mật khẩu không chính xác.",
         ) from error
     except Exception as error:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Authentication service is temporarily unavailable.",
+            detail="Dịch vụ xác thực đang tạm thời không khả dụng.",
         ) from error
 
     session = response.session
@@ -292,7 +305,7 @@ def login_service(body: LoginRequest, db: Session):
     if session is None or user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Email or password is incorrect.",
+            detail="Email hoặc mật khẩu không chính xác.",
         )
 
     db_user = (
@@ -304,13 +317,13 @@ def login_service(body: LoginRequest, db: Session):
     if db_user is None:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="User profile does not exist.",
+            detail="Hồ sơ người dùng không tồn tại.",
         )
 
     if db_user.status is None:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Account status is not configured. Please contact an administrator.",
+            detail="Trạng thái tài khoản chưa được thiết lập. Vui lòng liên hệ quản trị viên.",
         )
 
     if db_user.role == UserRole.STUDENT:
@@ -333,7 +346,7 @@ def login_service(body: LoginRequest, db: Session):
     ):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Organizer account has been rejected.",
+            detail="Tài khoản ban tổ chức đã bị từ chối.",
         )
 
     if (
@@ -342,7 +355,7 @@ def login_service(body: LoginRequest, db: Session):
     ):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Account is not active. Please verify your email or wait for approval.",
+            detail="Tài khoản chưa hoạt động. Vui lòng xác minh email hoặc chờ phê duyệt.",
         )
 
     return LoginResponse(
@@ -370,25 +383,25 @@ def verify_email(
     except AuthApiError as error:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="The email verification link is invalid or has expired.",
+            detail="Liên kết xác minh email không hợp lệ hoặc đã hết hạn.",
         ) from error
     except Exception as error:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Authentication service is temporarily unavailable.",
+            detail="Dịch vụ xác thực đang tạm thời không khả dụng.",
         ) from error
 
     auth_user = response.user if response else None
     if auth_user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="The email verification link is invalid or has expired.",
+            detail="Liên kết xác minh email không hợp lệ hoặc đã hết hạn.",
         )
 
     if auth_user.email_confirmed_at is None:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Email has not been verified.",
+            detail="Email chưa được xác minh.",
         )
 
     db_user = (
@@ -400,19 +413,19 @@ def verify_email(
     if db_user is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="User profile does not exist.",
+            detail="Hồ sơ người dùng không tồn tại.",
         )
 
     if db_user.role not in {UserRole.STUDENT, UserRole.ORGANIZER}:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="This account does not use the signup email verification flow.",
+            detail="Tài khoản này không sử dụng quy trình xác minh email đăng ký.",
         )
 
     if db_user.status == UserStatus.REJECTED:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Account has been rejected.",
+            detail="Tài khoản đã bị từ chối.",
         )
 
     if db_user.role == UserRole.STUDENT:
@@ -426,10 +439,10 @@ def verify_email(
             db.commit()
             db.refresh(db_user)
 
-        message = "Email verified and student account activated."
+        message = "Email đã được xác minh và tài khoản sinh viên đã được kích hoạt."
     else:
         message = (
-            "Email verified. The organizer account is pending administrator approval."
+            "Email đã được xác minh. Tài khoản ban tổ chức đang chờ quản trị viên phê duyệt."
         )
 
     return EmailVerificationResponse(
@@ -438,11 +451,39 @@ def verify_email(
     )
 
 
-def logout_service(credentials):                        
+def logout_service(credentials):
     try:
         supabase.auth.sign_out()
-    except Exception as e:
+    except Exception as error:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Logout failed: {str(e)}",
+            detail="Đăng xuất không thành công.",
+        ) from error
+
+
+def forgot_password_service(body: ForgotPasswordRequest) -> ForgotPasswordResponse:
+    email = body.email.strip().lower()
+
+
+    try:
+        supabase.auth.reset_password_for_email(
+            email,
+            {
+                "redirect_to": (
+                    f"{FRONTEND_URL}/auth/reset-password"
+                )
+            },
+        )
+
+        return ForgotPasswordResponse(
+            message=(
+                "Nếu email này thuộc một tài khoản, "
+                "liên kết đặt lại mật khẩu đã được gửi."
+            )
+        )
+
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Không thể gửi email đặt lại mật khẩu.",
         )

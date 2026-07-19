@@ -6,7 +6,7 @@ const SelectedCard = ({ role }) => {
   const Icon = role.icon;
   const navigate = useNavigate();
 
-  const handleClick = (e) => {
+  const handleClick = () => {
     localStorage.setItem("role", role.roleValue);
     navigate(role.rolePath);
   };
@@ -14,7 +14,7 @@ const SelectedCard = ({ role }) => {
   return (
     <div
       className="w-99.25 h-38.25 border border-gray-200 shadow-xl rounded-lg mb-10 p-5 flex flex-row gap-4 hover:border-purple-600 hover:-translate-y-2 duration-200"
-      onClick={(e) => handleClick(e)}
+      onClick={handleClick}
     >
       <Icon className="bg-[#E5EEFF] w-8 h-8 p-1.5 rounded-md text-[#630ED4]" />
       <div className="flex flex-col">

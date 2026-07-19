@@ -5,7 +5,7 @@ from app.models.enum import UserRole, UserStatus
 from app.models.user import User
 from app.routers.auth_router import router as auth_router
 
-app = FastAPI(title="Smart University Event Ecosystem API")
+app = FastAPI(title="API Hệ sinh thái sự kiện đại học thông minh")
 
 app.add_middleware(
     CORSMiddleware,
@@ -21,7 +21,7 @@ app.include_router(auth_router)
 
 @app.get("/")
 def read_root():
-    return {"message": "Welcome to Smart University Event Ecosystem API"}
+    return {"message": "Chào mừng đến với API Hệ sinh thái sự kiện đại học thông minh"}
 
 
 @app.get("/me")

@@ -18,6 +18,8 @@ import { validateStudentEmail } from "../utils/validateStudentEmail";
 
 const SignupPage = () => {
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [emailSent, setEmailSent] = useState(false);
   const [registeredEmail, setRegisteredEmail] = useState("");
   const departmentOptions = [
@@ -46,8 +48,18 @@ const SignupPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    if (!formData.full_name || !formData.email || !formData.password) {
-      toast.error("Please fill in all fields");
+    if (
+      !formData.full_name ||
+      !formData.email ||
+      !formData.password ||
+      !confirmPassword
+    ) {
+      toast.error("Vui lòng điền đầy đủ các trường bắt buộc");
+      return;
+    }
+
+    if (formData.password !== confirmPassword) {
+      toast.error("Mật khẩu xác nhận không khớp");
       return;
     }
 
@@ -70,7 +82,7 @@ const SignupPage = () => {
       if (error.response?.status === 503) {
         setSubmissionBlocked(true);
       }
-      toast.error(error.response?.data?.detail || "Something went wrong");
+      toast.error(error.response?.data?.detail || "Đã xảy ra lỗi. Vui lòng thử lại");
     } finally {
       isLoading(false);
     }
@@ -118,7 +130,7 @@ const SignupPage = () => {
             <div className="mt-2 bg-purple-50 border border-purple-100 rounded-xl p-4 text-left w-full max-w-sm">
               <p className="text-xs text-purple-700 font-semibold mb-1">Lưu ý</p>
               <ul className="text-xs text-gray-600 space-y-1 list-disc list-inside">
-                <li>Kiểm tra thư mục <strong>Spam / Junk</strong> nếu không thấy email.</li>
+                <li>Kiểm tra thư mục <strong>Thư rác</strong> nếu không thấy email.</li>
                 <li>Link xác nhận có hiệu lực trong <strong>24 giờ</strong>.</li>
               </ul>
             </div>
@@ -173,7 +185,7 @@ const SignupPage = () => {
             <InputField
               label="Họ và tên *"
               id="fullname"
-              placeholder="Nguyen Van A"
+              placeholder="Nguyễn Văn A"
               icon={User}
               value={formData.full_name}
               onChange={(e) =>
@@ -202,7 +214,7 @@ const SignupPage = () => {
             <InputField
               label="Mật khẩu *"
               id="password"
-              placeholder="At least 6 characters"
+              placeholder="Gồm ít nhất 6 ký tự"
               icon={Lock}
               type={showPassword ? "text" : "password"}
               value={formData.password}
@@ -214,6 +226,18 @@ const SignupPage = () => {
               }
               showPassword={showPassword}
               setShowPassword={setShowPassword}
+            />
+
+            <InputField
+              label="Xác nhận mật khẩu *"
+              id="confirm-password"
+              placeholder="Nhập lại mật khẩu"
+              icon={Lock}
+              type={showConfirmPassword ? "text" : "password"}
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              showPassword={showConfirmPassword}
+              setShowPassword={setShowConfirmPassword}
             />
 
             <SelectedField
@@ -241,7 +265,7 @@ const SignupPage = () => {
               {loading ? (
                 <>
                   <span className="size-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
-                  Creating account…
+                  Đang tạo tài khoản…
                 </>
               ) : submissionBlocked ? (
                 "Vui lòng thử lại sau"

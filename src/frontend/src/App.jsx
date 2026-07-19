@@ -4,6 +4,8 @@ import SignupStudentPage from "./pages/SignupStudentPage.jsx";
 import SignupOrganizerPage from "./pages/SignupOrganizerPage.jsx";
 import SelectRolePage from "./pages/SelectRolePage.jsx";
 import AuthCallbackPage from "./pages/AuthCallbackPage.jsx";
+import ForgotPasswordPage from "./pages/ForgotPasswordPage.jsx";
+import ResetPasswordPage from "./pages/ResetPasswordPage.jsx";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
@@ -21,8 +23,8 @@ function App() {
             <Route path="organizer" element={<SignupOrganizerPage />} />
           </Route>
 
-          {/* <Route path="forgot-password" element={<ForgotPasswordPage />} />
-        <Route path="reset-password" element={<ResetPasswordPage />} /> */}
+          <Route path="forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="reset-password" element={<ResetPasswordPage />} />
         </Route>
       </Routes>
 
