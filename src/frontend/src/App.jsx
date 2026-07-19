@@ -3,6 +3,7 @@ import LoginPage from "./pages/LoginPage.jsx";
 import SignupStudentPage from "./pages/SignupStudentPage.jsx";
 import SignupOrganizerPage from "./pages/SignupOrganizerPage.jsx";
 import SelectRolePage from "./pages/SelectRolePage.jsx";
+import AuthCallbackPage from "./pages/AuthCallbackPage.jsx";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
@@ -12,6 +13,7 @@ function App() {
       <Routes>
         <Route path="/auth">
           <Route path="login" element={<LoginPage />} />
+          <Route path="callback" element={<AuthCallbackPage />} />
 
           <Route path="signup">
             <Route index element={<SelectRolePage />} />

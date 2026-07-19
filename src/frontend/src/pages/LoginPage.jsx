@@ -1,6 +1,6 @@
-import { GraduationCap } from "lucide-react";
+import { GraduationCap, CheckCircle } from "lucide-react";
 import hcmus from "../assets/hcmus.png";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { login } from "../api/authApi";
 import InputField from "../components/InputField";
 import { useState } from "react";
@@ -9,12 +9,17 @@ import { toast } from "react-toastify";
 
 const LoginPage = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const isVerified = searchParams.get("verified") === "true";
+
   const [data, setData] = useState({
     email: "",
     password: "",
   });
 
   const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -24,9 +29,11 @@ const LoginPage = () => {
     }
 
     try {
-      const result = await login(data);
-
-      console.log(result); /* nho xoa */
+      setLoading(true);
+      const result = await login({
+        ...data,
+        email: data.email.trim().toLowerCase(),
+      });
 
       toast.success("Log in successfully");
 
@@ -37,10 +44,12 @@ const LoginPage = () => {
         navigate("/landingPage");
       }, 2000);
     } catch (error) {
-      console.log(error.response.data);
       toast.error(error.response?.data?.detail || "Something went wrong");
+    } finally {
+      setLoading(false);
     }
   };
+
   return (
     <div className="flex min-h-screen w-screen">
       <div
@@ -73,6 +82,16 @@ const LoginPage = () => {
           <p className="text-[#4A4455] text-sm font-inter mb-5">
             Đăng nhập vào tài khoản
           </p>
+
+          {/* Banner xác nhận email thành công */}
+          {isVerified && (
+            <div className="mx-6 md:mx-8 mb-3 flex items-start gap-2 rounded-lg bg-green-50 border border-green-200 px-4 py-3">
+              <CheckCircle className="size-4 text-green-600 mt-0.5 shrink-0" />
+              <p className="text-sm text-green-700 font-medium">
+                Email đã được xác nhận! Hãy đăng nhập để tiếp tục.
+              </p>
+            </div>
+          )}
 
           <form
             className="w-full px-6 md:px-8 space-y-3"
@@ -118,9 +137,12 @@ const LoginPage = () => {
 
             <button
               type="submit"
-              className="bg-purple-800 w-full h-12 rounded-lg hover:bg-purple-950 flex justify-center items-center transition-colors duration-200"
+              disabled={loading}
+              className="bg-purple-800 w-full h-12 rounded-lg hover:bg-purple-950 flex justify-center items-center transition-colors duration-200 disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              <p className="text-white font-inter font-semibold">Đăng nhập</p>
+              <p className="text-white font-inter font-semibold">
+                {loading ? "Đang đăng nhập..." : "Đăng nhập"}
+              </p>
             </button>
 
             <div className="flex items-center gap-3 my-4">

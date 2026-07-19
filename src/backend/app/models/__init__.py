@@ -8,3 +8,4 @@ from .organizer_request_attachment import OrganizerRequestAttachment
 from .registration import EventRegistration
 from .saved_event import SavedEvent
 from .waiting_list import WaitingList
+from .organization_type import OrganizationType

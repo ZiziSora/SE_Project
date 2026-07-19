@@ -1,7 +1,6 @@
-from pydantic import BaseModel, EmailStr, Field
-from typing import Literal, List, Annotated, Union
+from pydantic import BaseModel, EmailStr
+from typing import Literal, List
 from uuid import UUID
-from datetime import datetime
 
 class LoginRequest(BaseModel):
     email: EmailStr
@@ -19,7 +18,6 @@ class StudentSignUpRequest(BaseModel):
     email: EmailStr
     password: str
     full_name: str
-    role: Literal["student"]
     department_name: str = ""
 
 class OrganizerSignUpRequest(BaseModel):
@@ -31,13 +29,12 @@ class OrganizerSignUpRequest(BaseModel):
     reason: str
     proof_urls : List[str]
 
-SignUpRequest = Annotated[
-    Union[StudentSignUpRequest, OrganizerSignUpRequest], 
-    Field(discriminator="role")
-]
-
-
 class SignUpResponse(BaseModel):
+    message: str
+    user_id: str
+
+
+class EmailVerificationResponse(BaseModel):
     message: str
     user_id: str
 
@@ -45,4 +42,3 @@ class SignUpResponse(BaseModel):
 class OrganizerRequestResponse(BaseModel):
     request_id: UUID
     status: str
-    

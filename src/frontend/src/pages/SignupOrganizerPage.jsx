@@ -15,7 +15,7 @@ import SelectedField from "../components/SelectedField";
 import UploadField from "../components/UploadField";
 import { Link, useNavigate } from "react-router-dom";
 import { useState } from "react";
-import { signup } from "../api/authApi";
+import { signupOrganizer } from "../api/authApi";
 import { toast } from "react-toastify";
 import { supabase } from "../libs/supabaseClient";
 
@@ -93,7 +93,7 @@ const SignupPage = () => {
       }
 
       const payload = { ...formData, proof_urls: proofUrls };
-      const result = await signup(payload);
+      const result = await signupOrganizer(payload);
 
       console.log(result);
       toast.success("Create account successfully!");
