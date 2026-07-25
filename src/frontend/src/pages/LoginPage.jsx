@@ -39,6 +39,8 @@ const LoginPage = () => {
 
       localStorage.setItem("access_token", result.access_token);
       localStorage.setItem("refresh_token", result.refresh_token);
+      localStorage.setItem("user_id", result.user_id);
+      localStorage.setItem("email", result.email);
       localStorage.setItem("role", result.role);
       localStorage.setItem("account_status", result.status);
       localStorage.setItem(
@@ -47,8 +49,12 @@ const LoginPage = () => {
       );
 
       setTimeout(() => {
+        if (result.role === "student" || result.role === "organizer") {
+          navigate(`/account/${result.role}/profile`);
+          return;
+        }
         navigate("/landingPage");
-      }, 2000);
+      }, 800);
     } catch (error) {
       toast.error(error.response?.data?.detail || "Đã xảy ra lỗi. Vui lòng thử lại");
     } finally {

@@ -14,6 +14,7 @@ class User(Base):
     full_name = Column(String)
     role = Column(SAEnum(UserRole, values_callable=lambda obj: [e.value for e in obj]), default=UserRole.STUDENT)
     status = Column(SAEnum(UserStatus, values_callable=lambda obj: [e.value for e in obj]), default=UserStatus.PENDING)
+    avatar_url = Column(String, nullable=True)
     student_code = Column(
         String,
         unique=True,
@@ -50,10 +51,6 @@ class User(Base):
         nullable=True,
     )
 
-    logo_url = Column(
-        String,
-        nullable=True,
-    )
 
     # Relationships
     organization_type = relationship(

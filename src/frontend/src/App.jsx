@@ -6,27 +6,36 @@ import SelectRolePage from "./pages/SelectRolePage.jsx";
 import AuthCallbackPage from "./pages/AuthCallbackPage.jsx";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage.jsx";
 import ResetPasswordPage from "./pages/ResetPasswordPage.jsx";
+import StudentProfile from "./pages/profile/StudentProfile.jsx";
+import OrganizerProfile from "./pages/profile/OrganizerProfile.jsx";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
 function App() {
   return (
     <BrowserRouter>
-      <Routes>
-        <Route path="/auth">
-          <Route path="login" element={<LoginPage />} />
-          <Route path="callback" element={<AuthCallbackPage />} />
+      <div className="bg-[#F8F9FF] min-h-screen">
+        <Routes>
+          <Route path="/auth">
+            <Route path="login" element={<LoginPage />} />
+            <Route path="callback" element={<AuthCallbackPage />} />
 
-          <Route path="signup">
-            <Route index element={<SelectRolePage />} />
-            <Route path="student" element={<SignupStudentPage />} />
-            <Route path="organizer" element={<SignupOrganizerPage />} />
+            <Route path="signup">
+              <Route index element={<SelectRolePage />} />
+              <Route path="student" element={<SignupStudentPage />} />
+              <Route path="organizer" element={<SignupOrganizerPage />} />
+            </Route>
+
+            <Route path="forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="reset-password" element={<ResetPasswordPage />} />
           </Route>
 
-          <Route path="forgot-password" element={<ForgotPasswordPage />} />
-          <Route path="reset-password" element={<ResetPasswordPage />} />
-        </Route>
-      </Routes>
+          <Route path="/account">
+            <Route path="student/profile" element={<StudentProfile />} />
+            <Route path="organizer/profile" element={<OrganizerProfile />} />
+          </Route>
+        </Routes>
+      </div>
 
       <ToastContainer position="top-right" autoClose={2000} theme="light" />
     </BrowserRouter>
