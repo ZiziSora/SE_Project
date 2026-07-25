@@ -5,6 +5,8 @@ import SideTabProfile from "../../components/SideTabProfile";
 import {
   changePassword,
   getMyProfile,
+  getOrganizationTypes,
+  updateMyProfile,
   uploadAvatar,
 } from "../../api/profileApi";
 
@@ -18,7 +20,7 @@ const studentInitialData = {
 
 const organizerInitialData = {
   organizationName: "",
-  organizationType: "",
+  organizationTypeId: "",
   email: "",
   phone: "",
   address: "",
@@ -208,19 +210,17 @@ const StudentProfileForm = ({ data, setData, avatarUrl, onAvatarUpdated }) => (
       </Field>
       <Field label="Mã sinh viên">
         <input
-          className={inputClass}
+          className={`${inputClass} cursor-not-allowed bg-[#f4f5f8] text-[#697386]`}
           value={data.studentId}
-          onChange={(event) =>
-            setData({ ...data, studentId: event.target.value })
-          }
+          readOnly
         />
       </Field>
       <Field label="Email">
         <input
-          className={inputClass}
+          className={`${inputClass} cursor-not-allowed bg-[#f4f5f8] text-[#697386]`}
           type="email"
           value={data.email}
-          onChange={(event) => setData({ ...data, email: event.target.value })}
+          readOnly
         />
       </Field>
       <Field label="Số điện thoại">
@@ -230,7 +230,7 @@ const StudentProfileForm = ({ data, setData, avatarUrl, onAvatarUpdated }) => (
           onChange={(event) => setData({ ...data, phone: event.target.value })}
         />
       </Field>
-      <Field label="Trường đại học" className="col-span-2 max-sm:col-span-1">
+      <Field label="Khoa/đơn vị" className="col-span-2 max-sm:col-span-1">
         <input
           className={inputClass}
           value={data.university}
@@ -243,7 +243,13 @@ const StudentProfileForm = ({ data, setData, avatarUrl, onAvatarUpdated }) => (
   </>
 );
 
-const OrganizerProfileForm = ({ data, setData, avatarUrl, onAvatarUpdated }) => (
+const OrganizerProfileForm = ({
+  data,
+  setData,
+  avatarUrl,
+  onAvatarUpdated,
+  organizationTypes,
+}) => (
   <>
     <CardTitle>Thông tin tổ chức</CardTitle>
     <UploadArea
@@ -265,15 +271,20 @@ const OrganizerProfileForm = ({ data, setData, avatarUrl, onAvatarUpdated }) => 
         <div className="relative">
           <select
             className={`${inputClass} appearance-none pr-10`}
-            value={data.organizationType}
+            value={data.organizationTypeId}
             onChange={(event) =>
-              setData({ ...data, organizationType: event.target.value })
+              setData({ ...data, organizationTypeId: event.target.value })
             }
           >
-            <option>Đoàn/Hội</option>
-            <option>Câu lạc bộ</option>
-            <option>Khoa/Bộ môn</option>
-            <option>Đơn vị đối tác</option>
+            <option value="">Chọn loại tổ chức</option>
+            {organizationTypes.map((organizationType) => (
+              <option
+                key={organizationType.organization_type_id}
+                value={organizationType.organization_type_id}
+              >
+                {organizationType.name}
+              </option>
+            ))}
           </select>
           <ChevronDown
             className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-[#69758a]"
@@ -283,10 +294,10 @@ const OrganizerProfileForm = ({ data, setData, avatarUrl, onAvatarUpdated }) => 
       </Field>
       <Field label="Email liên hệ">
         <input
-          className={inputClass}
+          className={`${inputClass} cursor-not-allowed bg-[#f4f5f8] text-[#697386]`}
           type="email"
           value={data.email}
-          onChange={(event) => setData({ ...data, email: event.target.value })}
+          readOnly
         />
       </Field>
       <Field label="Số điện thoại liên hệ">
@@ -376,7 +387,9 @@ const AccountProfilePage = ({ role, initialTab }) => {
   const [avatarUrl, setAvatarUrl] = useState("");
   const [isProfileLoading, setIsProfileLoading] = useState(true);
   const [profileError, setProfileError] = useState("");
+  const [organizationTypes, setOrganizationTypes] = useState([]);
   const [isPasswordUpdating, setIsPasswordUpdating] = useState(false);
+  const [isProfileUpdating, setIsProfileUpdating] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -391,7 +404,7 @@ const AccountProfilePage = ({ role, initialTab }) => {
         if (isOrganizer) {
           setProfileData({
             organizationName: profile.full_name || "",
-            organizationType: profile.organization_type || "",
+            organizationTypeId: profile.organization_type_id || "",
             email: profile.email || "",
             phone: profile.contact_phone || "",
             address: profile.office_address || "",
@@ -418,6 +431,31 @@ const AccountProfilePage = ({ role, initialTab }) => {
       .finally(() => {
         if (isMounted) {
           setIsProfileLoading(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isOrganizer]);
+
+  useEffect(() => {
+    if (!isOrganizer) return undefined;
+
+    let isMounted = true;
+
+    getOrganizationTypes()
+      .then((items) => {
+        if (isMounted) {
+          setOrganizationTypes(items);
+        }
+      })
+      .catch((error) => {
+        if (isMounted) {
+          toast.error(
+            error.response?.data?.detail ||
+              "Không thể tải danh sách loại tổ chức.",
+          );
         }
       });
 
@@ -470,9 +508,33 @@ const AccountProfilePage = ({ role, initialTab }) => {
       }
       return;
     }
-    toast.success(
-      isOrganizer ? "Đã lưu thông tin tổ chức." : "Đã lưu thông tin cá nhân.",
-    );
+    const displayName = isOrganizer
+      ? profileData.organizationName
+      : profileData.fullName;
+
+    if (!displayName.trim()) {
+      toast.error(
+        isOrganizer
+          ? "Tên tổ chức không được để trống."
+          : "Họ và tên không được để trống.",
+      );
+      return;
+    }
+
+    try {
+      setIsProfileUpdating(true);
+      const result = await updateMyProfile(role, profileData);
+      toast.success(
+        result.message || "Cập nhật thông tin tài khoản thành công.",
+      );
+    } catch (error) {
+      toast.error(
+        error.response?.data?.detail ||
+          "Không thể cập nhật thông tin tài khoản. Vui lòng thử lại.",
+      );
+    } finally {
+      setIsProfileUpdating(false);
+    }
   };
 
   const contentClass = isOrganizer
@@ -525,6 +587,7 @@ const AccountProfilePage = ({ role, initialTab }) => {
                   setData={setProfileData}
                   avatarUrl={avatarUrl}
                   onAvatarUpdated={setAvatarUrl}
+                  organizationTypes={organizationTypes}
                 />
               ) : (
                 <StudentProfileForm
@@ -543,7 +606,12 @@ const AccountProfilePage = ({ role, initialTab }) => {
               <button
                 className={`${activeTab === "security" ? "min-w-52" : "min-w-38"} h-10 cursor-pointer rounded-lg border-0 bg-linear-to-r from-[#7e38ee] to-[#6a0fdc] px-6 font-inter text-[13px] font-semibold tracking-wide text-white shadow-md hover:brightness-95 disabled:cursor-wait disabled:opacity-65 max-sm:w-full`}
                 type="submit"
-                disabled={activeTab === "security" && isPasswordUpdating}
+                disabled={
+                  isProfileLoading ||
+                  (activeTab === "security"
+                    ? isPasswordUpdating
+                    : isProfileUpdating)
+                }
               >
                 {activeTab === "security" ? (
                   isPasswordUpdating ? (
@@ -555,7 +623,14 @@ const AccountProfilePage = ({ role, initialTab }) => {
                     "Cập nhật mật khẩu"
                   )
                 ) : (
-                  "Lưu thay đổi"
+                  isProfileUpdating ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <LoaderCircle className="animate-spin" size={17} />
+                      Đang lưu...
+                    </span>
+                  ) : (
+                    "Lưu thay đổi"
+                  )
                 )}
               </button>
             </div>

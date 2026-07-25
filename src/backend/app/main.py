@@ -38,6 +38,7 @@ def get_me(user: User = Depends(get_current_user)):
         "avatar_url": get_avatar_url(user.avatar_url),
         "student_code": user.student_code,
         "department_name": user.department_name,
+        "organization_type_id": user.organization_type_id,
         "organization_type": (
             user.organization_type.name
             if user.organization_type

@@ -17,6 +17,23 @@ class ChangePasswordResponse(BaseModel):
     message: str
 
 
+class UpdateProfileRequest(BaseModel):
+    full_name: str
+    department_name: str | None = None
+    organization_type_id: UUID | None = None
+    contact_phone: str | None = None
+    office_address: str | None = None
+
+
+class UpdateProfileResponse(BaseModel):
+    message: str
+
+
+class OrganizationTypeResponse(BaseModel):
+    organization_type_id: UUID
+    name: str
+
+
 class UserProfileResponse(BaseModel):
     user_id: UUID
     full_name: str | None = None
@@ -26,6 +43,7 @@ class UserProfileResponse(BaseModel):
     avatar_url: str | None = None
     student_code: str | None = None
     department_name: str | None = None
+    organization_type_id: UUID | None = None
     organization_type: str | None = None
     contact_phone: str | None = None
     office_address: str | None = None

@@ -1,4 +1,5 @@
 import logging
+import re
 from io import BytesIO
 from uuid import uuid4
 
@@ -9,11 +10,16 @@ from sqlalchemy.orm import Session
 from supabase_auth.errors import AuthApiError
 
 from app.database import supabase, supabase_admin
+from app.models.enum import UserRole
+from app.models.organization_type import OrganizationType
 from app.models.user import User
 from app.schemas.profile import (
     AvatarUploadResponse,
     ChangePasswordRequest,
     ChangePasswordResponse,
+    OrganizationTypeResponse,
+    UpdateProfileRequest,
+    UpdateProfileResponse,
 )
 
 logger = logging.getLogger(__name__)
@@ -142,6 +148,118 @@ def get_avatar_url(avatar_path: str | None) -> str | None:
     )
 
 
+def update_profile_service(
+    body: UpdateProfileRequest,
+    current_user: User,
+    db: Session,
+) -> UpdateProfileResponse:
+    full_name = body.full_name.strip()
+    contact_phone = (body.contact_phone or "").strip()
+
+    if not full_name:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Tên hiển thị không được để trống.",
+        )
+
+    if len(full_name) > 200:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Tên hiển thị không được vượt quá 200 ký tự.",
+        )
+
+    if contact_phone and not re.fullmatch(
+        r"[0-9+().\-\s]{7,25}",
+        contact_phone,
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Số điện thoại không hợp lệ.",
+        )
+
+    try:
+        current_user.full_name = full_name
+        current_user.contact_phone = contact_phone or None
+
+        if current_user.role == UserRole.STUDENT:
+            department_name = (body.department_name or "").strip()
+            if len(department_name) > 200:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Tên khoa hoặc đơn vị không được vượt quá 200 ký tự.",
+                )
+            current_user.department_name = department_name or None
+
+        elif current_user.role == UserRole.ORGANIZER:
+            office_address = (body.office_address or "").strip()
+
+            if len(office_address) > 500:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Địa chỉ không được vượt quá 500 ký tự.",
+                )
+
+            current_user.office_address = office_address or None
+
+            if body.organization_type_id:
+                organization_type = (
+                    db.query(OrganizationType)
+                    .filter(
+                        OrganizationType.organization_type_id
+                        == body.organization_type_id
+                    )
+                    .first()
+                )
+                if organization_type is None:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="Loại tổ chức không tồn tại.",
+                    )
+                current_user.organization_type = organization_type
+            else:
+                current_user.organization_type = None
+
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Tài khoản này không thể cập nhật hồ sơ tại đây.",
+            )
+
+        db.commit()
+        db.refresh(current_user)
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as error:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Không thể cập nhật thông tin tài khoản.",
+        ) from error
+
+    return UpdateProfileResponse(
+        message="Cập nhật thông tin tài khoản thành công.",
+    )
+
+
+def list_organization_types_service(
+    db: Session,
+) -> list[OrganizationTypeResponse]:
+    organization_types = (
+        db.query(OrganizationType)
+        .order_by(OrganizationType.name.asc())
+        .all()
+    )
+
+    return [
+        OrganizationTypeResponse(
+            organization_type_id=item.organization_type_id,
+            name=item.name,
+        )
+        for item in organization_types
+    ]
+
+
 def change_password_service(
     body: ChangePasswordRequest,
     current_user: User,
@@ -156,10 +274,10 @@ def change_password_service(
             detail="Vui lòng nhập đầy đủ thông tin mật khẩu.",
         )
 
-    if len(body.new_password) < 6:
+    if len(body.new_password) < 8:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Mật khẩu mới cần có ít nhất 6 ký tự.",
+            detail="Mật khẩu mới cần có ít nhất 8 ký tự.",
         )
 
     if body.new_password != body.confirm_password:

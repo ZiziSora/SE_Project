@@ -5,6 +5,11 @@ export const getMyProfile = async () => {
   return response.data;
 };
 
+export const getOrganizationTypes = async () => {
+  const response = await api.get("/users/organization-types");
+  return response.data;
+};
+
 export const uploadAvatar = async (file) => {
   const formData = new FormData();
   formData.append("file", file);
@@ -21,5 +26,23 @@ export const changePassword = async (passwords) => {
     confirm_password: passwords.confirmPassword,
   });
 
+  return response.data;
+};
+
+export const updateMyProfile = async (role, profile) => {
+  const payload = {
+    full_name:
+      role === "organizer" ? profile.organizationName : profile.fullName,
+    contact_phone: profile.phone,
+  };
+
+  if (role === "organizer") {
+    payload.organization_type_id = profile.organizationTypeId || null;
+    payload.office_address = profile.address;
+  } else {
+    payload.department_name = profile.university;
+  }
+
+  const response = await api.put("/users/me/profile", payload);
   return response.data;
 };
