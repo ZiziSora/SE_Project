@@ -48,6 +48,7 @@ const LoginPage = () => {
         String(result.can_manage_events),
       );
 
+
       setTimeout(() => {
         if (result.role === "student" || result.role === "organizer") {
           navigate(`/account/${result.role}/profile`);
@@ -56,7 +57,9 @@ const LoginPage = () => {
         navigate("/landingPage");
       }, 800);
     } catch (error) {
-      toast.error(error.response?.data?.detail || "Đã xảy ra lỗi. Vui lòng thử lại");
+      toast.error(
+        error.response?.data?.detail || "Đã xảy ra lỗi. Vui lòng thử lại",
+      );
     } finally {
       setLoading(false);
     }

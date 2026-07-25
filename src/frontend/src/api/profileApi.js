@@ -13,3 +13,13 @@ export const uploadAvatar = async (file) => {
 
   return response.data;
 };
+
+export const changePassword = async (passwords) => {
+  const response = await api.put("/users/me/password", {
+    current_password: passwords.currentPassword,
+    new_password: passwords.newPassword,
+    confirm_password: passwords.confirmPassword,
+  });
+
+  return response.data;
+};

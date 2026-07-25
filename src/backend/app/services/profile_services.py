@@ -6,9 +6,15 @@ from fastapi import HTTPException, UploadFile, status
 from PIL import Image, UnidentifiedImageError
 from sqlalchemy.orm import Session
 
-from app.database import supabase
+from supabase_auth.errors import AuthApiError
+
+from app.database import supabase, supabase_admin
 from app.models.user import User
-from app.schemas.profile import AvatarUploadResponse
+from app.schemas.profile import (
+    AvatarUploadResponse,
+    ChangePasswordRequest,
+    ChangePasswordResponse,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -133,4 +139,75 @@ def get_avatar_url(avatar_path: str | None) -> str | None:
         supabase.storage
         .from_(AVATAR_BUCKET)
         .get_public_url(avatar_path)
+    )
+
+
+def change_password_service(
+    body: ChangePasswordRequest,
+    current_user: User,
+) -> ChangePasswordResponse:
+    if (
+        not body.current_password
+        or not body.new_password
+        or not body.confirm_password
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Vui lòng nhập đầy đủ thông tin mật khẩu.",
+        )
+
+    if len(body.new_password) < 6:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Mật khẩu mới cần có ít nhất 6 ký tự.",
+        )
+
+    if body.new_password != body.confirm_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Mật khẩu xác nhận chưa khớp.",
+        )
+
+    if body.current_password == body.new_password:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Mật khẩu mới phải khác mật khẩu hiện tại.",
+        )
+
+    try:
+        supabase.auth.sign_in_with_password(
+            {
+                "email": current_user.email,
+                "password": body.current_password,
+            }
+        )
+    except AuthApiError as error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Mật khẩu hiện tại không chính xác.",
+        ) from error
+    except Exception as error:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Không thể xác minh mật khẩu lúc này. Vui lòng thử lại.",
+        ) from error
+
+    try:
+        supabase_admin.auth.admin.update_user_by_id(
+            str(current_user.user_id),
+            {"password": body.new_password},
+        )
+    except AuthApiError as error:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Mật khẩu mới không đáp ứng yêu cầu bảo mật.",
+        ) from error
+    except Exception as error:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Không thể cập nhật mật khẩu lúc này. Vui lòng thử lại.",
+        ) from error
+
+    return ChangePasswordResponse(
+        message="Cập nhật mật khẩu thành công.",
     )

@@ -7,6 +7,16 @@ class AvatarUploadResponse(BaseModel):
     avatar_url: str
 
 
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+    confirm_password: str
+
+
+class ChangePasswordResponse(BaseModel):
+    message: str
+
+
 class UserProfileResponse(BaseModel):
     user_id: UUID
     full_name: str | None = None

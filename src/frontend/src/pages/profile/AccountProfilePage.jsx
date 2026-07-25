@@ -2,7 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import { ChevronDown, ImagePlus, LoaderCircle } from "lucide-react";
 import { toast } from "react-toastify";
 import SideTabProfile from "../../components/SideTabProfile";
-import { getMyProfile, uploadAvatar } from "../../api/profileApi";
+import {
+  changePassword,
+  getMyProfile,
+  uploadAvatar,
+} from "../../api/profileApi";
 
 const studentInitialData = {
   fullName: "",
@@ -365,13 +369,14 @@ const AccountProfilePage = ({ role, initialTab }) => {
     isOrganizer ? organizerInitialData : studentInitialData,
   );
   const [passwords, setPasswords] = useState({
-    currentPassword: "12345678",
-    newPassword: "12345678",
-    confirmPassword: "12345678",
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
   });
   const [avatarUrl, setAvatarUrl] = useState("");
   const [isProfileLoading, setIsProfileLoading] = useState(true);
   const [profileError, setProfileError] = useState("");
+  const [isPasswordUpdating, setIsPasswordUpdating] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -421,7 +426,7 @@ const AccountProfilePage = ({ role, initialTab }) => {
     };
   }, [isOrganizer]);
 
-  const handleSubmit = (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
     if (activeTab === "security") {
       if (
@@ -440,7 +445,29 @@ const AccountProfilePage = ({ role, initialTab }) => {
         toast.error("Mật khẩu xác nhận chưa khớp.");
         return;
       }
-      toast.success("Cập nhật mật khẩu thành công.");
+
+      if (passwords.currentPassword === passwords.newPassword) {
+        toast.error("Mật khẩu mới phải khác mật khẩu hiện tại.");
+        return;
+      }
+
+      try {
+        setIsPasswordUpdating(true);
+        const result = await changePassword(passwords);
+        setPasswords({
+          currentPassword: "",
+          newPassword: "",
+          confirmPassword: "",
+        });
+        toast.success(result.message || "Cập nhật mật khẩu thành công.");
+      } catch (error) {
+        toast.error(
+          error.response?.data?.detail ||
+            "Không thể cập nhật mật khẩu. Vui lòng thử lại.",
+        );
+      } finally {
+        setIsPasswordUpdating(false);
+      }
       return;
     }
     toast.success(
@@ -514,12 +541,22 @@ const AccountProfilePage = ({ role, initialTab }) => {
               className={`flex justify-end ${activeTab === "security" ? "mt-12 border-t border-[#d6cee3] pt-4" : "mt-8"}`}
             >
               <button
-                className={`${activeTab === "security" ? "min-w-52" : "min-w-38"} h-10 cursor-pointer rounded-lg border-0 bg-linear-to-r from-[#7e38ee] to-[#6a0fdc] px-6 font-inter text-[13px] font-semibold tracking-wide text-white shadow-md hover:brightness-95 max-sm:w-full`}
+                className={`${activeTab === "security" ? "min-w-52" : "min-w-38"} h-10 cursor-pointer rounded-lg border-0 bg-linear-to-r from-[#7e38ee] to-[#6a0fdc] px-6 font-inter text-[13px] font-semibold tracking-wide text-white shadow-md hover:brightness-95 disabled:cursor-wait disabled:opacity-65 max-sm:w-full`}
                 type="submit"
+                disabled={activeTab === "security" && isPasswordUpdating}
               >
-                {activeTab === "security"
-                  ? "Cập nhật mật khẩu"
-                  : "Lưu thay đổi"}
+                {activeTab === "security" ? (
+                  isPasswordUpdating ? (
+                    <span className="flex items-center justify-center gap-2">
+                      <LoaderCircle className="animate-spin" size={17} />
+                      Đang cập nhật...
+                    </span>
+                  ) : (
+                    "Cập nhật mật khẩu"
+                  )
+                ) : (
+                  "Lưu thay đổi"
+                )}
               </button>
             </div>
           </form>
