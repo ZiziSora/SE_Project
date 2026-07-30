@@ -3,48 +3,26 @@ import Header from './components/Header';
 import FilterBar from './components/FilterBar';
 import EventCard from './components/EventCard';
 import FloatingChatbox from './components/FloatingChatbox';
+import { Route, Routes, BrowserRouter } from "react-router-dom";
+import LoginPage from "./pages/LoginPage.jsx";
+import SignupStudentPage from "./pages/SignupStudentPage.jsx";
+import SignupOrganizerPage from "./pages/SignupOrganizerPage.jsx";
+import SelectRolePage from "./pages/SelectRolePage.jsx";
+import AuthCallbackPage from "./pages/AuthCallbackPage.jsx";
+import ForgotPasswordPage from "./pages/ForgotPasswordPage.jsx";
+import ResetPasswordPage from "./pages/ResetPasswordPage.jsx";
+import StudentProfile from "./pages/profile/StudentProfile.jsx";
+import OrganizerProfile from "./pages/profile/OrganizerProfile.jsx";
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
-// ─── Gợi ý cho bạn (Giữ nguyên phần cứng cố định nếu muốn) ─────────────────────
-const featuredEvents = [
-  {
-    id: 'f1',
-    image: 'https://picsum.photos/seed/physics-ai/600/400',
-    badgeText: '92% Match',
-    title: 'Vật lý lượng tử và ứng dụng trong công nghệ tương lai',
-    faculty: 'Khoa Vật lý',
-    date: '18/7/2024 • 08:00',
-    location: 'Sảnh I',
-    isFeatured: true,
-  },
-  {
-    id: 'f2',
-    image: 'https://picsum.photos/seed/biodiversity/600/400',
-    badgeText: 'High Demand',
-    title: 'Đa dạng sinh học và bảo tồn các loài nguy cấp tại Việt Nam',
-    faculty: 'Khoa Sinh học',
-    date: '7/10/2024 • 08:00',
-    location: 'Sảnh I',
-    isFeatured: true,
-  },
-  {
-    id: 'f3',
-    image: 'https://picsum.photos/seed/biotech/600/400',
-    badgeText: 'Based on your major',
-    title: 'Kỹ thuật nuôi cấy mô tế bào thực vật trong công nghệ sinh học',
-    faculty: 'CLB Công nghệ Sinh học',
-    date: '5/10/2024 • 08:00',
-    location: 'Sảnh I',
-    isFeatured: true,
-  },
-];
-
-export default function App() {
+// ─── Component Trang Khám Phá Sự Kiện (Student Explore Page) ─────────────────
+function ExploreEventsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedFaculty, setSelectedFaculty] = useState('Tất cả');
   const [selectedCategory, setSelectedCategory] = useState('Tất cả');
   const [sortOption, setSortOption] = useState('Mới nhất');
-  
-  // State lưu danh sách sự kiện lấy từ Backend
+
   const [events, setEvents] = useState([]);
   const [showMore, setShowMore] = useState(false);
 
@@ -63,10 +41,10 @@ export default function App() {
         const res = await fetch(`http://127.0.0.1:8000/api/events?${params.toString()}`, {
           signal: controller.signal,
         });
-        
+
         if (!res.ok) return;
         const data = await res.json();
-        
+
         if (data && data.events) {
           setEvents(data.events);
         }
@@ -82,16 +60,44 @@ export default function App() {
 
   const displayedEvents = showMore ? events : events.slice(0, 4);
 
+  // Dữ liệu gợi ý cố định
+  const featuredEvents = [
+    {
+      id: 'f1',
+      image: 'https://picsum.photos/seed/physics-ai/600/400',
+      badgeText: '92% Match',
+      title: 'Vật lý lượng tử và ứng dụng trong công nghệ tương lai',
+      faculty: 'Khoa Vật lý',
+      date: '18/7/2024 • 08:00',
+      location: 'Sảnh I',
+      isFeatured: true,
+    },
+    {
+      id: 'f2',
+      image: 'https://picsum.photos/seed/biodiversity/600/400',
+      badgeText: 'High Demand',
+      title: 'Đa dạng sinh học và bảo tồn các loài nguy cấp tại Việt Nam',
+      faculty: 'Khoa Sinh học',
+      date: '7/10/2024 • 08:00',
+      location: 'Sảnh I',
+      isFeatured: true,
+    },
+    {
+      id: 'f3',
+      image: 'https://picsum.photos/seed/biotech/600/400',
+      badgeText: 'Based on your major',
+      title: 'Kỹ thuật nuôi cấy mô tế bào thực vật trong công nghệ sinh học',
+      faculty: 'CLB Công nghệ Sinh học',
+      date: '5/10/2024 • 08:00',
+      location: 'Sảnh I',
+      isFeatured: true,
+    },
+  ];
+
   return (
     <div className="min-h-screen bg-white font-sans">
-
-      {/* ── Header ── */}
       <Header />
-
-      {/* ── Page content ── */}
       <main className="mx-auto px-6 py-8 space-y-7" style={{ maxWidth: '780px' }}>
-
-        {/* ── Hero Title ── */}
         <section id="hero-title" className="space-y-2 pt-1">
           <h1 className="text-3xl font-extrabold leading-tight" style={{ color: '#7C3AED' }}>
             Cập nhật sự kiện toàn trường
@@ -102,7 +108,6 @@ export default function App() {
           </p>
         </section>
 
-        {/* ── Gợi ý cho bạn ── */}
         <section
           id="featured-events"
           className="rounded-2xl p-5"
@@ -123,7 +128,6 @@ export default function App() {
           </div>
         </section>
 
-        {/* ── Filter Bar ── */}
         <FilterBar
           searchTerm={searchTerm}
           setSearchTerm={setSearchTerm}
@@ -135,7 +139,6 @@ export default function App() {
           setSortOption={setSortOption}
         />
 
-        {/* ── All Events (Render từ Backend) ── */}
         <section
           id="all-events"
           className="rounded-2xl p-5 bg-white"
@@ -147,15 +150,15 @@ export default function App() {
           <div className="grid grid-cols-4 gap-4">
             {displayedEvents.length > 0 ? (
               displayedEvents.map((event) => (
-                <EventCard 
-                  key={event.event_id || event.id} 
+                <EventCard
+                  key={event.event_id || event.id}
                   image={event.banner_url || 'https://picsum.photos/seed/default/600/400'}
                   title={event.title}
                   faculty={event.department_name || 'Đơn vị tổ chức'}
                   date={`${event.start_time || ''}`}
                   location={event.location}
                   badgeText={event.registered_count > 0 ? `${event.registered_count} đã đăng ký` : 'Mới'}
-                  {...event} 
+                  {...event}
                 />
               ))
             ) : (
@@ -179,12 +182,43 @@ export default function App() {
             </div>
           )}
         </section>
-
         <div className="h-20" />
       </main>
-
-      {/* ── Floating Chatbox ── */}
       <FloatingChatbox />
     </div>
+  );
+}
+
+// ─── Component App Chính chứa Router ──────────────────────────────────────────
+export default function App() {
+  return (
+    <BrowserRouter>
+      <div className="bg-[#F8F9FF] min-h-screen">
+        <Routes>
+          <Route path="/" element={<ExploreEventsPage />} />
+
+          <Route path="/auth">
+            <Route path="login" element={<LoginPage />} />
+            <Route path="callback" element={<AuthCallbackPage />} />
+
+            <Route path="signup">
+              <Route index element={<SelectRolePage />} />
+              <Route path="student" element={<SignupStudentPage />} />
+              <Route path="organizer" element={<SignupOrganizerPage />} />
+            </Route>
+
+            <Route path="forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="reset-password" element={<ResetPasswordPage />} />
+          </Route>
+
+          <Route path="/account">
+            <Route path="student/profile" element={<StudentProfile />} />
+            <Route path="organizer/profile" element={<OrganizerProfile />} />
+          </Route>
+        </Routes>
+      </div>
+
+      <ToastContainer position="top-right" autoClose={2000} theme="light" />
+    </BrowserRouter>
   );
 }
