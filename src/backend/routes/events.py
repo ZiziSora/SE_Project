@@ -15,6 +15,7 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 # Khởi tạo Router
 router = APIRouter(prefix="/api/events", tags=["Events"])
 
+@router.get('')
 @router.get('/')
 def get_events(
     search_term: Optional[str] = Query(None),
@@ -30,12 +31,22 @@ def get_events(
     if search_term:
         builder = builder.ilike('title', f"%{search_term}%")
 
-    # Step 3: category filter
+    # Step 3: category filter (Tuỳ chỉnh theo dạng số hoặc chữ của DB)
     if category and category != 'Tất cả':
-        builder = builder.eq('category_id', category)
+        category_map = {
+            'Học thuật': 1,
+            'Kỹ năng mềm': 2,
+            'Việc làm': 3,
+            'Văn hóa - Nghệ thuật': 4,
+            'Tình nguyện': 5,
+            'Khởi nghiệp': 6
+        }
+        cat_id = category_map.get(category)
+        if cat_id is not None:
+            builder = builder.eq('category_id', cat_id)
 
     resp = builder.execute()
-    events = resp.data if hasattr(resp, 'data') else resp.get('data', [])
+    events = resp.data if hasattr(resp, 'data') else (resp.get('data', []) if isinstance(resp, dict) else [])
 
     if not events:
         return {"events": []}
@@ -45,9 +56,12 @@ def get_events(
 
     if faculty and faculty != 'Tất cả' and organizer_ids:
         users_resp = supabase.table('users').select('user_id, department_name').in_('user_id', organizer_ids).execute()
-        users = users_resp.data if hasattr(users_resp, 'data') else users_resp.get('data', [])
-        id_to_dept = {u['user_id']: u.get('department_name') for u in users}
+        users = users_resp.data if hasattr(users_resp, 'data') else (users_resp.get('data', []) if isinstance(users_resp, dict) else [])
+        id_to_dept = {u['user_id']: u.get('department_name') for u in (users or [])}
         events = [e for e in events if id_to_dept.get(e.get('organizer_id')) == faculty]
+
+    if not events:
+        return {"events": []}
 
     # Step 5: get registration counts
     event_ids = [e.get('event_id') for e in events if e.get('event_id')]
@@ -55,10 +69,11 @@ def get_events(
     
     if event_ids:
         regs_resp = supabase.table('event_registrations').select('event_id').in_('event_id', event_ids).execute()
-        regs = regs_resp.data if hasattr(regs_resp, 'data') else regs_resp.get('data', [])
-        for r in regs:
+        regs = regs_resp.data if hasattr(regs_resp, 'data') else (regs_resp.get('data', []) if isinstance(regs_resp, dict) else [])
+        for r in (regs or []):
             eid = r.get('event_id')
-            registered_counts[eid] = registered_counts.get(eid, 0) + 1
+            if eid:
+                registered_counts[eid] = registered_counts.get(eid, 0) + 1
 
     # attach registered_count
     for e in events:
