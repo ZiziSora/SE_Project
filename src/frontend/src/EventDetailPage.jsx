@@ -58,9 +58,9 @@ function formatVietnameseTime(dateString) {
   try {
     const date = new Date(dateString);
     if (isNaN(date.getTime())) return "";
-    const hours = date.getHours();
+    const hours = date.getHours() % 12;
     const minutes = date.getMinutes().toString().padStart(2, "0");
-    const period = hours >= 12 ? "CHIỀU" : "SÁNG";
+    const period = date.getHours() >= 12 ? "CHIỀU" : "SÁNG";
     const formattedHours = hours.toString().padStart(2, "0");
     return `${formattedHours}:${minutes} ${period}`;
   } catch (err) {
@@ -187,15 +187,14 @@ function RegisterActionBar({
       {/* Dynamic Feedback Banner */}
       {feedback.message && (
         <div
-          className={`flex items-center gap-3 p-4 rounded-xl text-sm font-medium transition-all shadow-sm ${
-            feedback.type === "success"
-              ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
-              : feedback.type === "warning"
+          className={`flex items-center gap-3 p-4 rounded-xl text-sm font-medium transition-all shadow-sm ${feedback.type === "success"
+            ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
+            : feedback.type === "warning"
               ? "bg-amber-50 text-amber-900 border border-amber-200"
               : feedback.type === "info"
-              ? "bg-blue-50 text-blue-800 border border-blue-200"
-              : "bg-rose-50 text-rose-800 border border-rose-200"
-          }`}
+                ? "bg-blue-50 text-blue-800 border border-blue-200"
+                : "bg-rose-50 text-rose-800 border border-rose-200"
+            }`}
         >
           {feedback.type === "success" && (
             <CheckCircle2 className="w-5 h-5 shrink-0 text-emerald-600" />
@@ -247,15 +246,14 @@ function RegisterActionBar({
         <button
           onClick={onRegister}
           disabled={registered || registerLoading || isFull}
-          className={`font-bold text-[15px] rounded-xl px-8 py-3.5 transition-all flex items-center justify-center gap-2 shadow-sm ${
-            registered
-              ? "bg-emerald-600 text-white cursor-not-allowed"
-              : isFull
+          className={`font-bold text-[15px] rounded-xl px-8 py-3.5 transition-all flex items-center justify-center gap-2 shadow-sm ${registered
+            ? "bg-emerald-600 text-white cursor-not-allowed"
+            : isFull
               ? "bg-gray-300 text-gray-600 cursor-not-allowed"
               : registerLoading
-              ? "bg-purple-500 text-white cursor-wait opacity-90"
-              : "bg-purple-700 hover:bg-purple-800 text-white hover:shadow-md active:scale-[0.99]"
-          }`}
+                ? "bg-purple-500 text-white cursor-wait opacity-90"
+                : "bg-purple-700 hover:bg-purple-800 text-white hover:shadow-md active:scale-[0.99]"
+            }`}
         >
           {registerLoading ? (
             <>
@@ -506,44 +504,44 @@ export function EventDetailPage() {
   // Map dữ liệu linh hoạt từ đối tượng event (Supabase) vào mảng chi tiết UI
   const details = event
     ? [
-        {
-          icon: Calendar,
-          label: "Ngày & giờ bắt đầu",
-          value: formatVietnameseDate(event.start_time || event.start_date),
-          subValue: formatVietnameseTime(event.start_time || event.start_date),
-        },
-        {
-          icon: Calendar,
-          label: "Ngày & giờ kết thúc",
-          value: formatVietnameseDate(event.end_time || event.end_date),
-          subValue: formatVietnameseTime(event.end_time || event.end_date),
-        },
-        {
-          icon: Calendar,
-          label: "Hạn chót đăng ký",
-          value: formatVietnameseDate(
-            event.registration_deadline || event.deadline
-          ),
-          subValue: formatVietnameseTime(
-            event.registration_deadline || event.deadline
-          ),
-        },
-        {
-          icon: Users,
-          label: "Số lượng tham gia tối đa",
-          value: `${event.capacity || event.max_capacity || 0} Sinh viên`,
-        },
-        {
-          icon: MapPin,
-          label: "Địa điểm",
-          value: event.location || "Chưa cập nhật địa điểm",
-        },
-        {
-          icon: Tag,
-          label: "Lĩnh vực / Danh mục",
-          value: event.category || event.topic || "Công nghệ Thông tin",
-        },
-      ]
+      {
+        icon: Calendar,
+        label: "Ngày & giờ bắt đầu",
+        value: formatVietnameseDate(event.start_time || event.start_date),
+        subValue: formatVietnameseTime(event.start_time || event.start_date),
+      },
+      {
+        icon: Calendar,
+        label: "Ngày & giờ kết thúc",
+        value: formatVietnameseDate(event.end_time || event.end_date),
+        subValue: formatVietnameseTime(event.end_time || event.end_date),
+      },
+      {
+        icon: Calendar,
+        label: "Hạn chót đăng ký",
+        value: formatVietnameseDate(
+          event.registration_deadline || event.deadline
+        ),
+        subValue: formatVietnameseTime(
+          event.registration_deadline || event.deadline
+        ),
+      },
+      {
+        icon: Users,
+        label: "Số lượng tham gia tối đa",
+        value: `${event.capacity || event.max_capacity || 0} Sinh viên`,
+      },
+      {
+        icon: MapPin,
+        label: "Địa điểm",
+        value: event.location || "Chưa cập nhật địa điểm",
+      },
+      {
+        icon: Tag,
+        label: "Lĩnh vực / Danh mục",
+        value: event.category || event.topic || "Công nghệ Thông tin",
+      },
+    ]
     : [];
 
   const maxCapacity = event?.capacity || event?.max_capacity || 250;
