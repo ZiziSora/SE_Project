@@ -1,10 +1,20 @@
-import { StrictMode } from 'react'
-import { createRoot } from 'react-dom/client'
-import './index.css'
-import Event from './EventDetailPage.jsx'
+import React from "react"
+import ReactDOM from "react-dom/client"
+import Header from "./components/header.jsx"
+import MyEventsPage from "./MyEventsPage.jsx"
+import "./index.css"
 
-createRoot(document.getElementById('root')).render(
-  <StrictMode>
-    <Event />
-  </StrictMode>,
+function App() {
+  return (
+    <>
+      <Header />
+      <MyEventsPage />
+    </>
+  )
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>,
 )
