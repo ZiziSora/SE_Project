@@ -32,6 +32,15 @@ export default function App() {
             }
           />
 
+          <Route
+            path="/organizer"
+            element={
+              <ProtectedRoute allowedRole="organizer">
+                <OrganizerHomePage />
+              </ProtectedRoute>
+            }
+          />
+
           <Route path="/auth">
             <Route path="login" element={<LoginPage />} />
             <Route path="callback" element={<AuthCallbackPage />} />

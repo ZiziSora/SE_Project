@@ -1,56 +1,14 @@
-import { useState, useEffect } from 'react';
 import Header from '../components/Header';
 import FilterBar from '../components/FilterBar';
 import EventCard from '../components/EventCard';
+import { useEventFilter } from '../utils/useEventFilter';
 
 export default function OrganizerHomePage() {
-    const [searchTerm, setSearchTerm] = useState('');
-    const [selectedFaculty, setSelectedFaculty] = useState('Tất cả');
-    const [selectedCategory, setSelectedCategory] = useState('Tất cả');
-    const [sortOption, setSortOption] = useState('Mới nhất');
-
-    const [events, setEvents] = useState([]);
-    const [currentPage, setCurrentPage] = useState(1);
-    const [totalPages, setTotalPages] = useState(1);
-
-    // Gọi API lấy dữ liệu từ FastAPI
-    useEffect(() => {
-        const controller = new AbortController();
-
-        async function fetchEvents() {
-            try {
-                const params = new URLSearchParams();
-                if (searchTerm) params.append('search_term', searchTerm);
-                if (selectedFaculty) params.append('faculty', selectedFaculty);
-                if (selectedCategory) params.append('category', selectedCategory);
-                if (sortOption) params.append('sort_by', sortOption);
-                params.append('page', currentPage);
-                params.append('limit', 12);
-
-                const res = await fetch(`http://127.0.0.1:8000/api/events?${params.toString()}`, {
-                    signal: controller.signal,
-                });
-
-                if (!res.ok) return;
-                const data = await res.json();
-
-                if (data && data.events) {
-                    setEvents(data.events);
-                    setTotalPages(data.total_pages || 1);
-                }
-            } catch (err) {
-                if (err.name === 'AbortError') return;
-                console.error('Không thể kết nối đến Backend API:', err);
-            }
-        }
-
-        fetchEvents();
-        return () => controller.abort();
-    }, [searchTerm, selectedFaculty, selectedCategory, sortOption, currentPage]);
+    // Gọi custom hook để quản lý toàn bộ filter, phân trang và gọi API
+    const { filters, setters, events, totalPages } = useEventFilter();
 
     return (
         <div className="min-h-screen bg-white font-sans">
-            {/* 1. Gọi Header với role organizer để đổi menu */}
             <Header role="organizer" />
 
             <main className="mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6 sm:space-y-7 max-w-5xl">
@@ -59,21 +17,20 @@ export default function OrganizerHomePage() {
                         Cập nhật sự kiện toàn trường
                     </h1>
                     <p className="text-gray-500 text-sm leading-relaxed max-w-lg">
-                        Theo dõi và quản lý các hoạt động học thuật, hội thảo, và phong trào đang
-                        diễn ra tại các khoa và câu lạc bộ. Nắm bắt thông tin để điều phối hiệu quả.
+                        Theo dõi và quản lý các hoạt động học thuật, hội thảo, và phong trào đang diễn ra.
                     </p>
                 </section>
 
-                {/* Thanh lọc */}
+                {/* Thanh lọc liên kết trực tiếp với hook */}
                 <FilterBar
-                    searchTerm={searchTerm}
-                    setSearchTerm={setSearchTerm}
-                    selectedFaculty={selectedFaculty}
-                    setSelectedFaculty={setSelectedFaculty}
-                    selectedCategory={selectedCategory}
-                    setSelectedCategory={setSelectedCategory}
-                    sortOption={sortOption}
-                    setSortOption={setSortOption}
+                    searchTerm={filters.searchTerm}
+                    setSearchTerm={setters.setSearchTerm}
+                    selectedFaculty={filters.selectedFaculty}
+                    setSelectedFaculty={setters.setSelectedFaculty}
+                    selectedCategory={filters.selectedCategory}
+                    setSelectedCategory={setters.setSelectedCategory}
+                    sortOption={filters.sortOption}
+                    setSortOption={setters.setSortOption}
                 />
 
                 {/* Danh sách sự kiện */}
@@ -83,7 +40,7 @@ export default function OrganizerHomePage() {
                             events.map((event) => (
                                 <EventCard
                                     key={event.event_id || event.id}
-                                    role="organizer" /* 2. Truyền role organizer để ẩn nút Đăng ký */
+                                    role="organizer"
                                     image={event.banner_url || 'https://picsum.photos/seed/default/600/400'}
                                     title={event.title}
                                     faculty={event.department_name || 'Đơn vị tổ chức'}
@@ -104,18 +61,18 @@ export default function OrganizerHomePage() {
                     {totalPages > 1 && (
                         <div className="mt-8 flex justify-center items-center gap-4">
                             <button
-                                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                                disabled={currentPage === 1}
+                                onClick={() => setters.setCurrentPage(p => Math.max(1, p - 1))}
+                                disabled={filters.currentPage === 1}
                                 className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg disabled:opacity-50 cursor-pointer"
                             >
                                 Trang trước
                             </button>
                             <span className="text-sm text-gray-500 font-medium">
-                                Trang {currentPage} / {totalPages}
+                                Trang {filters.currentPage} / {totalPages}
                             </span>
                             <button
-                                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                                disabled={currentPage === totalPages}
+                                onClick={() => setters.setCurrentPage(p => Math.min(totalPages, p + 1))}
+                                disabled={filters.currentPage === totalPages}
                                 className="px-4 py-2 text-sm font-medium text-white bg-[#7C3AED] rounded-lg disabled:opacity-50 cursor-pointer"
                             >
                                 Trang sau
