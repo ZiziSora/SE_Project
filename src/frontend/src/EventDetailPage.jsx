@@ -5,281 +5,23 @@ import {
   Route,
   Navigate,
   useParams,
-  useNavigate,
 } from "react-router-dom";
 import Header from "./components/Header";
 import { supabase } from "./lib/supabase";
+import { Calendar, Users, MapPin, Tag, Loader2, AlertCircle, RotateCcw } from "lucide-react";
+import { EventPoster } from "./components/EventDetail/EventPoster";
+import { EventDetails } from "./components/EventDetail/EventDetails";
+import { EventDescription } from "./components/EventDetail/EventDescription";
+import { RegisterActionBar } from "./components/EventDetail/RegisterActionBar";
 import {
-  Calendar,
-  Users,
-  MapPin,
-  Tag,
-  ChevronRight,
-  Loader2,
-  AlertCircle,
-  CheckCircle2,
-  Info,
-  LogIn,
-  RotateCcw,
-} from "lucide-react";
-
-// Event ID mặc định hiển thị trên UniEvent
-const DEFAULT_EVENT_ID = "3ca6a6f4-39e3-4a97-aa87-0a0efac68562";
-const FALLBACK_POSTER_IMAGE =
-  "https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=1200&q=80";
+  DEFAULT_EVENT_ID,
+  FALLBACK_POSTER_IMAGE,
+  formatVietnameseDate,
+  formatVietnameseTime,
+} from "./components/EventDetail/eventDetailUtils";
 
 /* =========================================================
-   HÀM BỔ TRỢ: Định dạng Ngày & Giờ tiếng Việt (vi-VN)
-   ========================================================= */
-
-/**
- * Định dạng chuỗi ISO hoặc Date sang kiểu Ngày tiếng Việt (VD: "30 Tháng 5, 2026")
- */
-function formatVietnameseDate(dateString) {
-  if (!dateString) return "Chưa cập nhật";
-  try {
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) return String(dateString);
-    const day = date.getDate();
-    const month = date.getMonth() + 1;
-    const year = date.getFullYear();
-    return `${day} Tháng ${month}, ${year}`;
-  } catch (err) {
-    console.error("Lỗi định dạng ngày:", err);
-    return String(dateString);
-  }
-}
-
-/**
- * Định dạng giờ sang chuẩn tiếng Việt (VD: "13:30 CHIỀU" hoặc "09:00 SÁNG")
- */
-function formatVietnameseTime(dateString) {
-  if (!dateString) return "";
-  try {
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) return "";
-    const hours = date.getHours() % 12;
-    const minutes = date.getMinutes().toString().padStart(2, "0");
-    const period = date.getHours() >= 12 ? "CHIỀU" : "SÁNG";
-    const formattedHours = hours.toString().padStart(2, "0");
-    return `${formattedHours}:${minutes} ${period}`;
-  } catch (err) {
-    console.error("Lỗi định dạng giờ:", err);
-    return "";
-  }
-}
-
-/* =========================================================
-   1. EventPoster Component - Xử lý ảnh & Fallback chuẩn
-   ========================================================= */
-export function EventPoster({ imageUrl, banner_url, title, alt }) {
-  const posterSrc = imageUrl || banner_url;
-  const [imgSrc, setImgSrc] = useState(posterSrc);
-
-  useEffect(() => {
-    setImgSrc(posterSrc);
-  }, [posterSrc]);
-
-  return (
-    <div className="bg-[#EEE8F9] rounded-2xl p-5 flex justify-center mb-8 shadow-sm">
-      {imgSrc ? (
-        <img
-          src={imgSrc}
-          alt={title || alt || "Event Poster"}
-          className="w-full max-w-2xl rounded-xl object-cover shadow-md transition-all hover:shadow-lg aspect-[16/9]"
-          onError={(e) => {
-            console.warn("Poster image load failed, reverting to fallback:", imgSrc);
-            if (e.target.src !== FALLBACK_POSTER_IMAGE) {
-              e.target.onerror = null;
-              setImgSrc(FALLBACK_POSTER_IMAGE);
-            }
-          }}
-        />
-      ) : (
-        /* Khung hiển thị mặc định nếu chưa upload banner lên Supabase Storage */
-        <div className="w-full max-w-2xl h-64 md:h-80 rounded-xl bg-purple-100 border-2 border-dashed border-purple-300 flex flex-col items-center justify-center text-purple-600 p-6 text-center">
-          <svg
-            className="w-12 h-12 mb-2 opacity-60"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth="2"
-              d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2 2v12a2 2 0 002 2z"
-            />
-          </svg>
-          <p className="font-semibold text-sm">Chưa có Banner cho sự kiện này</p>
-          <p className="text-xs text-purple-400 mt-1">
-            Cập nhật link banner vào cột banner_url trên Supabase Storage bucket 'event-banners'
-          </p>
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* =========================================================
-   2. Reusable DetailItem
-   ========================================================= */
-function DetailItem({ icon: Icon, label, value, subValue }) {
-  return (
-    <div className="flex items-start gap-3.5">
-      <div className="w-9 h-9 rounded-full bg-purple-100 text-purple-700 flex items-center justify-center shrink-0">
-        <Icon size={16} />
-      </div>
-      <div>
-        <p className="text-[11px] font-bold tracking-wide text-gray-500 uppercase mb-1">
-          {label}
-        </p>
-        <p className="text-[15px] font-bold text-gray-900">{value}</p>
-        {subValue && (
-          <p className="text-[13px] text-gray-500 mt-0.5">{subValue}</p>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/* =========================================================
-   3. Event Details Grid Component
-   ========================================================= */
-function EventDetails({ details }) {
-  return (
-    <div className="bg-[#EEE8F9] rounded-2xl px-6 md:px-8 py-7 grid grid-cols-1 md:grid-cols-2 gap-x-14 gap-y-6 mb-6">
-      {details.map((item, i) => (
-        <DetailItem key={i} {...item} />
-      ))}
-    </div>
-  );
-}
-
-/* =========================================================
-   4. Event Description Component
-   ========================================================= */
-function EventDescription({ text }) {
-  return (
-    <div className="bg-[#EEE8F9] rounded-2xl px-6 md:px-8 py-7 text-[15px] leading-relaxed text-gray-700 mb-7 whitespace-pre-line">
-      {text}
-    </div>
-  );
-}
-
-/* =========================================================
-   5. Register Action Bar Component
-   ========================================================= */
-function RegisterActionBar({
-  maxCapacity = 250,
-  count = 0,
-  registered = false,
-  registerLoading = false,
-  dataLoading = false,
-  onRegister,
-  feedback = { type: null, message: "" },
-  user = null,
-}) {
-  const isFull = count >= maxCapacity;
-
-  return (
-    <div className="flex flex-col gap-4">
-      {/* Dynamic Feedback Banner */}
-      {feedback.message && (
-        <div
-          className={`flex items-center gap-3 p-4 rounded-xl text-sm font-medium transition-all shadow-sm ${feedback.type === "success"
-            ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
-            : feedback.type === "warning"
-              ? "bg-amber-50 text-amber-900 border border-amber-200"
-              : feedback.type === "info"
-                ? "bg-blue-50 text-blue-800 border border-blue-200"
-                : "bg-rose-50 text-rose-800 border border-rose-200"
-            }`}
-        >
-          {feedback.type === "success" && (
-            <CheckCircle2 className="w-5 h-5 shrink-0 text-emerald-600" />
-          )}
-          {feedback.type === "warning" && (
-            <LogIn className="w-5 h-5 shrink-0 text-amber-600" />
-          )}
-          {feedback.type === "info" && (
-            <Info className="w-5 h-5 shrink-0 text-blue-600" />
-          )}
-          {feedback.type === "error" && (
-            <AlertCircle className="w-5 h-5 shrink-0 text-rose-600" />
-          )}
-          <div className="flex-1">
-            <span>{feedback.message}</span>
-            {!user && feedback.type === "warning" && (
-              <span className="block text-xs mt-0.5 text-amber-700 font-normal">
-                Vui lòng đăng nhập tài khoản của bạn để tiến hành lưu đăng ký.
-              </span>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Action Controls */}
-      <div className="flex flex-col-reverse md:flex-row items-stretch md:items-center justify-end gap-4">
-        {/* Live Registration Counter */}
-        <div className="flex items-center gap-2 font-bold text-gray-900 text-[15px] justify-center md:justify-start bg-gray-100 md:bg-transparent py-2 px-4 rounded-lg md:p-0">
-          {dataLoading ? (
-            <span className="flex items-center gap-1.5 text-gray-500 font-normal">
-              <Loader2 className="w-4 h-4 animate-spin text-purple-600" /> Đang
-              tải lượt đăng ký...
-            </span>
-          ) : (
-            <>
-              <span
-                className={
-                  isFull ? "text-rose-600 font-extrabold" : "text-gray-900"
-                }
-              >
-                {count}/{maxCapacity}
-              </span>
-              <Users size={18} className="text-purple-700" />
-            </>
-          )}
-        </div>
-
-        {/* Register Button */}
-        <button
-          onClick={onRegister}
-          disabled={registered || registerLoading || isFull}
-          className={`font-bold text-[15px] rounded-xl px-8 py-3.5 transition-all flex items-center justify-center gap-2 shadow-sm ${registered
-            ? "bg-emerald-600 text-white cursor-not-allowed"
-            : isFull
-              ? "bg-gray-300 text-gray-600 cursor-not-allowed"
-              : registerLoading
-                ? "bg-purple-500 text-white cursor-wait opacity-90"
-                : "bg-purple-700 hover:bg-purple-800 text-white hover:shadow-md active:scale-[0.99]"
-            }`}
-        >
-          {registerLoading ? (
-            <>
-              <Loader2 className="w-4 h-4 animate-spin" />
-              <span>Đang xử lý...</span>
-            </>
-          ) : registered ? (
-            <>
-              <span>Đã đăng ký ✓</span>
-            </>
-          ) : isFull ? (
-            <span>Hết chỗ</span>
-          ) : (
-            <>
-              <span>Đăng kí ngay</span>
-              <ChevronRight size={16} />
-            </>
-          )}
-        </button>
-      </div>
-    </div>
-  );
-}
-
-/* =========================================================
-   6. EventDetailPage Component (Dynamic Page based on route /events/:eventId)
+   EventDetailPage Component (Dynamic Page based on route /events/:eventId)
    ========================================================= */
 export function EventDetailPage() {
   const { eventId } = useParams();
@@ -631,7 +373,7 @@ export function EventDetailPage() {
 export const EventRegistrationPage = EventDetailPage;
 
 /* =========================================================
-   7. Main App Entry Point with React Router v6
+   Main App Entry Point with React Router v6
    ========================================================= */
 export default function App() {
   return (
