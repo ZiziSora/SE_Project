@@ -1,20 +1,13 @@
 import React from "react"
 import ReactDOM from "react-dom/client"
-import Header from "./components/header.jsx"
-import MyEventsPage from "./MyEventsPage.jsx"
+import { BrowserRouter } from "react-router-dom"
+import App from "./App.jsx"
 import "./index.css"
-
-function App() {
-  return (
-    <>
-      <Header />
-      <MyEventsPage />
-    </>
-  )
-}
 
 ReactDOM.createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <App />
+    <BrowserRouter>
+      <App />
+    </BrowserRouter>
   </React.StrictMode>,
-)
+)

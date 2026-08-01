@@ -1,19 +1,21 @@
-// src/components/Header.jsx
+// src/components/header.jsx
 import React from 'react';
 import { Search, Bell } from 'lucide-react';
+import { Link, NavLink } from 'react-router-dom';
 
 export default function Header() {
   return (
-    <header className="w-full bg-[#f8f9ff] px-8 py-3 flex items-center justify-between sticky top-0 z-50 shadow-lg shadow-purple-950/20">      {/* Khối bên trái: Logo & Thanh tìm kiếm & Navigation */}
+    <header className="w-full bg-[#f8f9ff] px-8 py-3 flex items-center justify-between sticky top-0 z-50 shadow-lg shadow-purple-950/20">
+      {/* Khối bên trái: Logo & Thanh tìm kiếm & Navigation */}
       <div className="flex items-center space-x-8">
         {/* Logo */}
-        <a 
-          href="#" 
-          className="text-2xl font-black text-[#6c38cc] tracking-tight"
+        <Link 
+          to="/my-events" 
+          className="text-2xl font-black text-[#6c38cc] tracking-tight hover:opacity-90 transition-opacity"
           style={{ fontFamily: "'Manrope', sans-serif" }}
         >
           UniEvent
-        </a>
+        </Link>
 
         {/* Ô tìm kiếm */}
         <div className="relative flex items-center">
@@ -27,24 +29,36 @@ export default function Header() {
 
         {/* Menu điều hướng */}
         <nav className="flex items-center space-x-6 text-sm font-medium">
-          <a
-            href="#"
-            className="text-[#6c38cc] font-bold border-b-2 border-[#6c38cc] pb-0.5"
+          <NavLink
+            to="/explore"
+            className={({ isActive }) =>
+              isActive
+                ? "text-[#6c38cc] font-bold border-b-2 border-[#6c38cc] pb-0.5"
+                : "text-gray-600 hover:text-[#6c38cc] transition-colors"
+            }
           >
             Khám phá
-          </a>
-          <a
-            href="#"
-            className="text-gray-600 hover:text-[#6c38cc] transition-colors"
+          </NavLink>
+          <NavLink
+            to="/my-events"
+            className={({ isActive }) =>
+              isActive
+                ? "text-[#6c38cc] font-bold border-b-2 border-[#6c38cc] pb-0.5"
+                : "text-gray-600 hover:text-[#6c38cc] transition-colors"
+            }
           >
-            Sự kiện
-          </a>
-          <a
-            href="#"
-            className="text-gray-600 hover:text-[#6c38cc] transition-colors"
+            Sự kiện của tôi
+          </NavLink>
+          <NavLink
+            to="/history"
+            className={({ isActive }) =>
+              isActive
+                ? "text-[#6c38cc] font-bold border-b-2 border-[#6c38cc] pb-0.5"
+                : "text-gray-600 hover:text-[#6c38cc] transition-colors"
+            }
           >
             Lịch sử
-          </a>
+          </NavLink>
         </nav>
       </div>
 
@@ -62,4 +76,4 @@ export default function Header() {
       </div>
     </header>
   );
-}
+}
