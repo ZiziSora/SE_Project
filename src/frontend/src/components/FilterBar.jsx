@@ -10,11 +10,16 @@ export default function FilterBar({
 }) {
   const faculties = [
     'Tất cả',
-    'Khoa CNTT',
-    'Khoa Sinh học',
-    'Khoa Toán - Tin',
-    'Khoa Môi trường',
-    'Phòng Công tác SV',
+    'Toán – Tin học',
+    'Công nghệ Thông tin',
+    'Vật lý – Vật lý kỹ thuật',
+    'Hóa học',
+    'Sinh học – Công nghệ Sinh học',
+    'Môi trường',
+    'Địa chất',
+    'Khoa học và Công nghệ Vật liệu',
+    'Điện tử – Viễn thông',
+    'Khoa học Liên ngành',
   ];
 
   const categories = [
@@ -30,11 +35,11 @@ export default function FilterBar({
   const sorts = ['Mới nhất', 'Nổi nhất'];
 
   return (
-    <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-4">
-      <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+    <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-3 sm:p-4">
+      <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-center">
 
         {/* Search input — ~40% width */}
-        <div className="relative sm:w-2/5 w-full">
+        <div className="relative md:w-2/5 w-full">
           <span className="absolute inset-y-0 left-3 flex items-center text-gray-400 pointer-events-none">
             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
@@ -51,7 +56,7 @@ export default function FilterBar({
         </div>
 
         {/* Selects — fill remaining ~60% split into 3 */}
-        <div className="flex flex-col sm:flex-row gap-3 sm:flex-1">
+        <div className="flex flex-col sm:flex-row gap-3 md:flex-1">
           {/* Faculty */}
           <div className="relative flex-1">
             <select
@@ -62,7 +67,7 @@ export default function FilterBar({
             >
               {faculties.map((f) => (
                 <option key={f} value={f}>
-                  Khoa {f === 'Tất cả' ? '(Tất cả)' : f}
+                  {f}
                 </option>
               ))}
             </select>

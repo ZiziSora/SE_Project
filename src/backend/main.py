@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 # Import router từ file events.py
-from backend.routes.events import router as events_router
+from app.routers.events import router as events_router
 
 app = FastAPI()
 

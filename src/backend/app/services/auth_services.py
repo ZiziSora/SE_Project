@@ -215,15 +215,18 @@ def signup_organizer(data: OrganizerSignUpRequest, db: Session):
             },
         })
     except Exception as error:
+        # IN LỖI SUPABASE RA TERMINAL
+        print("LỖI SUPABASE AUTH:", str(error))
         raise HTTPException(
             status_code=400,
-            detail="Không thể tạo tài khoản ban tổ chức.",
+            detail=f"Lỗi Supabase: {str(error)}",
         ) from error
+
     if not response.user: 
         raise HTTPException(status_code=400, detail="Không thể tạo tài khoản.")
     
-
     supabase_user = response.user
+    
     try:
         user = User(
             user_id = supabase_user.id, 
@@ -235,7 +238,7 @@ def signup_organizer(data: OrganizerSignUpRequest, db: Session):
         )
 
         db.add(user)
-        db.flush()  # Đảm bảo user được ghi vào DB trước khi insert organizer_request
+        db.flush() 
 
         request = OrganizerRequest(
             user_id = supabase_user.id,
@@ -244,7 +247,7 @@ def signup_organizer(data: OrganizerSignUpRequest, db: Session):
         )
 
         db.add(request)
-        db.flush()  # Đảm bảo request_id được generate trước khi insert attachments
+        db.flush() 
 
         if data.proof_urls and len(data.proof_urls) > 0: 
             for url in data.proof_urls: 
@@ -258,15 +261,20 @@ def signup_organizer(data: OrganizerSignUpRequest, db: Session):
         db.refresh(user)
 
         return {"message": "Đăng ký thành công. Vui lòng chờ quản trị viên phê duyệt.", "user_id": str(supabase_user.id)}
+        
     except Exception as error:
         db.rollback()
-        supabase_admin.auth.admin.delete_user(supabase_user.id)
-
+        try:
+            supabase_admin.auth.admin.delete_user(supabase_user.id)
+        except Exception:
+            pass
+            
+        # IN LỖI DATABASE RA TERMINAL
+        print("LỖI DATABASE / TRANSACTION:", str(error))
         raise HTTPException(
             status_code=500,
-            detail="Không thể hoàn tất đăng ký tài khoản.",
+            detail=f"Lỗi Database: {str(error)}",
         ) from error
-
         
     
         

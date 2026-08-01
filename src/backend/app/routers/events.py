@@ -1,18 +1,7 @@
 from fastapi import APIRouter, Query
 from typing import Optional, Dict, Any
-from supabase import create_client
-from dotenv import load_dotenv
-import os
+from app.database import supabase
 
-load_dotenv()
-
-SUPABASE_URL = os.getenv('SUPABASE_URL')
-SUPABASE_KEY = os.getenv('SUPABASE_SERVICE_ROLE_KEY') or os.getenv('SUPABASE_SECRET_KEY') or os.getenv('SUPABASE_PUBLISHED_KEY')
-
-# Khởi tạo Supabase client
-supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-
-# Khởi tạo Router
 router = APIRouter(prefix="/api/events", tags=["Events"])
 
 @router.get('')
@@ -22,6 +11,8 @@ def get_events(
     faculty: Optional[str] = Query(None),
     category: Optional[str] = Query(None),
     sort_by: str = Query('Mới nhất'),
+    page: int = Query(1, ge=1, description="Trang hiện tại (bắt đầu từ 1)"),
+    limit: int = Query(10, ge=1, le=100, description="Số lượng sự kiện mỗi trang (tối đa 100)")
 ) -> Dict[str, Any]:
     
     # Step 1: base query for events
@@ -31,7 +22,7 @@ def get_events(
     if search_term:
         builder = builder.ilike('title', f"%{search_term}%")
 
-    # Step 3: category filter (Tuỳ chỉnh theo dạng số hoặc chữ của DB)
+    # Step 3: category filter
     if category and category != 'Tất cả':
         category_map = {
             'Học thuật': 1,
@@ -49,19 +40,38 @@ def get_events(
     events = resp.data if hasattr(resp, 'data') else (resp.get('data', []) if isinstance(resp, dict) else [])
 
     if not events:
-        return {"events": []}
+        return {
+            "total_items": 0,
+            "current_page": page,
+            "page_size": limit,
+            "total_pages": 0,
+            "events": []
+        }
 
-    # Step 4: faculty filter
+    # Step 4: faculty filter (Đã chuẩn hóa để không bị lỗi chữ hoa/thường/khoảng trắng)
     organizer_ids = list({e.get('organizer_id') for e in events if e.get('organizer_id')})
 
     if faculty and faculty != 'Tất cả' and organizer_ids:
         users_resp = supabase.table('users').select('user_id, department_name').in_('user_id', organizer_ids).execute()
         users = users_resp.data if hasattr(users_resp, 'data') else (users_resp.get('data', []) if isinstance(users_resp, dict) else [])
         id_to_dept = {u['user_id']: u.get('department_name') for u in (users or [])}
-        events = [e for e in events if id_to_dept.get(e.get('organizer_id')) == faculty]
+        
+        normalized_faculty = faculty.strip().lower()
+        filtered_events = []
+        for e in events:
+            dept_name = id_to_dept.get(e.get('organizer_id'))
+            if dept_name and dept_name.strip().lower() == normalized_faculty:
+                filtered_events.append(e)
+        events = filtered_events
 
     if not events:
-        return {"events": []}
+        return {
+            "total_items": 0,
+            "current_page": page,
+            "page_size": limit,
+            "total_pages": 0,
+            "events": []
+        }
 
     # Step 5: get registration counts
     event_ids = [e.get('event_id') for e in events if e.get('event_id')]
@@ -85,4 +95,16 @@ def get_events(
     else:
         events.sort(key=lambda x: x.get('created_at') or '', reverse=True)
 
-    return {"events": events}
+    # Step 7: Pagination (Đã đưa xuống cuối hàm để thực hiện cắt mảng chính xác)
+    total_events = len(events)
+    start_idx = (page - 1) * limit
+    end_idx = start_idx + limit
+    paginated_events = events[start_idx:end_idx]
+
+    return {
+        "total_items": total_events,
+        "current_page": page,
+        "page_size": limit,
+        "total_pages": (total_events + limit - 1) // limit if limit > 0 else 0,
+        "events": paginated_events
+    }

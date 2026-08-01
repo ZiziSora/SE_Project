@@ -1,4 +1,7 @@
-export default function EventCard({ image, badgeText, title, faculty, date, location, isFeatured }) {
+export default function EventCard({ image, badgeText, title, faculty, date, location, isFeatured, role = 'student' }) {
+  // Logic kiểm tra vai trò được đặt ngay đầu hàm
+  const isOrganizer = role === 'organizer';
+
   return (
     <div
       className={`
@@ -67,21 +70,25 @@ export default function EventCard({ image, badgeText, title, faculty, date, loca
           </div>
         </div>
 
-        {/* Action Buttons */}
+        {/* Action Buttons ĐÃ ĐƯỢC CHUẨN HÓA */}
         <div className="flex gap-2 mt-3">
           <button
-            className="flex-1 py-2 px-3 text-xs font-semibold rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition"
+            className={`py-2 px-3 text-xs font-semibold rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition ${isOrganizer ? 'w-full' : 'flex-1'}`}
           >
             Xem thông tin
           </button>
-          <button
-            className="flex-1 py-2 px-3 text-xs font-semibold rounded-lg text-white transition shadow-sm"
-            style={{ backgroundColor: '#7C3AED' }}
-            onMouseEnter={e => e.currentTarget.style.backgroundColor = '#6D28D9'}
-            onMouseLeave={e => e.currentTarget.style.backgroundColor = '#7C3AED'}
-          >
-            Đăng ký
-          </button>
+
+          {/* Nếu KHÔNG PHẢI organizer thì mới hiển thị nút Đăng Ký */}
+          {!isOrganizer && (
+            <button
+              className="flex-1 py-2 px-3 text-xs font-semibold rounded-lg text-white transition shadow-sm"
+              style={{ backgroundColor: '#7C3AED' }}
+              onMouseEnter={e => e.currentTarget.style.backgroundColor = '#6D28D9'}
+              onMouseLeave={e => e.currentTarget.style.backgroundColor = '#7C3AED'}
+            >
+              Đăng ký
+            </button>
+          )}
         </div>
       </div>
     </div>
