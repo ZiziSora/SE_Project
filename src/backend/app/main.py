@@ -1,8 +1,15 @@
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.core.auth import get_current_user
 from app.core.config import CORS_ORIGINS
+from app.models.enum import UserRole, UserStatus
+from app.models.user import User
+from app.routers.auth_router import router as auth_router
 from app.routers.events import router as events_router
+from app.routers.profile_router import router as user_router
+from app.schemas.profile import UserProfileResponse
+from app.services.profile_services import get_avatar_url
 
 app = FastAPI(title="Smart University Event Ecosystem API")
 
@@ -15,8 +22,34 @@ app.add_middleware(
 )
 
 app.include_router(events_router)
+app.include_router(auth_router)
+app.include_router(user_router)
 
 
 @app.get("/")
 def read_root():
     return {"message": "Welcome to Smart University Event Ecosystem API"}
+
+
+@app.get("/me", response_model=UserProfileResponse)
+def get_me(user: User = Depends(get_current_user)):
+    return {
+        "user_id": user.user_id,
+        "full_name": user.full_name,
+        "email": user.email,
+        "role": user.role.value,
+        "status": user.status.value if user.status else None,
+        "avatar_url": get_avatar_url(user.avatar_url),
+        "student_code": user.student_code,
+        "department_name": user.department_name,
+        "organization_type_id": user.organization_type_id,
+        "organization_type": (
+            user.organization_type.name if user.organization_type else None
+        ),
+        "contact_phone": user.contact_phone,
+        "office_address": user.office_address,
+        "organization_description": user.organization_description,
+        "can_manage_events": (
+            user.role == UserRole.ORGANIZER and user.status == UserStatus.ACTIVE
+        ),
+    }

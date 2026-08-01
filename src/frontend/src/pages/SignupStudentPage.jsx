@@ -1,0 +1,297 @@
+import {
+  Telescope,
+  User,
+  Mail,
+  Lock,
+  School,
+  ArrowRight,
+  MailCheck,
+} from "lucide-react";
+import hcmus from "../assets/hcmus.png";
+import InputField from "../components/InputField";
+import SelectedField from "../components/SelectedField";
+import { Link } from "react-router-dom";
+import { useState } from "react";
+import { signupStudent } from "../api/authApi";
+import { toast } from "react-toastify";
+import { validateStudentEmail } from "../utils/validateStudentEmail";
+
+const SignupPage = () => {
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [emailSent, setEmailSent] = useState(false);
+  const [registeredEmail, setRegisteredEmail] = useState("");
+  const departmentOptions = [
+    "Công nghệ Thông tin",
+    "Hóa học",
+    "Toán - Tin học",
+    "Vật lý - Vật lý kỹ thuật",
+    "Sinh học và công nghệ sinh học",
+    "Môi trường",
+    "Địa chất",
+    "Khoa học và công nghệ vật liệu",
+    "Điện tử viễn thông",
+    "Khoa học liên ngành",
+  ];
+
+  const [formData, setFormData] = useState({
+    full_name: "",
+    email: "",
+    department_name: "",
+    password: "",
+  });
+
+  const [loading, isLoading] = useState(false);
+  const [submissionBlocked, setSubmissionBlocked] = useState(false);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+
+    if (
+      !formData.full_name ||
+      !formData.email ||
+      !formData.password ||
+      !confirmPassword
+    ) {
+      toast.error("Vui lòng điền đầy đủ các trường bắt buộc");
+      return;
+    }
+
+    if (formData.password !== confirmPassword) {
+      toast.error("Mật khẩu xác nhận không khớp");
+      return;
+    }
+
+    const validation = validateStudentEmail(formData.email);
+    if (!validation.valid) {
+      toast.error(validation.message);
+      return;
+    }
+
+    try {
+      isLoading(true);
+      const normalizedEmail = formData.email.trim().toLowerCase();
+      await signupStudent({ ...formData, email: normalizedEmail });
+
+      setRegisteredEmail(normalizedEmail);
+      setEmailSent(true);
+      localStorage.removeItem("role");
+    } catch (error) {
+      console.log(error.response?.data);
+      if (error.response?.status === 503) {
+        setSubmissionBlocked(true);
+      }
+      toast.error(error.response?.data?.detail || "Đã xảy ra lỗi. Vui lòng thử lại");
+    } finally {
+      isLoading(false);
+    }
+  };
+
+  // Màn hình hiển thị sau khi gửi email xác nhận thành công
+  if (emailSent) {
+    return (
+      <div className="flex min-h-screen w-screen">
+        {/* Left panel */}
+        <div
+          className="hidden md:flex flex-1 relative bg-cover bg-center bg-no-repeat"
+          style={{ backgroundImage: `url(${hcmus})` }}
+        >
+          <div className="absolute inset-0 bg-linear-to-t from-black/70 to-transparent" />
+          <div className="absolute bottom-16 left-8 lg:bottom-30 lg:left-17 bg-white/70 rounded-lg shadow-sm p-5 lg:p-6 max-w-xs lg:max-w-lg">
+            <div className="flex flex-row gap-2 text-3xl lg:text-4xl items-center font-manrope text-purple-900 font-bold mb-4">
+              <Telescope className="size-8 lg:size-10" />
+              <span>UniEvent</span>
+            </div>
+            <span className="text-gray-600 text-sm lg:text-base">
+              Khám phá sự kiện theo cách thông minh hơn. Tìm kiếm, đăng ký và tham
+              gia các sự kiện phù hợp với sở thích và lĩnh vực học tập của bạn.
+            </span>
+          </div>
+        </div>
+
+        <div className="flex-1 bg-white min-h-screen flex items-center justify-center px-4 py-10 md:px-6 md:py-0">
+          <div className="w-full max-w-md flex flex-col items-center text-center gap-4">
+            {/* Icon */}
+            <div className="w-20 h-20 rounded-full bg-purple-100 flex items-center justify-center mb-2">
+              <MailCheck className="size-10 text-purple-700" />
+            </div>
+
+            <h2 className="text-2xl md:text-3xl font-bold font-manrope text-gray-900">
+              Kiểm tra email của bạn
+            </h2>
+
+            <p className="text-[#4A4455] text-sm leading-relaxed max-w-sm">
+              Chúng tôi đã gửi email xác nhận đến{" "}
+              <span className="font-semibold text-purple-700">{registeredEmail}</span>.
+              Vui lòng mở email và bấm vào liên kết để kích hoạt tài khoản.
+            </p>
+
+            <div className="mt-2 bg-purple-50 border border-purple-100 rounded-xl p-4 text-left w-full max-w-sm">
+              <p className="text-xs text-purple-700 font-semibold mb-1">Lưu ý</p>
+              <ul className="text-xs text-gray-600 space-y-1 list-disc list-inside">
+                <li>Kiểm tra thư mục <strong>Thư rác</strong> nếu không thấy email.</li>
+                <li>Link xác nhận có hiệu lực trong <strong>24 giờ</strong>.</li>
+              </ul>
+            </div>
+
+            <Link
+              to="/auth/login"
+              className="mt-4 text-sm text-purple-700 font-medium hover:underline transition-colors"
+            >
+              Quay lại đăng nhập
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex min-h-screen w-screen">
+      <div
+        className="hidden md:flex flex-1 relative bg-cover bg-center bg-no-repeat"
+        style={{ backgroundImage: `url(${hcmus})` }}
+      >
+        <div className="absolute inset-0 bg-linear-to-t from-black/70 to-transparent"></div>
+
+        <div className="absolute bottom-16 left-8 lg:bottom-30 lg:left-17 bg-white/70 rounded-lg shadow-sm p-5 lg:p-6 max-w-xs lg:max-w-lg">
+          <div className="flex flex-row gap-2 text-3xl lg:text-4xl items-center font-manrope text-purple-900 font-bold mb-4">
+            <Telescope className="size-8 lg:size-10" />
+            <span>UniEvent</span>
+          </div>
+          <span className="text-gray-600 text-sm lg:text-base">
+            Khám phá sự kiện theo cách thông minh hơn. Tìm kiếm, đăng ký và tham
+            gia các sự kiện phù hợp với sở thích và lĩnh vực học tập của bạn.
+          </span>
+        </div>
+      </div>
+
+      <div className="flex-1 bg-white min-h-screen flex items-center justify-center px-4 py-10 md:px-6 md:py-0">
+        <div className="w-full max-w-lg">
+          <div className="flex md:hidden flex-row gap-2 items-center text-[#630ED4] text-xl font-semibold mb-6">
+            <Telescope className="size-6" />
+            <span className="font-manrope font-bold">UniEvent</span>
+          </div>
+
+          <p className="text-2xl md:text-4xl font-bold font-manrope">
+            Tạo tài khoản
+          </p>
+
+          <p className="text-[#4A4455] text-sm font-inter mt-2 mb-8">
+            Điền thông tin bên dưới để tiếp tục
+          </p>
+          <form className="space-y-4" onSubmit={handleSubmit}>
+            <InputField
+              label="Họ và tên *"
+              id="fullname"
+              placeholder="Nguyễn Văn A"
+              icon={User}
+              value={formData.full_name}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  full_name: e.target.value,
+                })
+              }
+            />
+
+            <InputField
+              label="Email *"
+              id="email"
+              placeholder="abcd@gmail.com"
+              icon={Mail}
+              type="email"
+              value={formData.email}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  email: e.target.value,
+                })
+              }
+            />
+
+            <InputField
+              label="Mật khẩu *"
+              id="password"
+              placeholder="Gồm ít nhất 6 ký tự"
+              icon={Lock}
+              type={showPassword ? "text" : "password"}
+              value={formData.password}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  password: e.target.value,
+                })
+              }
+              showPassword={showPassword}
+              setShowPassword={setShowPassword}
+            />
+
+            <InputField
+              label="Xác nhận mật khẩu *"
+              id="confirm-password"
+              placeholder="Nhập lại mật khẩu"
+              icon={Lock}
+              type={showConfirmPassword ? "text" : "password"}
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              showPassword={showConfirmPassword}
+              setShowPassword={setShowConfirmPassword}
+            />
+
+            <SelectedField
+              label="Khoa"
+              id="department"
+              icon={School}
+              options={departmentOptions}
+              onChange={(e) =>
+                setFormData({
+                  ...formData,
+                  department_name: e.target.value,
+                })
+              }
+              bgColor="bg-[#F8F9FF]"
+            />
+
+            <button
+              type="submit"
+              disabled={loading || submissionBlocked}
+              className="w-full h-11 rounded-lg bg-linear-to-r from-purple-700 to-purple-900
+                text-white font-semibold flex items-center justify-center gap-2
+                transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-purple-200
+                disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:translate-y-0 mt-1"
+            >
+              {loading ? (
+                <>
+                  <span className="size-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                  Đang tạo tài khoản…
+                </>
+              ) : submissionBlocked ? (
+                "Vui lòng thử lại sau"
+              ) : (
+                <>
+                  Tạo tài khoản
+                  <ArrowRight className="size-4" />
+                </>
+              )}
+            </button>
+
+            <div className="flex justify-center items-center mt-6 md:mt-8 text-gray-600">
+              <span>Đã có tài khoản?</span>
+
+              <Link
+                to="/auth/login"
+                className="ml-1 text-[#630ED4] font-medium hover:underline transition-colors"
+              >
+                Đăng nhập
+              </Link>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default SignupPage;
