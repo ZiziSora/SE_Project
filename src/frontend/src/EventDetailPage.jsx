@@ -8,6 +8,7 @@ import {
 } from "react-router-dom";
 import Header from "./components/Header";
 import { supabase } from "./lib/supabase";
+import { api, ApiError } from "./lib/api";
 import { Calendar, Users, MapPin, Tag, Loader2, AlertCircle, RotateCcw } from "lucide-react";
 import { EventPoster } from "./components/EventDetail/EventPoster";
 import { EventDetails } from "./components/EventDetail/EventDetails";
@@ -15,7 +16,6 @@ import { EventDescription } from "./components/EventDetail/EventDescription";
 import { RegisterActionBar } from "./components/EventDetail/RegisterActionBar";
 import {
   DEFAULT_EVENT_ID,
-  FALLBACK_POSTER_IMAGE,
   formatVietnameseDate,
   formatVietnameseTime,
 } from "./components/EventDetail/eventDetailUtils";
@@ -36,60 +36,27 @@ export function EventDetailPage() {
   const [user, setUser] = useState(null);
   const [registered, setRegistered] = useState(false);
   const [count, setCount] = useState(0);
-  const [imageUrl, setImageUrl] = useState("");
   const [dataLoading, setDataLoading] = useState(true);
   const [registerLoading, setRegisterLoading] = useState(false);
   const [feedback, setFeedback] = useState({ type: null, message: "" });
 
   /**
-   * 1. Query chi tiết thông tin Event từ bảng `events` theo `event_id`
+   * 1. Lấy chi tiết sự kiện từ Backend API (GET /events/:eventId)
    */
   const fetchEventDetails = useCallback(async (id) => {
     setEventLoading(true);
     setEventError(null);
 
     try {
-      // Query bằng cột event_id (NOT id)
-      const { data, error } = await supabase
-        .from("events")
-        .select("*")
-        .eq("event_id", id)
-        .maybeSingle();
-
-      if (error) {
-        throw error;
-      }
-
-      if (!data) {
-        setEventError(`Không tìm thấy sự kiện với ID "${id}" trên hệ thống.`);
-        setEvent(null);
-      } else {
-        setEvent(data);
-
-        // Xử lý link ảnh banner từ Supabase Storage bucket 'event-banners' hoặc URL công khai
-        const rawUrl = data.banner_url || data.poster_url || data.image_url;
-        if (rawUrl) {
-          if (rawUrl.startsWith("http://") || rawUrl.startsWith("https://")) {
-            setImageUrl(rawUrl);
-          } else {
-            // Lấy URL công khai từ Supabase Storage bucket 'event-banners'
-            const { data: storagePublicData } = supabase.storage
-              .from("event-banners")
-              .getPublicUrl(rawUrl);
-            setImageUrl(storagePublicData?.publicUrl || rawUrl);
-          }
-        } else {
-          // Fallback: Check public bucket 'event-banners' theo ID sự kiện
-          const { data: bucketFallback } = supabase.storage
-            .from("event-banners")
-            .getPublicUrl(`${id}.jpg`);
-          setImageUrl(bucketFallback?.publicUrl || FALLBACK_POSTER_IMAGE);
-        }
-      }
+      const data = await api.getEvent(id);
+      setEvent(data);
     } catch (err) {
-      console.error("Lỗi khi fetch chi tiết sự kiện từ Supabase:", err);
+      console.error("Lỗi khi tải chi tiết sự kiện:", err);
+      setEvent(null);
       setEventError(
-        err.message || "Không thể kết nối đến cơ sở dữ liệu Supabase."
+        err instanceof ApiError && err.status === 404
+          ? `Không tìm thấy sự kiện với ID "${id}" trên hệ thống.`
+          : err.message || "Không thể kết nối đến máy chủ."
       );
     } finally {
       setEventLoading(false);
@@ -139,42 +106,20 @@ export function EventDetailPage() {
     };
   }, []);
 
-  // 3. Fetch Lượt đăng ký & trạng thái đăng ký của user hiện tại trên event_registrations
+  // 3. Lấy số lượt đăng ký & trạng thái đăng ký của user hiện tại từ Backend API
   useEffect(() => {
     let isMounted = true;
 
-    async function fetchEventRegistrationData() {
+    async function fetchRegistrationStatus() {
       setDataLoading(true);
       try {
-        const { count: totalRegistrations, error: countError } = await supabase
-          .from("event_registrations")
-          .select("*", { count: "exact", head: true })
-          .eq("event_id", currentEventId);
-
-        if (countError) {
-          console.error("Failed to count registrations:", countError.message);
-        } else if (isMounted && totalRegistrations !== null) {
-          setCount(totalRegistrations);
-        }
-
-        if (user) {
-          const { data: existingReg, error: regError } = await supabase
-            .from("event_registrations")
-            .select("id")
-            .eq("event_id", currentEventId)
-            .eq("user_id", user.id)
-            .maybeSingle();
-
-          if (regError) {
-            console.error("Failed to check user registration:", regError.message);
-          } else if (isMounted) {
-            setRegistered(!!existingReg);
-          }
-        } else if (isMounted) {
-          setRegistered(false);
+        const status = await api.getRegistrationStatus(currentEventId);
+        if (isMounted) {
+          setCount(status.count);
+          setRegistered(status.registered);
         }
       } catch (err) {
-        console.error("Error loading event data:", err);
+        console.error("Lỗi khi tải trạng thái đăng ký:", err);
       } finally {
         if (isMounted) {
           setDataLoading(false);
@@ -182,7 +127,11 @@ export function EventDetailPage() {
       }
     }
 
-    fetchEventRegistrationData();
+    fetchRegistrationStatus();
+
+    return () => {
+      isMounted = false;
+    };
   }, [currentEventId, user]);
 
   // 4. Xử lý nút Đăng ký tham gia
@@ -202,76 +151,59 @@ export function EventDetailPage() {
     setRegisterLoading(true);
 
     try {
-      const { error: insertError } = await supabase
-        .from("event_registrations")
-        .insert([
-          {
-            user_id: user.id,
-            event_id: currentEventId,
-            registration_status: "registered",
-          },
-        ]);
-
-      if (insertError) {
-        if (insertError.code === "23505") {
-          setRegistered(true);
-          setFeedback({
-            type: "info",
-            message: "Bạn đã đăng ký sự kiện này từ trước!",
-          });
-        } else {
-          setFeedback({
-            type: "error",
-            message: `Đăng ký thất bại: ${insertError.message || "Vui lòng thử lại sau."}`,
-          });
-        }
-      } else {
-        setCount((prevCount) => prevCount + 1);
-        setRegistered(true);
+      const result = await api.registerForEvent(currentEventId);
+      setCount(result.count);
+      setRegistered(true);
+      setFeedback(
+        result.already_registered
+          ? { type: "info", message: "Bạn đã đăng ký sự kiện này từ trước!" }
+          : {
+              type: "success",
+              message: "Đăng ký thành công! Bạn đã giữ được chỗ tham gia sự kiện.",
+            }
+      );
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
         setFeedback({
-          type: "success",
-          message: "Đăng ký thành công! Bạn đã giữ được chỗ tham gia sự kiện.",
+          type: "warning",
+          message: "Bạn chưa đăng nhập! Vui lòng đăng nhập để đăng ký tham gia sự kiện.",
+        });
+      } else {
+        setFeedback({
+          type: "error",
+          message: `Đăng ký thất bại: ${err.message || "Vui lòng thử lại sau."}`,
         });
       }
-    } catch (err) {
-      setFeedback({
-        type: "error",
-        message: `Đã xảy ra lỗi: ${err?.message || "Không thể thực hiện đăng ký."}`,
-      });
     } finally {
       setRegisterLoading(false);
     }
   };
 
-  // Map dữ liệu linh hoạt từ đối tượng event (Supabase) vào mảng chi tiết UI
+  // Map dữ liệu từ Event (trả về bởi Backend API) vào mảng chi tiết UI
   const details = event
     ? [
       {
         icon: Calendar,
         label: "Ngày & giờ bắt đầu",
-        value: formatVietnameseDate(event.start_time || event.start_date),
-        subValue: formatVietnameseTime(event.start_time || event.start_date),
+        value: formatVietnameseDate(event.start_time),
+        subValue: formatVietnameseTime(event.start_time),
       },
       {
         icon: Calendar,
         label: "Ngày & giờ kết thúc",
-        value: formatVietnameseDate(event.end_time || event.end_date),
-        subValue: formatVietnameseTime(event.end_time || event.end_date),
+        value: formatVietnameseDate(event.end_time),
+        subValue: formatVietnameseTime(event.end_time),
       },
       {
         icon: Calendar,
         label: "Hạn chót đăng ký",
-        value: formatVietnameseDate(
-          event.registration_deadline || event.deadline
-        ),
-        subValue: formatVietnameseTime(
-          event.registration_deadline || event.deadline
-        ),
+        value: formatVietnameseDate(event.registration_deadline),
+        subValue: formatVietnameseTime(event.registration_deadline),
       },
       {
         icon: Users,
         label: "Số lượng tham gia tối đa",
-        value: `${event.capacity || event.max_capacity || 0} Sinh viên`,
+        value: event.capacity ? `${event.capacity} Sinh viên` : "Không giới hạn",
       },
       {
         icon: MapPin,
@@ -281,12 +213,12 @@ export function EventDetailPage() {
       {
         icon: Tag,
         label: "Lĩnh vực / Danh mục",
-        value: event.category || event.topic || "Công nghệ Thông tin",
+        value: event.category_name || "Chưa phân loại",
       },
     ]
     : [];
 
-  const maxCapacity = event?.capacity || event?.max_capacity || 250;
+  const maxCapacity = event?.capacity || 250;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -294,12 +226,12 @@ export function EventDetailPage() {
       <Header />
 
       <main className="max-w-5xl mx-auto px-6 md:px-10 py-10 pb-20">
-        {/* State 1: Fallback UI khi đang Loading dữ liệu từ Supabase */}
+        {/* State 1: Fallback UI khi đang Loading dữ liệu từ Backend API */}
         {eventLoading && (
           <div className="flex flex-col items-center justify-center py-24 bg-white rounded-2xl shadow-sm border border-gray-100 my-6">
             <Loader2 className="w-12 h-12 animate-spin text-purple-600 mb-4" />
             <h3 className="text-lg font-bold text-gray-800">
-              Đang tải dữ liệu sự kiện từ Supabase...
+              Đang tải dữ liệu sự kiện...
             </h3>
             <p className="text-sm text-gray-500 mt-1">
               Vui lòng chờ trong giây lát.
@@ -330,15 +262,11 @@ export function EventDetailPage() {
           <>
             {/* Tiêu đề Sự kiện */}
             <h1 className="text-2xl md:text-[28px] font-extrabold uppercase text-[#6D28D9] leading-snug mb-6 max-w-3xl">
-              {event.title || event.name || "Sự kiện không có tiêu đề"}
+              {event.title || "Sự kiện không có tiêu đề"}
             </h1>
 
             {/* Banner Poster */}
-            <EventPoster
-              imageUrl={imageUrl}
-              banner_url={event.banner_url}
-              title={event.title || event.name}
-            />
+            <EventPoster imageUrl={event.banner_url} title={event.title} />
 
             {/* Khung Thông tin chi tiết */}
             <h2 className="text-xl font-bold mb-4 text-gray-900">

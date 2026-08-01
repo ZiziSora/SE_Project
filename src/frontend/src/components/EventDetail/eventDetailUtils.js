@@ -1,7 +1,7 @@
 // Hằng số & hàm bổ trợ dùng chung cho các component trang chi tiết sự kiện
 
 // Event ID mặc định hiển thị trên UniEvent
-export const DEFAULT_EVENT_ID = "3ca6a6f4-39e3-4a97-aa87-0a0efac68562";
+export const DEFAULT_EVENT_ID = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa";
 export const FALLBACK_POSTER_IMAGE =
   "https://images.unsplash.com/photo-1540575467063-178a50c2df87?auto=format&fit=crop&w=1200&q=80";
 

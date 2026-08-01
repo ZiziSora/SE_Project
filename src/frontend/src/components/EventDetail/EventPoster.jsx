@@ -4,13 +4,12 @@ import { FALLBACK_POSTER_IMAGE } from "./eventDetailUtils";
 /* =========================================================
    EventPoster Component - Xử lý ảnh & Fallback chuẩn
    ========================================================= */
-export function EventPoster({ imageUrl, banner_url, title, alt }) {
-  const posterSrc = imageUrl || banner_url;
-  const [imgSrc, setImgSrc] = useState(posterSrc);
+export function EventPoster({ imageUrl, title, alt }) {
+  const [imgSrc, setImgSrc] = useState(imageUrl);
 
   useEffect(() => {
-    setImgSrc(posterSrc);
-  }, [posterSrc]);
+    setImgSrc(imageUrl);
+  }, [imageUrl]);
 
   return (
     <div className="bg-[#EEE8F9] rounded-2xl p-5 flex justify-center mb-8 shadow-sm">
