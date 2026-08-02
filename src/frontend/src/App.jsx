@@ -4,6 +4,7 @@ import "react-toastify/dist/ReactToastify.css";
 
 import { EventDetailPage } from "./EventDetailPage.jsx";
 import { DEFAULT_EVENT_ID } from "./components/EventDetail/eventDetailUtils";
+import ProtectedRoute from "./components/ProtectedRoute.jsx";
 
 import LoginPage from "./pages/LoginPage.jsx";
 import SignupStudentPage from "./pages/SignupStudentPage.jsx";
@@ -22,13 +23,28 @@ function App() {
         <Routes>
           <Route
             path="/"
-            element={<Navigate to={`/events/${DEFAULT_EVENT_ID}`} replace />}
+            element={
+              <ProtectedRoute>
+                <Navigate to={`/events/${DEFAULT_EVENT_ID}`} replace />
+              </ProtectedRoute>
+            }
           />
           <Route
             path="/events"
-            element={<Navigate to={`/events/${DEFAULT_EVENT_ID}`} replace />}
+            element={
+              <ProtectedRoute>
+                <Navigate to={`/events/${DEFAULT_EVENT_ID}`} replace />
+              </ProtectedRoute>
+            }
           />
-          <Route path="/events/:eventId" element={<EventDetailPage />} />
+          <Route
+            path="/events/:eventId"
+            element={
+              <ProtectedRoute>
+                <EventDetailPage />
+              </ProtectedRoute>
+            }
+          />
 
           <Route path="/auth">
             <Route path="login" element={<LoginPage />} />
@@ -49,10 +65,7 @@ function App() {
             <Route path="organizer/profile" element={<OrganizerProfile />} />
           </Route>
 
-          <Route
-            path="*"
-            element={<Navigate to={`/events/${DEFAULT_EVENT_ID}`} replace />}
-          />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </div>
 

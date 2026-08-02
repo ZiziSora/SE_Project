@@ -50,11 +50,7 @@ const LoginPage = () => {
 
 
       setTimeout(() => {
-        if (result.role === "student" || result.role === "organizer") {
-          navigate(`/account/${result.role}/profile`);
-          return;
-        }
-        navigate("/landingPage");
+        navigate("/events");
       }, 800);
     } catch (error) {
       toast.error(
