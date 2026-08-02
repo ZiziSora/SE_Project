@@ -14,6 +14,7 @@ import { EventPoster } from "./components/EventDetail/EventPoster";
 import { EventDetails } from "./components/EventDetail/EventDetails";
 import { EventDescription } from "./components/EventDetail/EventDescription";
 import { RegisterActionBar } from "./components/EventDetail/RegisterActionBar";
+import { BookmarkButton } from "./components/EventDetail/BookmarkButton";
 import {
   DEFAULT_EVENT_ID,
   formatVietnameseDate,
@@ -39,6 +40,11 @@ export function EventDetailPage() {
   const [dataLoading, setDataLoading] = useState(true);
   const [registerLoading, setRegisterLoading] = useState(false);
   const [feedback, setFeedback] = useState({ type: null, message: "" });
+
+  // State quản lý Bookmark (Lưu sự kiện) - chỉ dành cho role Student
+  const [saved, setSaved] = useState(false);
+  const [bookmarkLoading, setBookmarkLoading] = useState(false);
+  const isStudent = user?.user_metadata?.role === "student";
 
   /**
    * 1. Lấy chi tiết sự kiện từ Backend API (GET /events/:eventId)
@@ -75,15 +81,35 @@ export function EventDetailPage() {
     async function checkCurrentUser() {
       try {
         const {
-          data: { user: currentUser },
-          error,
-        } = await supabase.auth.getUser();
+          data: { session },
+        } = await supabase.auth.getSession();
 
-        if (error) {
-          console.warn("Supabase auth check notice:", error.message);
+        let activeSession = session;
+
+        // Đăng nhập qua LoginPage gọi thẳng backend (/auth/login) và chỉ lưu
+        // token vào localStorage, chưa đồng bộ vào Supabase client SDK.
+        // Khôi phục lại phiên đăng nhập từ token đã lưu để supabase.auth
+        // nhận diện đúng user (và để lib/api.js đính kèm Bearer token).
+        if (!activeSession) {
+          const storedAccessToken = localStorage.getItem("access_token");
+          const storedRefreshToken = localStorage.getItem("refresh_token");
+
+          if (storedAccessToken && storedRefreshToken) {
+            const { data, error: restoreError } = await supabase.auth.setSession({
+              access_token: storedAccessToken,
+              refresh_token: storedRefreshToken,
+            });
+
+            if (restoreError) {
+              console.warn("Không thể khôi phục phiên đăng nhập:", restoreError.message);
+            } else {
+              activeSession = data.session;
+            }
+          }
         }
+
         if (isMounted) {
-          setUser(currentUser || null);
+          setUser(activeSession?.user ?? null);
         }
       } catch (err) {
         console.error("Auth status initialization error:", err);
@@ -134,7 +160,54 @@ export function EventDetailPage() {
     };
   }, [currentEventId, user]);
 
-  // 4. Xử lý nút Đăng ký tham gia
+  // 3b. Lấy trạng thái Bookmark (đã lưu hay chưa) - chỉ khi user là Student
+  useEffect(() => {
+    let isMounted = true;
+
+    async function fetchSavedStatus() {
+      if (!isStudent) {
+        if (isMounted) setSaved(false);
+        return;
+      }
+
+      try {
+        const status = await api.getSavedStatus(currentEventId);
+        if (isMounted) {
+          setSaved(status.saved);
+        }
+      } catch (err) {
+        console.error("Lỗi khi tải trạng thái bookmark:", err);
+      }
+    }
+
+    fetchSavedStatus();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [currentEventId, isStudent]);
+
+  // 4. Xử lý nút Bookmark (Lưu sự kiện)
+  const handleToggleBookmark = async () => {
+    if (bookmarkLoading) return;
+
+    setBookmarkLoading(true);
+    try {
+      if (saved) {
+        const result = await api.unsaveEvent(currentEventId);
+        setSaved(!result.removed);
+      } else {
+        await api.saveEvent(currentEventId);
+        setSaved(true);
+      }
+    } catch (err) {
+      console.error("Lỗi khi lưu sự kiện:", err);
+    } finally {
+      setBookmarkLoading(false);
+    }
+  };
+
+  // 5. Xử lý nút Đăng ký tham gia
   const handleRegister = async () => {
     setFeedback({ type: null, message: "" });
 
@@ -158,9 +231,9 @@ export function EventDetailPage() {
         result.already_registered
           ? { type: "info", message: "Bạn đã đăng ký sự kiện này từ trước!" }
           : {
-              type: "success",
-              message: "Đăng ký thành công! Bạn đã giữ được chỗ tham gia sự kiện.",
-            }
+            type: "success",
+            message: "Đăng ký thành công! Bạn đã giữ được chỗ tham gia sự kiện.",
+          }
       );
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
@@ -220,6 +293,7 @@ export function EventDetailPage() {
 
   const maxCapacity = event?.capacity || 250;
 
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header Navigation */}
@@ -260,10 +334,19 @@ export function EventDetailPage() {
         {/* State 3: Hiển thị giao diện chính sau khi fetch dữ liệu thành công */}
         {!eventLoading && !eventError && event && (
           <>
-            {/* Tiêu đề Sự kiện */}
-            <h1 className="text-2xl md:text-[28px] font-extrabold uppercase text-[#6D28D9] leading-snug mb-6 max-w-3xl">
-              {event.title || "Sự kiện không có tiêu đề"}
-            </h1>
+            {/* Tiêu đề Sự kiện + Nút Bookmark (chỉ hiển thị với role Student) */}
+            <div className="flex items-start justify-between gap-4 mb-6">
+              <h1 className="text-2xl md:text-[28px] font-extrabold uppercase text-[#6D28D9] leading-snug max-w-3xl">
+                {event.title || "Sự kiện không có tiêu đề"}
+              </h1>
+              {isStudent && (
+                <BookmarkButton
+                  saved={saved}
+                  loading={bookmarkLoading}
+                  onClick={handleToggleBookmark}
+                />
+              )}
+            </div>
 
             {/* Banner Poster */}
             <EventPoster imageUrl={event.banner_url} title={event.title} />

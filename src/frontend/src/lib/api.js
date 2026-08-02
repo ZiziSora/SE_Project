@@ -31,6 +31,9 @@ export const api = {
   getEvent: (eventId) => request(`/events/${eventId}`),
   getRegistrationStatus: (eventId) => request(`/events/${eventId}/registration-status`),
   registerForEvent: (eventId) => request(`/events/${eventId}/register`, { method: "POST" }),
+  getSavedStatus: (eventId) => request(`/events/${eventId}/saved-status`),
+  saveEvent: (eventId) => request(`/events/${eventId}/save`, { method: "POST" }),
+  unsaveEvent: (eventId) => request(`/events/${eventId}/save`, { method: "DELETE" }),
 };
 
 export { ApiError };
