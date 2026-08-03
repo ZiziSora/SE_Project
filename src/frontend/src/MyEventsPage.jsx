@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Clock, MapPin, QrCode, AlertTriangle, X, Loader2, CheckCircle2, Calendar } from "lucide-react";
-import { supabase } from "./lib/supabase";
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
 export default function MyEventsPage() {
   const [activeTab, setActiveTab] = useState("Sắp diễn ra");
@@ -13,43 +14,18 @@ export default function MyEventsPage() {
   const [isCanceling, setIsCanceling] = useState(false);
   const [toast, setToast] = useState(null);
 
-  // Fetch danh sách sự kiện từ Supabase
+  // Fetch danh sách sự kiện từ Backend API
   const fetchMyEvents = async () => {
     try {
       setLoading(true);
       setError(null);
 
-      const { data, error: fetchError } = await supabase
-        .from("event_registrations")
-        .select(`
-          registration_id,
-          user_id,
-          event_id,
-          registration_status,
-          created_at,
-          events (
-            event_id,
-            title,
-            description,
-            location,
-            start_time,
-            end_time,
-            registration_deadline,
-            capacity,
-            event_status,
-            banner_url,
-            event_categories (
-              category_id,
-              name
-            )
-          )
-        `)
-        .order("created_at", { ascending: false });
-
-      if (fetchError) {
-        throw fetchError;
+      const response = await fetch(`${API_BASE_URL}/api/my-events`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
 
+      const data = await response.json();
       setRegistrations(data || []);
     } catch (err) {
       console.error("Lỗi khi tải danh sách sự kiện:", err);
@@ -70,14 +46,19 @@ export default function MyEventsPage() {
     try {
       setIsCanceling(true);
 
-      // Cập nhật trạng thái trong Supabase thành CANCELLED
-      const { error: updateError } = await supabase
-        .from("event_registrations")
-        .update({ registration_status: "CANCELLED" })
-        .eq("registration_id", selectedRegistration.registration_id);
+      // Cập nhật trạng thái thông qua Backend API thành CANCELLED
+      const response = await fetch(
+        `${API_BASE_URL}/api/registrations/${selectedRegistration.registration_id}/cancel`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
 
-      if (updateError) {
-        throw updateError;
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       // Cập nhật state cục bộ
@@ -230,7 +211,7 @@ export default function MyEventsPage() {
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20 text-gray-400">
             <Loader2 className="w-8 h-8 animate-spin text-purple-600 mb-3" />
-            <p className="text-sm font-medium">Đang tải danh sách sự kiện từ Supabase...</p>
+            <p className="text-sm font-medium">Đang tải danh sách sự kiện...</p>
           </div>
         ) : error ? (
           <div className="bg-red-50 border border-red-100 rounded-2xl p-6 mt-8 text-center text-red-600">
