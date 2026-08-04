@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from supabase import create_client, Client
+from datetime import datetime, timezone, timedelta
 
 # Load .env file from backend/.env or root
 backend_env_path = Path(__file__).resolve().parent.parent.parent / "backend" / ".env"
@@ -85,6 +86,39 @@ def cancel_registration(registration_id: str):
     if not supabase_client:
         raise HTTPException(status_code=500, detail="Supabase client is not configured.")
     try:
+        # Lấy thông tin đăng ký và ngày bắt đầu của sự kiện
+        reg_res = (
+            supabase_client.table("event_registrations")
+            .select("registration_id, registration_status, events(start_time)")
+            .eq("registration_id", registration_id)
+            .execute()
+        )
+        
+        if not reg_res.data:
+            raise HTTPException(status_code=404, detail="Không tìm thấy thông tin đăng ký.")
+            
+        reg_info = reg_res.data[0]
+        event_info = reg_info.get("events") or {}
+        if isinstance(event_info, list) and len(event_info) > 0:
+            event_info = event_info[0]
+
+        start_time_str = event_info.get("start_time") if isinstance(event_info, dict) else None
+
+        if start_time_str:
+            try:
+                start_time = datetime.fromisoformat(start_time_str.replace("Z", "+00:00"))
+                if start_time.tzinfo is None:
+                    start_time = start_time.replace(tzinfo=timezone.utc)
+
+                now = datetime.now(timezone.utc)
+                if (start_time - now) < timedelta(days=5):
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Chỉ có thể hủy đăng ký trước khi sự kiện diễn ra ít nhất 5 ngày."
+                    )
+            except ValueError:
+                pass
+
         response = (
             supabase_client.table("event_registrations")
             .update({"registration_status": "CANCELLED"})
@@ -92,5 +126,7 @@ def cancel_registration(registration_id: str):
             .execute()
         )
         return {"message": "Registration cancelled successfully", "data": response.data}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

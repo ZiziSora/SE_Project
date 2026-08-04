@@ -39,9 +39,28 @@ export default function MyEventsPage() {
     fetchMyEvents();
   }, []);
 
+  // Kiểm tra thời hạn hủy đăng ký (phải trước 5 ngày khi sự kiện diễn ra)
+  const canCancelRegistration = (startTimeStr) => {
+    if (!startTimeStr) return false;
+    const startTime = new Date(startTimeStr).getTime();
+    const now = new Date().getTime();
+    const fiveDaysInMs = 5 * 24 * 60 * 60 * 1000;
+    return startTime - now >= fiveDaysInMs;
+  };
+
   // Xử lý hủy đăng ký sự kiện
   const handleConfirmCancel = async () => {
     if (!selectedRegistration) return;
+
+    if (!canCancelRegistration(selectedRegistration.events?.start_time)) {
+      setToast({
+        type: "error",
+        message: "Không thể hủy đăng ký. Thời hạn hủy phải trước khi sự kiện diễn ra ít nhất 5 ngày.",
+      });
+      setSelectedRegistration(null);
+      setTimeout(() => setToast(null), 4000);
+      return;
+    }
 
     try {
       setIsCanceling(true);
@@ -57,8 +76,10 @@ export default function MyEventsPage() {
         }
       );
 
+      const resData = await response.json().catch(() => ({}));
+
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        throw new Error(resData.detail || `Hủy đăng ký thất bại (Mã lỗi: ${response.status})`);
       }
 
       // Cập nhật state cục bộ
@@ -82,7 +103,7 @@ export default function MyEventsPage() {
       console.error("Lỗi khi hủy đăng ký:", err);
       setToast({
         type: "error",
-        message: "Không thể hủy đăng ký. Vui lòng thử lại sau.",
+        message: err.message || "Không thể hủy đăng ký. Vui lòng thử lại sau.",
       });
     } finally {
       setIsCanceling(false);
@@ -240,6 +261,7 @@ export default function MyEventsPage() {
               const categoryName = event.event_categories?.name || "Hội thảo Học thuật";
               const banner = event.banner_url || defaultImage;
               const isCancelled = item.registration_status === "CANCELLED";
+              const canCancel = canCancelRegistration(event.start_time);
 
               return (
                 <div
@@ -315,13 +337,23 @@ export default function MyEventsPage() {
                     </button>
 
                     {!isCancelled && (
-                      <button
-                        onClick={() => setSelectedRegistration(item)}
-                        title="Hủy đăng ký"
-                        className="px-3 py-2.5 border border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 rounded-xl transition text-xs font-semibold flex items-center gap-1 shrink-0 active:scale-[0.98]"
-                      >
-                        Hủy
-                      </button>
+                      canCancel ? (
+                        <button
+                          onClick={() => setSelectedRegistration(item)}
+                          title="Hủy đăng ký (yêu cầu trước 5 ngày)"
+                          className="px-3 py-2.5 border border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 rounded-xl transition text-xs font-semibold flex items-center gap-1 shrink-0 active:scale-[0.98]"
+                        >
+                          Hủy
+                        </button>
+                      ) : (
+                        <button
+                          disabled
+                          title="Thời hạn hủy đăng ký đã hết (phải trước 5 ngày khi sự kiện diễn ra)"
+                          className="px-3 py-2.5 border border-gray-200 text-gray-400 bg-gray-100 rounded-xl transition text-xs font-semibold flex items-center gap-1 shrink-0 cursor-not-allowed whitespace-nowrap"
+                        >
+                          Hết hạn hủy
+                        </button>
+                      )
                     )}
                   </div>
                 </div>
@@ -353,68 +385,81 @@ export default function MyEventsPage() {
             </div>
 
             {/* Nội dung xác nhận */}
-            <div className="text-center">
-              <h3 className="text-lg font-bold text-gray-900">
-                Xác nhận hủy đăng ký sự kiện
-              </h3>
-              <p className="text-xs text-gray-500 mt-2">
-                Bạn có chắc chắn muốn hủy đăng ký tham gia sự kiện dưới đây không?
-              </p>
+            {(() => {
+              const isAllowed = canCancelRegistration(selectedRegistration.events?.start_time);
+              return (
+                <>
+                  <div className="text-center">
+                    <h3 className="text-lg font-bold text-gray-900">
+                      Xác nhận hủy đăng ký sự kiện
+                    </h3>
+                    <p className="text-xs text-gray-500 mt-2">
+                      Bạn có chắc chắn muốn hủy đăng ký tham gia sự kiện dưới đây không?
+                    </p>
 
-              {/* Thẻ thông tin sự kiện trong Modal */}
-              <div className="bg-gray-50 border border-gray-100 rounded-2xl p-4 mt-4 text-left">
-                <span className="inline-block bg-purple-100 text-purple-800 text-[10px] font-bold px-2 py-0.5 rounded-md mb-1.5">
-                  {selectedRegistration.events?.event_categories?.name || "Sự kiện"}
-                </span>
-                <h4 className="font-bold text-sm text-gray-900 line-clamp-2">
-                  {selectedRegistration.events?.title || "Sự kiện học thuật"}
-                </h4>
-                <div className="mt-2 text-[11px] text-gray-500 space-y-1">
-                  <div className="flex items-center gap-1.5">
-                    <Clock className="w-3 h-3 text-gray-400" />
-                    <span>
-                      {formatEventDate(
-                        selectedRegistration.events?.start_time,
-                        selectedRegistration.events?.end_time
-                      ).time}
-                    </span>
+                    {/* Thẻ thông tin sự kiện trong Modal */}
+                    <div className="bg-gray-50 border border-gray-100 rounded-2xl p-4 mt-4 text-left">
+                      <span className="inline-block bg-purple-100 text-purple-800 text-[10px] font-bold px-2 py-0.5 rounded-md mb-1.5">
+                        {selectedRegistration.events?.event_categories?.name || "Sự kiện"}
+                      </span>
+                      <h4 className="font-bold text-sm text-gray-900 line-clamp-2">
+                        {selectedRegistration.events?.title || "Sự kiện học thuật"}
+                      </h4>
+                      <div className="mt-2 text-[11px] text-gray-500 space-y-1">
+                        <div className="flex items-center gap-1.5">
+                          <Clock className="w-3 h-3 text-gray-400" />
+                          <span>
+                            {formatEventDate(
+                              selectedRegistration.events?.start_time,
+                              selectedRegistration.events?.end_time
+                            ).time}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <MapPin className="w-3 h-3 text-gray-400" />
+                          <span>{selectedRegistration.events?.location || "Chưa cập nhật"}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {!isAllowed ? (
+                      <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-xl text-[11px] text-red-700 text-left font-medium">
+                        ⚠️ <strong>Thời hạn hủy đã hết:</strong> Quy định hủy đăng ký yêu cầu phải thực hiện trước khi sự kiện diễn ra ít nhất 5 ngày.
+                      </div>
+                    ) : (
+                      <p className="text-[11px] text-red-500 font-medium mt-3">
+                        * Lưu ý: Thao tác này sẽ cập nhật trạng thái hủy và ghế của bạn có thể được chuyển cho sinh viên khác (Yêu cầu thực hiện trước 5 ngày).
+                      </p>
+                    )}
                   </div>
-                  <div className="flex items-center gap-1.5">
-                    <MapPin className="w-3 h-3 text-gray-400" />
-                    <span>{selectedRegistration.events?.location || "Chưa cập nhật"}</span>
+
+                  {/* Các nút hành động trong Modal */}
+                  <div className="flex items-center gap-3 mt-6">
+                    <button
+                      onClick={() => setSelectedRegistration(null)}
+                      disabled={isCanceling}
+                      className="flex-1 py-2.5 px-4 border border-gray-200 text-gray-700 text-xs font-semibold rounded-xl hover:bg-gray-50 transition active:scale-[0.98] disabled:opacity-50"
+                    >
+                      Bỏ qua
+                    </button>
+                    <button
+                      onClick={handleConfirmCancel}
+                      disabled={isCanceling || !isAllowed}
+                      className="flex-1 py-2.5 px-4 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-xl flex items-center justify-center gap-2 transition active:scale-[0.98] shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isCanceling ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>Đang xử lý...</span>
+                        </>
+                      ) : (
+                        <span>Xác nhận hủy</span>
+                      )}
+                    </button>
                   </div>
-                </div>
-              </div>
-
-              <p className="text-[11px] text-red-500 font-medium mt-3">
-                * Lưu ý: Thao tác này sẽ cập nhật trạng thái hủy và ghế của bạn có thể được chuyển cho sinh viên khác.
-              </p>
-            </div>
-
-            {/* Các nút hành động trong Modal */}
-            <div className="flex items-center gap-3 mt-6">
-              <button
-                onClick={() => setSelectedRegistration(null)}
-                disabled={isCanceling}
-                className="flex-1 py-2.5 px-4 border border-gray-200 text-gray-700 text-xs font-semibold rounded-xl hover:bg-gray-50 transition active:scale-[0.98] disabled:opacity-50"
-              >
-                Bỏ qua
-              </button>
-              <button
-                onClick={handleConfirmCancel}
-                disabled={isCanceling}
-                className="flex-1 py-2.5 px-4 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-xl flex items-center justify-center gap-2 transition active:scale-[0.98] shadow-sm disabled:opacity-50"
-              >
-                {isCanceling ? (
-                  <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    <span>Đang xử lý...</span>
-                  </>
-                ) : (
-                  <span>Xác nhận hủy</span>
-                )}
-              </button>
-            </div>
+                </>
+              );
+            })()}
           </div>
         </div>
       )}
