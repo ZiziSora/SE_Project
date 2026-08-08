@@ -1,96 +1,37 @@
 import { useEffect, useState } from "react"
-import { Calendar, CircleCheck, FileText, Send, ArrowRight, Eye, Pencil, Trash2, type LucideIcon } from "lucide-react"
-import { Link } from "react-router-dom"
-import { supabase } from "../lib/supabase"
+import { Calendar, CircleCheck, FileText, Send } from "lucide-react"
+import { eventsApi, type StatsDTO } from "../lib/api" // Backend Python (FastAPI)
 
-type Status = {
-  label: string
-  className: string
+const EMPTY_STATS: StatsDTO = {
+  total: 0,
+  published: 0,
+  draft: 0,
+  pending: 0,
+  ongoing: 0,
+  ended: 0,
+  cancelled: 0,
 }
-
-type EventRow = {
-  id: string
-  name: string
-  time: string
-  status: Status
-  registered: string
-  canEdit: boolean
-}
-
-const statuses: Record<string, Status> = {
-  DRAFT: { label: "Bản nháp", className: "bg-blue-100 text-blue-600" },
-  draft: { label: "Bản nháp", className: "bg-blue-100 text-blue-600" },
-  PENDING: { label: "Chờ duyệt", className: "bg-yellow-100 text-yellow-700" },
-  pending: { label: "Chờ duyệt", className: "bg-yellow-100 text-yellow-700" },
-  PUBLISHED: { label: "Đang mở đăng ký", className: "bg-teal-100 text-teal-700" },
-  published: { label: "Đang mở đăng ký", className: "bg-teal-100 text-teal-700" },
-  ENDED: { label: "Đã kết thúc", className: "bg-slate-100 text-slate-600" },
-  ended: { label: "Đã kết thúc", className: "bg-slate-100 text-slate-600" },
-  CANCELLED: { label: "Đã hủy", className: "bg-red-100 text-red-600" },
-  cancelled: { label: "Đã hủy", className: "bg-red-100 text-red-600" },
-}
-
-const headers = ["TÊN SỰ KIỆN", "THỜI GIAN", "TRẠNG THÁI", "NGƯỜI ĐĂNG KÝ", "THAO TÁC"]
 
 export function StatCards() {
-  const [statsData, setStatsData] = useState({
-    total: 0,
-    published: 0,
-    draft: 0,
-    pending: 0,
-  })
-  const [rows, setRows] = useState<EventRow[]>([])
-  const [loading, setLoading] = useState<boolean>(true)
+  const [statsData, setStatsData] = useState<StatsDTO>(EMPTY_STATS)
 
-  // Lấy dữ liệu thống kê và 5 sự kiện gần đây từ Supabase
+  // Lấy số liệu thống kê từ endpoint GET /api/events/stats
   useEffect(() => {
-    async function fetchDashboardData() {
-      setLoading(true)
-      const { data, error } = await supabase
-        .from('events')
-        .select('*')
-        .order('start_time', { ascending: false })
+    let cancelled = false
 
-      if (error) {
-        console.error('Lỗi tải dữ liệu dashboard:', error.message)
-      } else if (data) {
-        // 1. Tính toán số liệu cho các thẻ thống kê
-        let total = data.length
-        let published = 0
-        let draft = 0
-        let pending = 0
-
-        data.forEach((item) => {
-          const st = (item.event_status || '').toUpperCase()
-          if (st === 'PUBLISHED') published++
-          else if (st === 'DRAFT') draft++
-          else if (st === 'PENDING') pending++
-        })
-
-        setStatsData({ total, published, draft, pending })
-
-        // 2. Lấy tối đa 5 sự kiện gần đây nhất cho bảng
-        const recentEvents = data.slice(0, 5).map((item) => {
-          const rawStatus = item.event_status || 'draft'
-          const mappedStatus = statuses[rawStatus] || { label: rawStatus, className: "bg-gray-100 text-gray-600" }
-          const canEdit = rawStatus.toUpperCase() === 'DRAFT' || rawStatus.toUpperCase() === 'PENDING'
-
-          return {
-            id: item.event_id || item.id,
-            name: item.title || 'Sự kiện chưa có tên',
-            time: item.start_time ? new Date(item.start_time).toLocaleString('vi-VN') : 'Chưa cập nhật',
-            status: mappedStatus,
-            registered: `0/${item.capacity || '∞'}`,
-            canEdit: canEdit,
-          }
-        })
-
-        setRows(recentEvents)
+    async function fetchStats() {
+      try {
+        const result = await eventsApi.stats()
+        if (!cancelled) setStatsData(result)
+      } catch (err) {
+        console.error("Lỗi tải dữ liệu dashboard:", err)
       }
-      setLoading(false)
     }
 
-    fetchDashboardData()
+    fetchStats()
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   // Khai báo mảng stats dựa trên dữ liệu thật từ state
@@ -147,7 +88,6 @@ export function StatCards() {
           )
         })}
       </div>
-
-     </div>
+    </div>
   )
 }

@@ -1,6 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from "react-router-dom";
-import { supabase } from '../lib/supabase'; // Đảm bảo đường dẫn này đúng với file supabase client của bạn
+import {
+  categoriesApi,
+  eventsApi,
+  uploadsApi,
+  type CategoryDTO,
+  type EventPayload,
+} from '../lib/api'; // Backend Python (FastAPI) — không còn gọi Supabase trực tiếp
 
 import {
   ArrowLeft,
@@ -14,7 +20,7 @@ import {
   Sparkles,
   FilePlus,
 } from 'lucide-react';
-import { TopNav } from '../components/top-nav'; 
+import { TopNav } from '../components/top-nav';
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -60,11 +66,24 @@ const inputCls =
 export default function CreateEvent() {
   const navigate = useNavigate();
   const [dragOver, setDragOver] = useState(false);
-  const [coverImage, setCoverImage] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Thêm state categories để lấy danh mục từ bảng event_categories nếu có, hoặc dùng danh sách tĩnh
-  const [categories, setCategories] = useState<{ category_id: number; name: string }[]>([]);
+  // Ảnh bìa: preview hiển thị tại chỗ, bannerUrl là URL thật do backend trả về
+  const [coverImage, setCoverImage] = useState<string | null>(null);
+  const [bannerUrl, setBannerUrl] = useState<string | null>(null);
+  const [uploadingBanner, setUploadingBanner] = useState(false);
+
+  // Tài liệu kế hoạch sự kiện: tệp lên bucket `event_plan`, URL lưu vào cột `file_url`
+  const [planFileName, setPlanFileName] = useState<string | null>(null);
+  const [planFileUrl, setPlanFileUrl] = useState<string | null>(null);
+  const [uploadingPlan, setUploadingPlan] = useState(false);
+
+  const [submitting, setSubmitting] = useState(false);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const planInputRef = useRef<HTMLInputElement>(null);
+
+  const [categories, setCategories] = useState<CategoryDTO[]>([]);
+  const [suggestedLocations, setSuggestedLocations] = useState<string[]>([]);
 
   // Gom toàn bộ state của form nhập liệu
   const [formData, setFormData] = useState({
@@ -80,17 +99,28 @@ export default function CreateEvent() {
     description: '',
   });
 
-  // Lấy danh mục từ database khi trang vừa load
+  // Lấy danh mục + gợi ý địa điểm từ Backend khi trang vừa load
   useEffect(() => {
-    async function fetchCategories() {
-      const { data, error } = await supabase.from('event_categories').select('category_id, name');
-      if (error) {
-        console.error('Lỗi tải danh mục:', error.message);
-      } else {
-        setCategories(data || []);
+    let cancelled = false;
+
+    async function loadDropdownData() {
+      try {
+        const [cats, locations] = await Promise.all([
+          categoriesApi.list(),
+          eventsApi.locations(),
+        ]);
+        if (cancelled) return;
+        setCategories(cats);
+        setSuggestedLocations(locations);
+      } catch (err) {
+        console.error('Lỗi tải dữ liệu danh mục / địa điểm:', err);
       }
     }
-    fetchCategories();
+
+    loadDropdownData();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -98,58 +128,95 @@ export default function CreateEvent() {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
+  // --- UPLOAD ẢNH BÌA QUA BACKEND (backend đẩy lên Supabase Storage) ---
+  const uploadCover = async (file: File) => {
+    setCoverImage(URL.createObjectURL(file)); // preview ngay lập tức
+    setUploadingBanner(true);
+    try {
+      const result = await uploadsApi.banner(file);
+      setBannerUrl(result.url);
+    } catch (err) {
+      console.error('Lỗi tải ảnh bìa:', err);
+      alert(err instanceof Error ? err.message : 'Không tải được ảnh bìa.');
+      setCoverImage(null);
+      setBannerUrl(null);
+    } finally {
+      setUploadingBanner(false);
+    }
+  };
+
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setDragOver(false);
     const file = e.dataTransfer.files[0];
     if (file && file.type.startsWith('image/')) {
-      setCoverImage(URL.createObjectURL(file));
-      // Nếu bạn có làm upload storage, có thể xử lý ở đây để lấy URL ảnh gán vào banner_url
+      uploadCover(file);
     }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setCoverImage(URL.createObjectURL(file));
+      uploadCover(file);
+    }
+  };
+
+  // --- UPLOAD TÀI LIỆU KẾ HOẠCH → bucket event_plan ---
+  const handlePlanChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingPlan(true);
+    try {
+      const result = await uploadsApi.eventPlan(file);
+      setPlanFileUrl(result.url);
+      setPlanFileName(file.name);
+    } catch (err) {
+      console.error('Lỗi tải tệp kế hoạch:', err);
+      alert(err instanceof Error ? err.message : 'Không tải được tệp kế hoạch.');
+    } finally {
+      setUploadingPlan(false);
     }
   };
 
   // --- HÀM XỬ LÝ LƯU BẢN NHÁP HOẶC TẠO SỰ KIỆN ---
   const handleSaveEvent = async (statusType: 'DRAFT' | 'PENDING') => {
-    // Ghép ngày và giờ thành chuẩn timestamp ISO (hoặc giữ nguyên định dạng datetime của DB)
-    const startDateTime = formData.start_date && formData.start_time 
-      ? `${formData.start_date}T${formData.start_time}:00` 
-      : null;
-      
-    const endDateTime = formData.end_date && formData.end_time 
-      ? `${formData.end_date}T${formData.end_time}:00` 
-      : null;
+    if (submitting) return;
 
-    const eventPayload = {
-      title: formData.title || 'Sự kiện chưa có tên',
-      category_id: formData.category_id ? parseInt(formData.category_id) : null,
-      location: formData.location,
+    // Ghép ngày và giờ thành chuẩn ISO để backend parse
+    const startDateTime =
+      formData.start_date && formData.start_time
+        ? `${formData.start_date}T${formData.start_time}:00`
+        : null;
+
+    const endDateTime =
+      formData.end_date && formData.end_time
+        ? `${formData.end_date}T${formData.end_time}:00`
+        : null;
+
+    const payload: EventPayload = {
+      title: formData.title || (statusType === 'DRAFT' ? 'Sự kiện chưa có tên' : ''),
+      category_id: formData.category_id ? parseInt(formData.category_id, 10) : null,
+      location: formData.location || null,
       start_time: startDateTime,
       end_time: endDateTime,
-      capacity: formData.capacity ? parseInt(formData.capacity) : null,
+      capacity: formData.capacity ? parseInt(formData.capacity, 10) : null,
       registration_deadline: formData.registration_deadline || null,
-      description: formData.description,
+      description: formData.description || null,
+      banner_url: bannerUrl,
+      file_url: planFileUrl,
       event_status: statusType, // 'DRAFT' cho lưu nháp, 'PENDING' cho tạo sự kiện chờ duyệt
-      banner_url: coverImage, // Hoặc link ảnh sau khi upload storage
     };
 
-    const { error } = await supabase
-      .from('events')
-      .insert([eventPayload]);
-
-    if (error) {
-      console.error('Lỗi khi lưu sự kiện:', error.message);
-      alert('Có lỗi xảy ra: ' + error.message);
-    } else {
+    setSubmitting(true);
+    try {
+      await eventsApi.create(payload);
       alert(statusType === 'DRAFT' ? 'Đã lưu bản nháp thành công!' : 'Tạo sự kiện thành công!');
-      // Điều hướng về trang Dashboard (hoặc trang danh sách sự kiện quản lý)
-      navigate('/'); // Điều chỉnh lại đường dẫn `/` hoặc `/dashboard` tùy route của bạn
+      navigate('/');
+    } catch (err) {
+      console.error('Lỗi khi lưu sự kiện:', err);
+      alert('Có lỗi xảy ra: ' + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -172,10 +239,11 @@ export default function CreateEvent() {
               <p className="text-xs text-slate-400 mt-0.5">Điền các thông tin chi tiết để thiết lập sự kiện của bạn.</p>
             </div>
             {/* Nút Lưu bản nháp */}
-            <button 
+            <button
               type="button"
+              disabled={submitting}
               onClick={() => handleSaveEvent('DRAFT')}
-              className="shrink-0 mt-0.5 border border-slate-300 rounded-lg px-3.5 py-1.5 text-xs font-medium text-slate-600 cursor-pointer hover:bg-slate-50 hover:border-slate-400 transition-colors whitespace-nowrap"
+              className="shrink-0 mt-0.5 border border-slate-300 rounded-lg px-3.5 py-1.5 text-xs font-medium text-slate-600 cursor-pointer hover:bg-slate-50 hover:border-slate-400 transition-colors whitespace-nowrap disabled:opacity-50"
             >
               Lưu bản nháp
             </button>
@@ -212,6 +280,9 @@ export default function CreateEvent() {
               </>
             )}
           </div>
+          {uploadingBanner && (
+            <p className="mt-2 text-[11px] text-slate-400">Đang tải ảnh lên máy chủ...</p>
+          )}
         </Card>
 
         {/* ── Card 2: Basic Info ── */}
@@ -230,7 +301,7 @@ export default function CreateEvent() {
             </div>
             <div>
               <FieldLabel label="Lĩnh vực / Danh mục" required />
-              <select 
+              <select
                 name="category_id"
                 value={formData.category_id}
                 onChange={handleInputChange}
@@ -253,9 +324,15 @@ export default function CreateEvent() {
                   name="location"
                   value={formData.location}
                   onChange={handleInputChange}
+                  list="location-list"
                   className={`${inputCls} pl-8`}
                   placeholder="Tìm kiếm tòa nhà, phòng học..."
                 />
+                <datalist id="location-list">
+                  {suggestedLocations.map((loc) => (
+                    <option key={loc} value={loc} />
+                  ))}
+                </datalist>
               </div>
             </div>
           </div>
@@ -267,38 +344,38 @@ export default function CreateEvent() {
             <div>
               <FieldLabel label="Ngày & Giờ Bắt đầu" required />
               <div className="flex gap-2">
-                <input 
-                  type="date" 
+                <input
+                  type="date"
                   name="start_date"
                   value={formData.start_date}
                   onChange={handleInputChange}
-                  className={`${inputCls} flex-1`} 
+                  className={`${inputCls} flex-1`}
                 />
-                <input 
-                  type="time" 
+                <input
+                  type="time"
                   name="start_time"
                   value={formData.start_time}
                   onChange={handleInputChange}
-                  className={`${inputCls} w-28`} 
+                  className={`${inputCls} w-28`}
                 />
               </div>
             </div>
             <div>
               <FieldLabel label="Ngày & Giờ Kết thúc" required />
               <div className="flex gap-2">
-                <input 
-                  type="date" 
+                <input
+                  type="date"
                   name="end_date"
                   value={formData.end_date}
                   onChange={handleInputChange}
-                  className={`${inputCls} flex-1`} 
+                  className={`${inputCls} flex-1`}
                 />
-                <input 
-                  type="time" 
+                <input
+                  type="time"
                   name="end_time"
                   value={formData.end_time}
                   onChange={handleInputChange}
-                  className={`${inputCls} w-28`} 
+                  className={`${inputCls} w-28`}
                 />
               </div>
             </div>
@@ -316,12 +393,12 @@ export default function CreateEvent() {
             </div>
             <div>
               <FieldLabel label="Hạn chót đăng ký" required />
-              <input 
-                type="datetime-local" 
+              <input
+                type="datetime-local"
                 name="registration_deadline"
                 value={formData.registration_deadline}
                 onChange={handleInputChange}
-                className={inputCls} 
+                className={inputCls}
               />
             </div>
           </div>
@@ -347,10 +424,27 @@ export default function CreateEvent() {
 
         {/* ── Card 5: Event Plan ── */}
         <Card icon={<FolderOpen size={15} />} title="Kế hoạch sự kiện" required>
-          <button type="button" className="flex items-center cursor-pointer gap-1.5 border border-primary text-primary rounded-lg px-3.5 py-1.5 text-xs font-medium hover:bg-primary/5 transition-colors">
+          <input
+            ref={planInputRef}
+            type="file"
+            accept=".pdf,.docx"
+            className="hidden"
+            onChange={handlePlanChange}
+          />
+          <button
+            type="button"
+            onClick={() => planInputRef.current?.click()}
+            className="flex items-center cursor-pointer gap-1.5 border border-primary text-primary rounded-lg px-3.5 py-1.5 text-xs font-medium hover:bg-primary/5 transition-colors"
+          >
             <FilePlus size={14} />
             Thêm tệp
           </button>
+          {uploadingPlan && (
+            <p className="mt-2 text-[11px] text-slate-400">Đang tải tệp lên máy chủ...</p>
+          )}
+          {planFileName && !uploadingPlan && (
+            <p className="mt-2 text-[11px] text-slate-500">Đã đính kèm: {planFileName}</p>
+          )}
         </Card>
 
         {/* ── Footer Actions ── */}
@@ -360,13 +454,14 @@ export default function CreateEvent() {
               Hủy bỏ
             </button>
           </Link>
-          {/* Nút tạo sự kiện chính thức (status: PENDING hoặc PUBLISHED tùy quy trình của bạn) */}
-          <button 
+          {/* Nút tạo sự kiện chính thức (gửi lên Backend với trạng thái PENDING chờ duyệt) */}
+          <button
             type="button"
+            disabled={submitting}
             onClick={() => handleSaveEvent('PENDING')}
-            className="bg-primary cursor-pointer hover:bg-primary-700 text-white font-semibold text-xs rounded-lg px-5 py-2 transition-colors shadow-sm"
+            className="bg-primary cursor-pointer hover:bg-primary-700 text-white font-semibold text-xs rounded-lg px-5 py-2 transition-colors shadow-sm disabled:opacity-50"
           >
-            Tạo sự kiện ngay
+            {submitting ? 'Đang xử lý...' : 'Tạo sự kiện ngay'}
           </button>
         </div>
 

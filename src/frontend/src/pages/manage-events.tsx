@@ -5,9 +5,10 @@ import { EventsTable } from "../components/events-table"
 
 export default function ManageEvents() {
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background ">
+      <TopNav />
       <main className="w-full">
-        <TopNav />
+        
         
         {/* Đổi py-8 thành py-4 để thu gọn lề trên dưới của toàn trang */}
         <div className="mx-auto max-w-5xl px-2 py-4 md:px-10">

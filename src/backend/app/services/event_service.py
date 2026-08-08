@@ -1,0 +1,366 @@
+"""Toàn bộ nghiệp vụ sự kiện: CRUD, thống kê, đếm người đăng ký, danh mục.
+
+Đây là tầng duy nhất gọi Supabase. Router chỉ nhận request → gọi service → trả JSON.
+"""
+from __future__ import annotations
+
+from datetime import datetime, timezone
+from typing import Any, Optional
+
+from fastapi import HTTPException, status
+from postgrest.exceptions import APIError
+
+from ..config import settings
+from ..db import get_supabase
+from ..schemas import (
+    CategoryOut,
+    EventCreate,
+    EventListOut,
+    EventOut,
+    EventStatus,
+    EventUpdate,
+    StatsOut,
+)
+
+EDITABLE_STATUSES = {EventStatus.DRAFT.value, EventStatus.PENDING.value}
+
+# Cho phép sort theo whitelist để tránh SQL injection qua query param
+SORT_FIELDS = {
+    "newest": ("start_time", True),   # (cột, desc)
+    "oldest": ("start_time", False),
+    "title": ("title", False),
+    "created": ("created_at", True),
+}
+
+
+# ─── Đọc ──────────────────────────────────────────────────────────────────────
+
+
+def list_events(
+    *,
+    search: Optional[str] = None,
+    status_filter: Optional[str] = None,
+    organizer_id: Optional[str] = None,
+    sort: str = "newest",
+    page: int = 1,
+    page_size: int = 5,
+) -> EventListOut:
+    sb = get_supabase()
+    query = sb.table(settings.TABLE_EVENTS).select("*", count="exact")
+
+    if search:
+        query = query.ilike("title", f"%{search}%")
+    if status_filter and status_filter.upper() != "ALL":
+        query = query.eq("event_status", status_filter.upper())
+    if organizer_id:
+        query = query.eq("organizer_id", organizer_id)
+
+    column, desc = SORT_FIELDS.get(sort, SORT_FIELDS["newest"])
+    query = query.order(column, desc=desc)
+
+    page = max(page, 1)
+    page_size = max(min(page_size, 100), 1)
+    start = (page - 1) * page_size
+    query = query.range(start, start + page_size - 1)
+
+    res = _run(query)
+    rows: list[dict[str, Any]] = res.data or []
+    total = res.count if res.count is not None else len(rows)
+
+    categories = _category_map()
+    counts = _registration_counts([_row_id(r) for r in rows])
+    items = [_to_event_out(r, categories, counts) for r in rows]
+
+    return EventListOut(
+        items=items,
+        total=total,
+        page=page,
+        page_size=page_size,
+        total_pages=max((total + page_size - 1) // page_size, 1),
+    )
+
+
+def get_event(event_id: str) -> EventOut:
+    sb = get_supabase()
+    res = _run(
+        sb.table(settings.TABLE_EVENTS).select("*").eq("event_id", event_id).limit(1)
+    )
+    if not res.data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy sự kiện."
+        )
+    row = res.data[0]
+    return _to_event_out(row, _category_map(), _registration_counts([_row_id(row)]))
+
+
+def get_stats(organizer_id: Optional[str] = None) -> StatsOut:
+    sb = get_supabase()
+    query = sb.table(settings.TABLE_EVENTS).select("event_status")
+    if organizer_id:
+        query = query.eq("organizer_id", organizer_id)
+    rows = _run(query).data or []
+
+    stats = StatsOut(total=len(rows))
+    bucket = {
+        EventStatus.PUBLISHED.value: "published",
+        EventStatus.DRAFT.value: "draft",
+        EventStatus.PENDING.value: "pending",
+        EventStatus.ONGOING.value: "ongoing",
+        EventStatus.ENDED.value: "ended",
+        EventStatus.CANCELLED.value: "cancelled",
+    }
+    for row in rows:
+        key = bucket.get((row.get("event_status") or "").upper())
+        if key:
+            setattr(stats, key, getattr(stats, key) + 1)
+    return stats
+
+
+def list_categories() -> list[CategoryOut]:
+    res = _run(
+        get_supabase()
+        .table(settings.TABLE_CATEGORIES)
+        .select("category_id, name")
+        .order("name")
+    )
+    return [CategoryOut(**row) for row in (res.data or [])]
+
+
+def list_locations() -> list[str]:
+    """Gợi ý địa điểm dựa trên các sự kiện đã có."""
+    res = _run(
+        get_supabase()
+        .table(settings.TABLE_EVENTS)
+        .select("location")
+        .not_.is_("location", "null")
+        .limit(500)
+    )
+    seen: list[str] = []
+    for row in res.data or []:
+        loc = (row.get("location") or "").strip()
+        if loc and loc not in seen:
+            seen.append(loc)
+    return sorted(seen)
+
+
+# ─── Ghi ──────────────────────────────────────────────────────────────────────
+
+
+def create_event(payload: EventCreate) -> EventOut:
+    data = payload.model_dump(exclude_none=True, mode="json")
+    data["event_status"] = payload.event_status.value
+    data.setdefault("title", "Sự kiện chưa có tên")
+
+    res = _run(get_supabase().table(settings.TABLE_EVENTS).insert(data))
+    if not res.data:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Tạo sự kiện thất bại.",
+        )
+    return _to_event_out(res.data[0], _category_map(), {})
+
+
+def update_event(event_id: str, payload: EventUpdate) -> EventOut:
+    current = _get_raw(event_id)
+
+    data = payload.model_dump(exclude_unset=True, mode="json")
+    if payload.event_status is not None:
+        data["event_status"] = payload.event_status.value
+
+    if not data:
+        return _to_event_out(current, _category_map(), {})
+
+    # Kiểm tra lại ràng buộc ngày tháng sau khi trộn dữ liệu cũ + mới
+    merged = {**current, **data}
+    _validate_merged_dates(merged)
+    _validate_capacity_against_registrations(event_id, merged.get("capacity"))
+
+    res = _run(
+        get_supabase()
+        .table(settings.TABLE_EVENTS)
+        .update(data)
+        .eq("event_id", event_id)
+    )
+    row = res.data[0] if res.data else merged
+    return _to_event_out(row, _category_map(), _registration_counts([event_id]))
+
+
+def delete_event(event_id: str) -> None:
+    _get_raw(event_id)
+    _run(
+        get_supabase()
+        .table(settings.TABLE_EVENTS)
+        .delete()
+        .eq("event_id", event_id)
+    )
+
+
+def change_status(event_id: str, new_status: EventStatus) -> EventOut:
+    return update_event(event_id, EventUpdate(event_status=new_status))
+
+
+# ─── Internal helpers ─────────────────────────────────────────────────────────
+
+
+def _run(query):
+    """Thực thi query Supabase và chuyển lỗi thành HTTPException dễ đọc."""
+    try:
+        return query.execute()
+    except APIError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Lỗi cơ sở dữ liệu: {exc.message}",
+        ) from exc
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"Không kết nối được Supabase: {exc}",
+        ) from exc
+
+
+def _get_raw(event_id: str) -> dict[str, Any]:
+    res = _run(
+        get_supabase()
+        .table(settings.TABLE_EVENTS)
+        .select("*")
+        .eq("event_id", event_id)
+        .limit(1)
+    )
+    if not res.data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy sự kiện."
+        )
+    return res.data[0]
+
+
+def _row_id(row: dict[str, Any]) -> str:
+    return str(row.get("event_id") or row.get("id") or "")
+
+
+def _category_map() -> dict[int, str]:
+    try:
+        res = (
+            get_supabase()
+            .table(settings.TABLE_CATEGORIES)
+            .select("category_id, name")
+            .execute()
+        )
+    except Exception:  # noqa: BLE001
+        return {}
+    return {row["category_id"]: row["name"] for row in (res.data or [])}
+
+
+def _registration_counts(event_ids: list[str]) -> dict[str, int]:
+    """Đếm số người đã đăng ký cho từng sự kiện.
+
+    Bảng registrations có thể chưa tồn tại ở giai đoạn này → trả về rỗng.
+    """
+    ids = [i for i in event_ids if i]
+    if not ids:
+        return {}
+    try:
+        res = (
+            get_supabase()
+            .table(settings.TABLE_REGISTRATIONS)
+            .select("event_id")
+            .in_("event_id", ids)
+            .execute()
+        )
+    except Exception:  # noqa: BLE001
+        return {}
+    counts: dict[str, int] = {}
+    for row in res.data or []:
+        key = str(row.get("event_id"))
+        counts[key] = counts.get(key, 0) + 1
+    return counts
+
+
+def _parse_dt(value: Any) -> Optional[datetime]:
+    if value in (None, ""):
+        return None
+    if isinstance(value, datetime):
+        return value
+    try:
+        return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+
+
+def _validate_merged_dates(merged: dict[str, Any]) -> None:
+    start = _parse_dt(merged.get("start_time"))
+    end = _parse_dt(merged.get("end_time"))
+    deadline = _parse_dt(merged.get("registration_deadline"))
+    if start and end and end <= start:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Thời gian kết thúc phải sau thời gian bắt đầu.",
+        )
+    if start and deadline and deadline > start:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Hạn chót đăng ký phải trước thời điểm sự kiện bắt đầu.",
+        )
+
+
+def _validate_capacity_against_registrations(
+    event_id: str, capacity: Any
+) -> None:
+    """Không cho hạ sức chứa xuống thấp hơn số người đã đăng ký."""
+    if capacity in (None, ""):
+        return
+    registered = _registration_counts([event_id]).get(event_id, 0)
+    if int(capacity) < registered:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                f"Sức chứa mới ({capacity}) nhỏ hơn số người đã đăng ký ({registered})."
+            ),
+        )
+
+
+def _aware(dt: Optional[datetime]) -> Optional[datetime]:
+    if dt and dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
+def _to_event_out(
+    row: dict[str, Any],
+    categories: dict[int, str],
+    counts: dict[str, int],
+) -> EventOut:
+    event_id = _row_id(row)
+    capacity = row.get("capacity")
+    registered = counts.get(event_id, 0)
+    event_status = (row.get("event_status") or EventStatus.DRAFT.value).upper()
+
+    deadline = _aware(_parse_dt(row.get("registration_deadline")))
+    now = datetime.now(timezone.utc)
+    is_full = capacity is not None and registered >= int(capacity)
+    is_open = (
+        event_status == EventStatus.PUBLISHED.value
+        and (deadline is None or deadline >= now)
+        and not is_full
+    )
+
+    return EventOut(
+        event_id=event_id or None,
+        title=row.get("title"),
+        category_id=row.get("category_id"),
+        category_name=categories.get(row.get("category_id")),
+        location=row.get("location"),
+        start_time=_parse_dt(row.get("start_time")),
+        end_time=_parse_dt(row.get("end_time")),
+        registration_deadline=_parse_dt(row.get("registration_deadline")),
+        capacity=capacity,
+        registered_count=registered,
+        seats_left=None if capacity is None else max(int(capacity) - registered, 0),
+        is_full=is_full,
+        is_registration_open=is_open,
+        description=row.get("description"),
+        banner_url=row.get("banner_url"),
+        file_url=row.get("file_url"),
+        event_status=event_status,
+        can_edit=event_status in EDITABLE_STATUSES,
+        created_at=_parse_dt(row.get("created_at")),
+    )

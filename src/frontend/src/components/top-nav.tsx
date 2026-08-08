@@ -1,18 +1,57 @@
 import { Bell, Plus } from "lucide-react"
 import { Link, useLocation } from "react-router-dom"
 
+/**
+ * Mỗi mục menu quản một NHÓM route, không chỉ một đường dẫn duy nhất.
+ * Nhờ vậy các trang con của Dashboard (danh sách tất cả sự kiện, tạo / sửa sự kiện)
+ * vẫn giữ gạch chân ở mục "Dashboard".
+ *
+ * - `path`  : đường dẫn khi bấm vào menu
+ * - `match` : danh sách tiền tố route thuộc về mục này
+ *             (`exact: true` = chỉ khớp đúng chuỗi, dùng cho "/" để nó không nuốt mọi route)
+ */
+const navItems: {
+  label: string
+  path: string
+  match: { prefix: string; exact?: boolean }[]
+}[] = [
+  {
+    // Trang khám phá sự kiện dành cho sinh viên — chưa dựng, tạm để cùng "/"
+    label: "Trang chủ",
+    path: "/",
+    match: [{ prefix: "/home", exact: true }],
+  },
+  {
+    // Dashboard hiện đang là trang gốc "/" nên mục này quản luôn "/"
+    label: "Dashboard",
+    path: "/",
+    match: [
+      { prefix: "/", exact: true },
+      { prefix: "/manage-events" },
+      { prefix: "/all-events" },
+      { prefix: "/create-event" },
+      { prefix: "/edit-event" },
+      { prefix: "/events" },
+    ],
+  },
+  {
+    label: "Quản lý người tham gia",
+    path: "/participants",
+    match: [{ prefix: "/participants" }, { prefix: "/check-in" }],
+  },
+]
+
+function isActive(pathname: string, item: (typeof navItems)[number]): boolean {
+  return item.match.some(({ prefix, exact }) =>
+    exact ? pathname === prefix : pathname === prefix || pathname.startsWith(`${prefix}/`),
+  )
+}
+
 export function TopNav() {
   const location = useLocation()
 
   // Kiểm tra xem có đang ở trang tạo sự kiện không để ẩn nút
   const isCreateEventPage = location.pathname === "/create-event"
-
-  // Định nghĩa danh sách các menu và đường dẫn tương ứng của chúng
-  const navItems = [
-    { label: "Trang chủ", path: "/" },
-    { label: "Dashboard", path: "/manage-events" }, // Hoặc đường dẫn trang quản lý của bạn
-    { label: "Quản lý người tham gia", path: "/participants" },
-  ]
 
   return (
     <header className="flex items-center justify-between border-b border-border bg-card px-6 py-2.5 md:px-8">
@@ -20,15 +59,16 @@ export function TopNav() {
         <span className="text-xl font-extrabold tracking-tight text-primary">UniEvent</span>
         <nav className="hidden items-center gap-6 md:flex">
           {navItems.map((item) => {
-            // Tự động active nếu đường dẫn hiện tại khớp với path của menu
-            const isActive = location.pathname === item.path
+            // Active khi route hiện tại thuộc nhóm route của mục menu
+            const active = isActive(location.pathname, item)
 
             return (
               <Link
                 key={item.label}
                 to={item.path}
+                aria-current={active ? "page" : undefined}
                 className={
-                  isActive
+                  active
                     ? "relative pb-1 text-sm font-semibold text-primary after:absolute after:inset-x-0 after:-bottom-0.5 after:h-0.5 after:rounded-full after:bg-primary cursor-pointer"
                     : "pb-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground cursor-pointer"
                 }
