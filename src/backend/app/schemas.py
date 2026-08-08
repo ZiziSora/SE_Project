@@ -74,19 +74,7 @@ class EventCreate(EventBase):
         if self.event_status == EventStatus.DRAFT:
             return self
 
-        missing: list[str] = []
-        if not self.title:
-            missing.append("Tên sự kiện")
-        if self.category_id is None:
-            missing.append("Lĩnh vực / Danh mục")
-        if not self.location:
-            missing.append("Địa điểm")
-        if self.start_time is None:
-            missing.append("Ngày & giờ bắt đầu")
-        if self.end_time is None:
-            missing.append("Ngày & giờ kết thúc")
-        if self.registration_deadline is None:
-            missing.append("Hạn chót đăng ký")
+        missing = missing_required_fields(self)
         if missing:
             raise ValueError("Thiếu thông tin bắt buộc: " + ", ".join(missing))
         return self
@@ -129,6 +117,8 @@ class EventOut(BaseModel):
     file_url: Optional[str] = None  # URL tài liệu kế hoạch (bucket event_plan)
     event_status: str = EventStatus.DRAFT.value
     can_edit: bool = False
+    # True khi sự kiện đang công khai: sửa nội dung sẽ bị đưa về PENDING chờ duyệt lại
+    requires_reapproval: bool = False
     created_at: Optional[datetime] = None
 
     model_config = {"extra": "ignore"}
@@ -166,6 +156,36 @@ class UploadOut(BaseModel):
 
 
 # ─── Helper dùng chung ────────────────────────────────────────────────────────
+
+
+# Các trường BẮT BUỘC khi gửi sự kiện đi duyệt (event_status = PENDING).
+# Bản nháp (DRAFT) được phép để trống tất cả.
+# Dùng chung cho cả lúc tạo mới (POST) lẫn lúc sửa rồi gửi duyệt (PUT).
+REQUIRED_FOR_SUBMIT: list[tuple[str, str]] = [
+    ("title", "Tên sự kiện"),
+    ("category_id", "Lĩnh vực / Danh mục"),
+    ("location", "Địa điểm"),
+    ("start_time", "Ngày & giờ bắt đầu"),
+    ("end_time", "Ngày & giờ kết thúc"),
+    ("registration_deadline", "Hạn chót đăng ký"),
+    ("file_url", "Tệp kế hoạch sự kiện"),
+]
+
+
+def missing_required_fields(data: Any) -> list[str]:
+    """Trả về nhãn tiếng Việt của các trường còn thiếu.
+
+    `data` có thể là dict (bản ghi từ DB) hoặc model Pydantic.
+    Chuỗi rỗng / khoảng trắng cũng bị coi là thiếu.
+    """
+    getter = data.get if isinstance(data, dict) else lambda k: getattr(data, k, None)
+
+    missing: list[str] = []
+    for field, label in REQUIRED_FOR_SUBMIT:
+        value = getter(field)
+        if value is None or (isinstance(value, str) and not value.strip()):
+            missing.append(label)
+    return missing
 
 
 def _check_dates(

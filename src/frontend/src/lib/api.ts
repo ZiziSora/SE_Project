@@ -41,6 +41,8 @@ export interface EventDTO {
   file_url: string | null
   event_status: EventStatus
   can_edit: boolean
+  /** True khi sự kiện đang công khai: sửa nội dung sẽ bị đưa về PENDING chờ duyệt lại */
+  requires_reapproval: boolean
   created_at: string | null
 }
 

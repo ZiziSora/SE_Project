@@ -20,9 +20,37 @@ from ..schemas import (
     EventStatus,
     EventUpdate,
     StatsOut,
+    missing_required_fields,
 )
 
-EDITABLE_STATUSES = {EventStatus.DRAFT.value, EventStatus.PENDING.value}
+# Trạng thái Organizer được phép mở form sửa
+EDITABLE_STATUSES = {
+    EventStatus.DRAFT.value,
+    EventStatus.PENDING.value,
+    EventStatus.PUBLISHED.value,
+    EventStatus.ONGOING.value,
+}
+
+# Sự kiện đã công khai: sửa xong PHẢI quay lại chờ Admin duyệt lại
+REAPPROVAL_STATUSES = {EventStatus.PUBLISHED.value, EventStatus.ONGOING.value}
+
+# Sự kiện đã đóng: không còn gì để duyệt lại nên khoá luôn
+LOCKED_STATUSES = {EventStatus.ENDED.value, EventStatus.CANCELLED.value}
+
+# Các cột thuộc "nội dung sự kiện". Chỉ khi một trong số này thay đổi thì mới
+# cần duyệt lại — đổi riêng event_status thì không tính.
+CONTENT_FIELDS = {
+    "title",
+    "category_id",
+    "location",
+    "start_time",
+    "end_time",
+    "registration_deadline",
+    "capacity",
+    "description",
+    "banner_url",
+    "file_url",
+}
 
 # Cho phép sort theo whitelist để tránh SQL injection qua query param
 SORT_FIELDS = {
@@ -162,6 +190,7 @@ def create_event(payload: EventCreate) -> EventOut:
 
 def update_event(event_id: str, payload: EventUpdate) -> EventOut:
     current = _get_raw(event_id)
+    current_status = (current.get("event_status") or EventStatus.DRAFT.value).upper()
 
     data = payload.model_dump(exclude_unset=True, mode="json")
     if payload.event_status is not None:
@@ -170,10 +199,37 @@ def update_event(event_id: str, payload: EventUpdate) -> EventOut:
     if not data:
         return _to_event_out(current, _category_map(), {})
 
+    # Sự kiện đã kết thúc / đã huỷ thì không cho sửa nữa
+    if current_status in LOCKED_STATUSES:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Sự kiện đã kết thúc hoặc đã huỷ nên không thể chỉnh sửa."
+            ),
+        )
+
+    # Sự kiện đang công khai: mọi thay đổi nội dung đều phải chờ Admin duyệt lại,
+    # nên tự đưa trạng thái về PENDING (kể cả khi client không gửi event_status).
+    content_changed = any(
+        field in data and data[field] != current.get(field) for field in CONTENT_FIELDS
+    )
+    if current_status in REAPPROVAL_STATUSES and content_changed:
+        data["event_status"] = EventStatus.PENDING.value
+
     # Kiểm tra lại ràng buộc ngày tháng sau khi trộn dữ liệu cũ + mới
     merged = {**current, **data}
     _validate_merged_dates(merged)
     _validate_capacity_against_registrations(event_id, merged.get("capacity"))
+
+    # Nếu kết quả cuối cùng là PENDING (gửi duyệt / duyệt lại) thì bản ghi SAU KHI
+    # trộn phải đủ thông tin bắt buộc — kể cả tệp kế hoạch sự kiện.
+    if merged.get("event_status") == EventStatus.PENDING.value:
+        missing = missing_required_fields(merged)
+        if missing:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Thiếu thông tin bắt buộc: " + ", ".join(missing),
+            )
 
     res = _run(
         get_supabase()
@@ -362,5 +418,7 @@ def _to_event_out(
         file_url=row.get("file_url"),
         event_status=event_status,
         can_edit=event_status in EDITABLE_STATUSES,
+        # Sửa sự kiện đang công khai thì phải chờ Admin duyệt lại → UI cảnh báo trước
+        requires_reapproval=event_status in REAPPROVAL_STATUSES,
         created_at=_parse_dt(row.get("created_at")),
     )
