@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { AlertTriangle, Loader2, Calendar } from "lucide-react";
-import Toast from "./components/Toast";
-import TabNavigation from "./components/TabNavigation";
-import EventCard from "./components/EventCard";
-import CancelModal from "./components/CancelModal";
+import Toast from "../components/Toast";
+import TabNavigation from "../components/TabNavigation";
+import EventCard from "../components/EventCard";
+import CancelModal from "../components/CancelModal";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 

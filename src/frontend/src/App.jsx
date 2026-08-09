@@ -8,8 +8,10 @@ import ForgotPasswordPage from "./pages/ForgotPasswordPage.jsx";
 import ResetPasswordPage from "./pages/ResetPasswordPage.jsx";
 import StudentProfile from "./pages/profile/StudentProfile.jsx";
 import OrganizerProfile from "./pages/profile/OrganizerProfile.jsx";
+import MyEventsPage from "./pages/MyEventsPage.jsx";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
+import { Navigate } from "react-router-dom";
 
 function PlaceholderPage({ title, description }) {
   return (
@@ -76,3 +78,5 @@ function App() {
     </BrowserRouter>
   );
 }
+
+export default App;
