@@ -4,6 +4,7 @@ from app.core.auth import get_current_user
 from app.models.enum import UserRole, UserStatus
 from app.models.user import User
 from app.routers.auth_router import router as auth_router
+from app.routers.my_event import router as history_router
 from app.routers.profile_router import router as user_router
 from app.schemas.profile import UserProfileResponse
 from app.services.profile_services import get_avatar_url
@@ -21,6 +22,7 @@ app.add_middleware(
 # Đăng ký routers
 app.include_router(auth_router)
 app.include_router(user_router)
+app.include_router(history_router)
 
 @app.get("/")
 def read_root():
