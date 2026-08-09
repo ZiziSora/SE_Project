@@ -1,5 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { Clock, MapPin, QrCode, AlertTriangle, X, Loader2, CheckCircle2, Calendar } from "lucide-react";
+import { AlertTriangle, Loader2, Calendar } from "lucide-react";
+import Toast from "./components/Toast";
+import TabNavigation from "./components/TabNavigation";
+import EventCard from "./components/EventCard";
+import CancelModal from "./components/CancelModal";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
@@ -9,12 +13,10 @@ export default function MyEventsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Trạng thái cửa sổ xác nhận hủy đăng ký (Modal)
   const [selectedRegistration, setSelectedRegistration] = useState(null);
   const [isCanceling, setIsCanceling] = useState(false);
   const [toast, setToast] = useState(null);
 
-  // Fetch danh sách sự kiện từ Backend API
   const fetchMyEvents = async () => {
     try {
       setLoading(true);
@@ -39,7 +41,6 @@ export default function MyEventsPage() {
     fetchMyEvents();
   }, []);
 
-  // Kiểm tra thời hạn hủy đăng ký (phải trước 5 ngày khi sự kiện diễn ra)
   const canCancelRegistration = (startTimeStr) => {
     if (!startTimeStr) return false;
     const startTime = new Date(startTimeStr).getTime();
@@ -48,7 +49,6 @@ export default function MyEventsPage() {
     return startTime - now >= fiveDaysInMs;
   };
 
-  // Xử lý hủy đăng ký sự kiện
   const handleConfirmCancel = async () => {
     if (!selectedRegistration) return;
 
@@ -65,7 +65,6 @@ export default function MyEventsPage() {
     try {
       setIsCanceling(true);
 
-      // Cập nhật trạng thái thông qua Backend API thành CANCELLED
       const response = await fetch(
         `${API_BASE_URL}/api/registrations/${selectedRegistration.registration_id}/cancel`,
         {
@@ -82,7 +81,6 @@ export default function MyEventsPage() {
         throw new Error(resData.detail || `Hủy đăng ký thất bại (Mã lỗi: ${response.status})`);
       }
 
-      // Cập nhật state cục bộ
       setRegistrations((prev) =>
         prev.map((item) =>
           item.registration_id === selectedRegistration.registration_id
@@ -91,13 +89,11 @@ export default function MyEventsPage() {
         )
       );
 
-      // Hiển thị thông báo thành công
       setToast({
         type: "success",
         message: `Đã hủy đăng ký thành công sự kiện "${selectedRegistration.events?.title || 'Sự kiện'}"`,
       });
 
-      // Đóng modal
       setSelectedRegistration(null);
     } catch (err) {
       console.error("Lỗi khi hủy đăng ký:", err);
@@ -111,14 +107,9 @@ export default function MyEventsPage() {
     }
   };
 
-  // Hàm format thời gian và ngày tháng
   const formatEventDate = (startTimeStr, endTimeStr) => {
     if (!startTimeStr) {
-      return {
-        month: "THG --",
-        day: "--",
-        time: "Chưa cập nhật",
-      };
+      return { month: "THG --", day: "--", time: "Chưa cập nhật" };
     }
 
     const startDate = new Date(startTimeStr);
@@ -146,89 +137,54 @@ export default function MyEventsPage() {
     return { month, day, time };
   };
 
-  // Lọc sự kiện theo Tab hiện tại
+  const getEffectiveStatus = (item) => {
+    const rawStatus = (item.registration_status || "REGISTERED").toUpperCase();
+
+    if (rawStatus === "CANCELLED") return "CANCELLED";
+    if (rawStatus === "CHECKED_IN" || rawStatus === "ATTENDED" || rawStatus === "CHECK_IN") {
+      return "ATTENDED";
+    }
+    if (rawStatus === "ABSENT") return "ABSENT";
+
+    const event = item.events || {};
+    const endTimeStr = event.end_time || event.start_time;
+    if (endTimeStr) {
+      const eventTime = new Date(endTimeStr).getTime();
+      const now = new Date().getTime();
+      if (now > eventTime) {
+        return "ABSENT";
+      }
+    }
+
+    return "REGISTERED";
+  };
+
   const filteredRegistrations = registrations.filter((item) => {
-    const status = item.registration_status || "REGISTERED";
-    if (activeTab === "Sắp diễn ra") {
-      return status === "REGISTERED";
-    }
-    if (activeTab === "Đã tham gia") {
-      return status === "ATTENDED";
-    }
-    if (activeTab === "Vắng mặt") {
-      return status === "ABSENT";
-    }
-    if (activeTab === "Đã hủy") {
-      return status === "CANCELLED";
-    }
+    const status = getEffectiveStatus(item);
+    if (activeTab === "Sắp diễn ra") return status === "REGISTERED";
+    if (activeTab === "Đã tham gia") return status === "ATTENDED";
+    if (activeTab === "Vắng mặt") return status === "ABSENT";
+    if (activeTab === "Đã hủy") return status === "CANCELLED";
     return true;
   });
 
-  const defaultImage =
-    "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=600&auto=format&fit=crop&q=80";
-
   return (
     <main className="min-h-[calc(100vh-64px)] bg-[#f8f9fa] text-gray-900 px-6 py-10 font-sans relative">
-      {/* Toast Notification */}
-      {toast && (
-        <div
-          className={`fixed top-5 right-5 z-50 flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg border transition-all animate-bounce ${toast.type === "success"
-              ? "bg-emerald-50 border-emerald-200 text-emerald-800"
-              : "bg-red-50 border-red-200 text-red-800"
-            }`}
-        >
-          {toast.type === "success" ? (
-            <CheckCircle2 className="w-5 h-5 text-emerald-600" />
-          ) : (
-            <AlertTriangle className="w-5 h-5 text-red-600" />
-          )}
-          <span className="text-xs font-semibold">{toast.message}</span>
-        </div>
-      )}
+      <Toast toast={toast} />
 
       <div className="max-w-6xl mx-auto">
-        {/* Tiêu đề & Mô tả */}
         <h1 className="text-3xl font-bold text-gray-900">Sự kiện của tôi</h1>
         <p className="text-gray-500 text-sm mt-1">
           Quản lý lịch trình nghiên cứu và các buổi hội thảo học thuật của bạn.
         </p>
 
-        {/* Thanh lọc trạng thái (Tabs) */}
-        <div className="inline-flex bg-[#f1f3f5] p-1 rounded-xl border border-gray-200 mt-6 gap-1 flex-wrap">
-          {["Sắp diễn ra", "Đã tham gia", "Vắng mặt", "Đã hủy"].map((tab) => {
-            const count = registrations.filter((item) => {
-              const status = item.registration_status || "REGISTERED";
-              if (tab === "Sắp diễn ra") return status === "REGISTERED";
-              if (tab === "Đã tham gia") return status === "ATTENDED";
-              if (tab === "Vắng mặt") return status === "ABSENT";
-              if (tab === "Đã hủy") return status === "CANCELLED";
-              return false;
-            }).length;
+        <TabNavigation
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          registrations={registrations}
+          getEffectiveStatus={getEffectiveStatus}
+        />
 
-            return (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                className={`px-5 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center gap-1.5 ${activeTab === tab
-                    ? "bg-white text-purple-900 shadow-sm"
-                    : "text-gray-500 hover:text-gray-900"
-                  }`}
-              >
-                <span>{tab}</span>
-                <span
-                  className={`px-1.5 py-0.5 rounded-full text-[10px] ${activeTab === tab
-                      ? "bg-purple-100 text-purple-800"
-                      : "bg-gray-200 text-gray-600"
-                    }`}
-                >
-                  {count}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Nội dung danh sách sự kiện */}
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20 text-gray-400">
             <Loader2 className="w-8 h-8 animate-spin text-purple-600 mb-3" />
@@ -255,214 +211,28 @@ export default function MyEventsPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
-            {filteredRegistrations.map((item) => {
-              const event = item.events || {};
-              const { month, day, time } = formatEventDate(event.start_time, event.end_time);
-              const categoryName = event.event_categories?.name || "Hội thảo Học thuật";
-              const banner = event.banner_url || defaultImage;
-              const isCancelled = item.registration_status === "CANCELLED";
-              const canCancel = canCancelRegistration(event.start_time);
-
-              return (
-                <div
-                  key={item.registration_id}
-                  className="bg-white rounded-2xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-md transition flex flex-col justify-between relative group"
-                >
-                  <div>
-                    {/* Ảnh Banner & Badge Ngày */}
-                    <div className="relative h-52 w-full bg-gray-100">
-                      <img
-                        src={banner}
-                        alt={event.title || "Sự kiện"}
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          e.target.onerror = null;
-                          e.target.src = defaultImage;
-                        }}
-                      />
-
-                      {/* Badge Ngày Tháng ở góc trên bên phải */}
-                      <div className="absolute top-3 right-3 bg-white/95 backdrop-blur-md px-2.5 py-1 rounded-lg text-center shadow-sm border border-gray-100">
-                        <span className="block text-[10px] font-bold text-red-500 uppercase tracking-wider">
-                          {month}
-                        </span>
-                        <span className="block text-base font-black text-gray-900 leading-none">
-                          {day}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Thông tin sự kiện */}
-                    <div className="p-5">
-                      <div className="flex items-center justify-between gap-2 mb-3">
-                        <span className="inline-block bg-[#f3e8ff] text-[#7e22ce] text-[11px] font-semibold px-2.5 py-0.5 rounded-md">
-                          {categoryName}
-                        </span>
-
-                        {isCancelled && (
-                          <span className="bg-red-100 text-red-700 text-[10px] font-bold px-2 py-0.5 rounded-md">
-                            Đã hủy đăng ký
-                          </span>
-                        )}
-                      </div>
-
-                      <h3 className="font-bold text-base text-gray-900 leading-snug line-clamp-2 min-h-[2.75rem]">
-                        {event.title || "Tên sự kiện chưa cập nhật"}
-                      </h3>
-
-                      <div className="mt-4 space-y-1.5 text-xs text-gray-500 font-medium">
-                        <div className="flex items-center gap-2">
-                          <Clock className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                          <span className="truncate">{time}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <MapPin className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                          <span className="truncate">{event.location || "Địa điểm chưa xác định"}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Nút Xem QR Check-in & Nút Hủy dưới chân card */}
-                  <div className="p-5 pt-0 flex items-center gap-2">
-                    <button
-                      disabled={isCancelled}
-                      className={`w-full text-xs font-semibold py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 transition shadow-sm ${isCancelled
-                          ? "bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200"
-                          : "bg-[#6D28D9] hover:bg-[#7E22CE] text-white active:scale-[0.99]"
-                        }`}
-                    >
-                      <QrCode className="w-4 h-4" />
-                      {isCancelled ? "Đã hủy đăng ký" : "Xem QR Check-in"}
-                    </button>
-
-                    {!isCancelled && (
-                      canCancel ? (
-                        <button
-                          onClick={() => setSelectedRegistration(item)}
-                          title="Hủy đăng ký (yêu cầu trước 5 ngày)"
-                          className="px-3 py-2.5 border border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 rounded-xl transition text-xs font-semibold flex items-center gap-1 shrink-0 active:scale-[0.98]"
-                        >
-                          Hủy
-                        </button>
-                      ) : (
-                        <button
-                          disabled
-                          title="Thời hạn hủy đăng ký đã hết (phải trước 5 ngày khi sự kiện diễn ra)"
-                          className="px-3 py-2.5 border border-gray-200 text-gray-400 bg-gray-100 rounded-xl transition text-xs font-semibold flex items-center gap-1 shrink-0 cursor-not-allowed whitespace-nowrap"
-                        >
-                          Hết hạn hủy
-                        </button>
-                      )
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+            {filteredRegistrations.map((item) => (
+              <EventCard
+                key={item.registration_id}
+                item={item}
+                getEffectiveStatus={getEffectiveStatus}
+                canCancelRegistration={canCancelRegistration}
+                formatEventDate={formatEventDate}
+                onSelectCancel={setSelectedRegistration}
+              />
+            ))}
           </div>
         )}
       </div>
 
-      {/* CỬA SỔ POPUP XÁC NHẬN HỦY ĐĂNG KÝ (MODAL) */}
-      {selectedRegistration && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
-          <div
-            className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-gray-100 relative animate-in zoom-in-95 duration-200"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Nút đóng X */}
-            <button
-              onClick={() => !isCanceling && setSelectedRegistration(null)}
-              disabled={isCanceling}
-              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100 transition"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            {/* Icon cảnh báo */}
-            <div className="w-12 h-12 bg-red-100 text-red-600 rounded-2xl flex items-center justify-center mb-4 mx-auto">
-              <AlertTriangle className="w-6 h-6" />
-            </div>
-
-            {/* Nội dung xác nhận */}
-            {(() => {
-              const isAllowed = canCancelRegistration(selectedRegistration.events?.start_time);
-              return (
-                <>
-                  <div className="text-center">
-                    <h3 className="text-lg font-bold text-gray-900">
-                      Xác nhận hủy đăng ký sự kiện
-                    </h3>
-                    <p className="text-xs text-gray-500 mt-2">
-                      Bạn có chắc chắn muốn hủy đăng ký tham gia sự kiện dưới đây không?
-                    </p>
-
-                    {/* Thẻ thông tin sự kiện trong Modal */}
-                    <div className="bg-gray-50 border border-gray-100 rounded-2xl p-4 mt-4 text-left">
-                      <span className="inline-block bg-purple-100 text-purple-800 text-[10px] font-bold px-2 py-0.5 rounded-md mb-1.5">
-                        {selectedRegistration.events?.event_categories?.name || "Sự kiện"}
-                      </span>
-                      <h4 className="font-bold text-sm text-gray-900 line-clamp-2">
-                        {selectedRegistration.events?.title || "Sự kiện học thuật"}
-                      </h4>
-                      <div className="mt-2 text-[11px] text-gray-500 space-y-1">
-                        <div className="flex items-center gap-1.5">
-                          <Clock className="w-3 h-3 text-gray-400" />
-                          <span>
-                            {formatEventDate(
-                              selectedRegistration.events?.start_time,
-                              selectedRegistration.events?.end_time
-                            ).time}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <MapPin className="w-3 h-3 text-gray-400" />
-                          <span>{selectedRegistration.events?.location || "Chưa cập nhật"}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {!isAllowed ? (
-                      <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-xl text-[11px] text-red-700 text-left font-medium">
-                        ⚠️ <strong>Thời hạn hủy đã hết:</strong> Quy định hủy đăng ký yêu cầu phải thực hiện trước khi sự kiện diễn ra ít nhất 5 ngày.
-                      </div>
-                    ) : (
-                      <p className="text-[11px] text-red-500 font-medium mt-3">
-                        * Lưu ý: Thao tác này sẽ cập nhật trạng thái hủy và ghế của bạn có thể được chuyển cho sinh viên khác (Yêu cầu thực hiện trước 5 ngày).
-                      </p>
-                    )}
-                  </div>
-
-                  {/* Các nút hành động trong Modal */}
-                  <div className="flex items-center gap-3 mt-6">
-                    <button
-                      onClick={() => setSelectedRegistration(null)}
-                      disabled={isCanceling}
-                      className="flex-1 py-2.5 px-4 border border-gray-200 text-gray-700 text-xs font-semibold rounded-xl hover:bg-gray-50 transition active:scale-[0.98] disabled:opacity-50"
-                    >
-                      Bỏ qua
-                    </button>
-                    <button
-                      onClick={handleConfirmCancel}
-                      disabled={isCanceling || !isAllowed}
-                      className="flex-1 py-2.5 px-4 bg-red-600 hover:bg-red-700 text-white text-xs font-semibold rounded-xl flex items-center justify-center gap-2 transition active:scale-[0.98] shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {isCanceling ? (
-                        <>
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                          <span>Đang xử lý...</span>
-                        </>
-                      ) : (
-                        <span>Xác nhận hủy</span>
-                      )}
-                    </button>
-                  </div>
-                </>
-              );
-            })()}
-          </div>
-        </div>
-      )}
+      <CancelModal
+        selectedRegistration={selectedRegistration}
+        onClose={() => setSelectedRegistration(null)}
+        onConfirm={handleConfirmCancel}
+        isCanceling={isCanceling}
+        canCancelRegistration={canCancelRegistration}
+        formatEventDate={formatEventDate}
+      />
     </main>
   );
 }
