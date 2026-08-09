@@ -7,7 +7,7 @@ import { EventForm } from '../components/event-form';
  * và gọi PUT /api/events/{id} khi lưu.
  */
 export default function EditEvent() {
-  const { eventId } = useParams<{ eventId: string }>();
+  const { eventId } = useParams();
 
   return <EventForm mode="edit" eventId={eventId} />;
 }

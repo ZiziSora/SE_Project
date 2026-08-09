@@ -8,8 +8,6 @@ import {
   formatDateTime,
   formatRegistered,
   getStatusDisplay,
-  type EventDTO,
-  type ListEventsParams,
 } from "../lib/api" // Backend Python (FastAPI) — lọc / tìm kiếm / phân trang chạy phía server
 
 const filters = ["Tất cả", "Đang mở đăng ký", "Đang diễn ra", "Chờ duyệt", "Bản nháp", "Đã kết thúc", "Đã hủy"]
@@ -21,7 +19,7 @@ const ITEMS_PER_PAGE = 5 // Số lượng sự kiện hiển thị tối đa tr�
 // (border-collapse làm hỏng viền khi header dính).
 const cellCls = "border-t border-border px-6 py-2.5"
 
-const sortOptions: { label: string; value: NonNullable<ListEventsParams["sort"]> }[] = [
+const sortOptions = [
   { label: "Mới nhất", value: "newest" },
   { label: "Cũ nhất", value: "oldest" },
   { label: "Tên A-Z", value: "title" },
@@ -30,13 +28,13 @@ const sortOptions: { label: string; value: NonNullable<ListEventsParams["sort"]>
 export function FullEventsTable() {
   const [activeFilter, setActiveFilter] = useState("Tất cả")
   const [search, setSearch] = useState("")
-  const [sort, setSort] = useState<NonNullable<ListEventsParams["sort"]>>("newest")
+  const [sort, setSort] = useState("newest")
   const [page, setPage] = useState(1)
 
-  const [events, setEvents] = useState<EventDTO[]>([])
+  const [events, setEvents] = useState([])
   const [totalPages, setTotalPages] = useState(1)
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState(null)
 
   // Gọi backend mỗi khi đổi từ khoá / bộ lọc / sắp xếp / trang (có debounce cho ô tìm kiếm)
   useEffect(() => {
@@ -70,7 +68,7 @@ export function FullEventsTable() {
     }
   }, [search, activeFilter, sort, page])
 
-  const handleDelete = async (event: EventDTO) => {
+  const handleDelete = async (event) => {
     if (!event.event_id) return
     if (!window.confirm(`Xoá sự kiện "${event.title}"?`)) return
     try {
@@ -134,7 +132,7 @@ export function FullEventsTable() {
                 aria-label="Sắp xếp sự kiện"
                 value={sort}
                 onChange={(e) => {
-                  setSort(e.target.value as NonNullable<ListEventsParams["sort"]>)
+                  setSort(e.target.value)
                   setPage(1)
                 }}
                 className="h-8 appearance-none cursor-pointer rounded-lg border border-border bg-card pl-3 pr-8 font-mono text-xs font-medium text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -266,7 +264,7 @@ export function FullEventsTable() {
           </table>
         </div>
 
-        {/* Pagination — luôn dính đáy bảng, không bị đẩy khỏi màn hình */}
+        {/* Pagination — tổng số trang do backend tính và trả về trong total_pages */}
         <div className="flex shrink-0 items-center justify-end gap-3 border-t border-border px-6 py-2">
           <button
             type="button"

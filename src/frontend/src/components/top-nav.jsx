@@ -3,18 +3,14 @@ import { Link, useLocation } from "react-router-dom"
 
 /**
  * Mỗi mục menu quản một NHÓM route, không chỉ một đường dẫn duy nhất.
- * Nhờ vậy các trang con của Dashboard (danh sách tất cả sự kiện, tạo / sửa sự kiện)
+ * Nhờ vậy các trang con của Dashboard (danh sách tất cả sự kiện, tạo / sửa / xem sự kiện)
  * vẫn giữ gạch chân ở mục "Dashboard".
  *
  * - `path`  : đường dẫn khi bấm vào menu
  * - `match` : danh sách tiền tố route thuộc về mục này
  *             (`exact: true` = chỉ khớp đúng chuỗi, dùng cho "/" để nó không nuốt mọi route)
  */
-const navItems: {
-  label: string
-  path: string
-  match: { prefix: string; exact?: boolean }[]
-}[] = [
+const navItems = [
   {
     // Trang khám phá sự kiện dành cho sinh viên — chưa dựng, tạm để cùng "/"
     label: "Trang chủ",
@@ -41,7 +37,7 @@ const navItems: {
   },
 ]
 
-function isActive(pathname: string, item: (typeof navItems)[number]): boolean {
+function isActive(pathname, item) {
   return item.match.some(({ prefix, exact }) =>
     exact ? pathname === prefix : pathname === prefix || pathname.startsWith(`${prefix}/`),
   )

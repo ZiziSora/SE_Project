@@ -7,7 +7,7 @@ import { EventForm } from '../components/event-form';
  * mọi ô nhập bị khoá, không có nút lưu.
  */
 export default function ViewEvent() {
-  const { eventId } = useParams<{ eventId: string }>();
+  const { eventId } = useParams();
 
   return <EventForm mode="view" eventId={eventId} />;
 }

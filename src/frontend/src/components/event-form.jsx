@@ -1,14 +1,10 @@
-import React, { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from "react-router-dom";
 import {
   categoriesApi,
   eventsApi,
   getStatusDisplay,
   uploadsApi,
-  type CategoryDTO,
-  type EventDTO,
-  type EventPayload,
-  type EventStatus,
 } from '../lib/api';
 
 import {
@@ -28,14 +24,7 @@ import { TopNav } from './top-nav';
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-interface CardProps {
-  icon: React.ReactNode;
-  title: string;
-  required?: boolean;
-  children: React.ReactNode;
-}
-
-function Card({ icon, title, required, children }: CardProps) {
+function Card({ icon, title, required, children }) {
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
       <div className="px-5 py-3 flex items-center gap-2 border-b border-slate-100">
@@ -48,12 +37,7 @@ function Card({ icon, title, required, children }: CardProps) {
   );
 }
 
-interface FieldLabelProps {
-  label: string;
-  required?: boolean;
-}
-
-function FieldLabel({ label, required }: FieldLabelProps) {
+function FieldLabel({ label, required }) {
   return (
     <label className="block text-[11px] font-semibold tracking-wider text-slate-500 mb-1 uppercase">
       {label}
@@ -75,16 +59,16 @@ const inputCls =
  * dạng "2026-08-08T09:00:00". Vì vậy chỉ cắt chuỗi thay vì dùng `new Date()` —
  * new Date() sẽ hiểu là UTC rồi đổi sang giờ máy, làm lệch mất vài tiếng.
  */
-function isoToDatePart(iso?: string | null): string {
+function isoToDatePart(iso) {
   return iso ? iso.slice(0, 10) : '';
 }
 
-function isoToTimePart(iso?: string | null): string {
+function isoToTimePart(iso) {
   return iso ? iso.slice(11, 16) : '';
 }
 
 /** datetime-local cần đúng định dạng "yyyy-MM-ddTHH:mm" */
-function isoToDatetimeLocal(iso?: string | null): string {
+function isoToDatetimeLocal(iso) {
   return iso ? iso.slice(0, 16) : '';
 }
 
@@ -103,14 +87,14 @@ const emptyForm = {
   description: '',
 };
 
-export interface EventFormProps {
-  /** 'view' = chỉ xem, mọi ô nhập bị khoá */
-  mode: 'create' | 'edit' | 'view';
-  /** Bắt buộc khi mode = 'edit' hoặc 'view' */
-  eventId?: string;
-}
-
-export function EventForm({ mode, eventId }: EventFormProps) {
+/**
+ * Form dùng chung cho cả 3 màn hình sự kiện.
+ *
+ * @param {object}  props
+ * @param {'create'|'edit'|'view'} props.mode  'view' = chỉ xem, mọi ô nhập bị khoá
+ * @param {string} [props.eventId]             Bắt buộc khi mode = 'edit' hoặc 'view'
+ */
+export function EventForm({ mode, eventId }) {
   const navigate = useNavigate();
   const isEdit = mode === 'edit';
   const isView = mode === 'view';
@@ -120,30 +104,30 @@ export function EventForm({ mode, eventId }: EventFormProps) {
   const [dragOver, setDragOver] = useState(false);
 
   // Ảnh bìa: coverImage để hiển thị, bannerUrl là URL thật đã lưu trên Storage
-  const [coverImage, setCoverImage] = useState<string | null>(null);
-  const [bannerUrl, setBannerUrl] = useState<string | null>(null);
+  const [coverImage, setCoverImage] = useState(null);
+  const [bannerUrl, setBannerUrl] = useState(null);
   const [uploadingBanner, setUploadingBanner] = useState(false);
 
   // Tài liệu kế hoạch: tệp lên bucket `event_plan`, URL lưu vào cột `file_url`
-  const [planFileName, setPlanFileName] = useState<string | null>(null);
-  const [planFileUrl, setPlanFileUrl] = useState<string | null>(null);
+  const [planFileName, setPlanFileName] = useState(null);
+  const [planFileUrl, setPlanFileUrl] = useState(null);
   const [uploadingPlan, setUploadingPlan] = useState(false);
 
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(needsLoad);
-  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState(null);
 
   // Trạng thái hiện tại của sự kiện (chỉ có nghĩa ở mode edit / view)
-  const [currentStatus, setCurrentStatus] = useState<EventStatus>('DRAFT');
+  const [currentStatus, setCurrentStatus] = useState('DRAFT');
   const [requiresReapproval, setRequiresReapproval] = useState(false);
   const [canEdit, setCanEdit] = useState(false);
   const [registeredLabel, setRegisteredLabel] = useState('');
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const planInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef(null);
+  const planInputRef = useRef(null);
 
-  const [categories, setCategories] = useState<CategoryDTO[]>([]);
-  const [suggestedLocations, setSuggestedLocations] = useState<string[]>([]);
+  const [categories, setCategories] = useState([]);
+  const [suggestedLocations, setSuggestedLocations] = useState([]);
   const [formData, setFormData] = useState(emptyForm);
 
   // ─── Nạp danh mục + gợi ý địa điểm ───
@@ -179,7 +163,7 @@ export function EventForm({ mode, eventId }: EventFormProps) {
       setLoading(true);
       setLoadError(null);
       try {
-        const event: EventDTO = await eventsApi.get(eventId!);
+        const event = await eventsApi.get(eventId);
         if (cancelled) return;
 
         setFormData({
@@ -219,13 +203,13 @@ export function EventForm({ mode, eventId }: EventFormProps) {
     };
   }, [needsLoad, eventId]);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+  const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   // --- UPLOAD ẢNH BÌA → bucket banner_event ---
-  const uploadCover = async (file: File) => {
+  const uploadCover = async (file) => {
     const previousUrl = bannerUrl;
     setCoverImage(URL.createObjectURL(file)); // preview ngay lập tức
     setUploadingBanner(true);
@@ -243,7 +227,7 @@ export function EventForm({ mode, eventId }: EventFormProps) {
     }
   };
 
-  const handleDrop = (e: React.DragEvent) => {
+  const handleDrop = (e) => {
     e.preventDefault();
     setDragOver(false);
     const file = e.dataTransfer.files[0];
@@ -252,7 +236,7 @@ export function EventForm({ mode, eventId }: EventFormProps) {
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (e) => {
     const file = e.target.files?.[0];
     if (file) {
       uploadCover(file);
@@ -260,7 +244,7 @@ export function EventForm({ mode, eventId }: EventFormProps) {
   };
 
   // --- UPLOAD TÀI LIỆU KẾ HOẠCH → bucket event_plan ---
-  const handlePlanChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePlanChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     setUploadingPlan(true);
@@ -276,8 +260,11 @@ export function EventForm({ mode, eventId }: EventFormProps) {
     }
   };
 
-  // --- LƯU: tạo mới hoặc cập nhật ---
-  const handleSave = async (targetStatus: 'DRAFT' | 'PENDING' | 'KEEP') => {
+  /**
+   * Lưu: tạo mới hoặc cập nhật.
+   * @param {'DRAFT'|'PENDING'|'KEEP'} targetStatus
+   */
+  const handleSave = async (targetStatus) => {
     if (submitting) return;
 
     // Không kiểm tra riêng lẻ ở client. Backend trả về MỘT thông báo liệt kê đầy đủ
@@ -295,7 +282,7 @@ export function EventForm({ mode, eventId }: EventFormProps) {
         ? `${formData.end_date}T${formData.end_time}:00`
         : null;
 
-    const payload: EventPayload = {
+    const payload = {
       title: formData.title || (targetStatus === 'DRAFT' ? 'Sự kiện chưa có tên' : ''),
       category_id: formData.category_id ? parseInt(formData.category_id, 10) : null,
       location: formData.location || null,

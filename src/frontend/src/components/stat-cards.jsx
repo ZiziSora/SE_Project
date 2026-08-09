@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react"
 import { Calendar, CircleCheck, FileText, Send } from "lucide-react"
-import { eventsApi, type StatsDTO } from "../lib/api" // Backend Python (FastAPI)
+import { eventsApi } from "../lib/api" // Backend Python (FastAPI)
 
-const EMPTY_STATS: StatsDTO = {
+const EMPTY_STATS = {
   total: 0,
   published: 0,
   draft: 0,
@@ -13,7 +13,7 @@ const EMPTY_STATS: StatsDTO = {
 }
 
 export function StatCards() {
-  const [statsData, setStatsData] = useState<StatsDTO>(EMPTY_STATS)
+  const [statsData, setStatsData] = useState(EMPTY_STATS)
 
   // Lấy số liệu thống kê từ endpoint GET /api/events/stats
   useEffect(() => {

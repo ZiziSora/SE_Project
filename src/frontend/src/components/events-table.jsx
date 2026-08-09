@@ -7,7 +7,6 @@ import {
   formatDateTime,
   formatRegistered,
   getStatusDisplay,
-  type EventDTO,
 } from "../lib/api" // Backend Python (FastAPI) — không còn gọi Supabase trực tiếp
 
 const headers = ["TÊN SỰ KIỆN", "THỜI GIAN", "TRẠNG THÁI", "NGƯỜI ĐĂNG KÝ", "THAO TÁC"]
@@ -17,9 +16,9 @@ const headers = ["TÊN SỰ KIỆN", "THỜI GIAN", "TRẠNG THÁI", "NGƯỜI �
 const cellCls = "border-t border-border px-6 py-2.5"
 
 export function EventsTable() {
-  const [rows, setRows] = useState<EventDTO[]>([])
-  const [loading, setLoading] = useState<boolean>(true)
-  const [error, setError] = useState<string | null>(null)
+  const [rows, setRows] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
   useEffect(() => {
     let cancelled = false
@@ -43,7 +42,7 @@ export function EventsTable() {
     }
   }, [])
 
-  const handleDelete = async (event: EventDTO) => {
+  const handleDelete = async (event) => {
     if (!event.event_id) return
     if (!window.confirm(`Xoá sự kiện "${event.title}"?`)) return
     try {
@@ -55,14 +54,16 @@ export function EventsTable() {
   }
 
   return (
-    // flex-1 (KHÔNG dùng h-full): chỉ chiếm phần chiều cao CÒN LẠI sau tiêu đề và thẻ
-    // thống kê. h-full = 100% chiều cao cha nên bảng sẽ dài quá khổ và bị cắt mất footer.
-    // min-h-0 cho phép phần thân co lại để scrollbar nằm bên trong bảng.
-    <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+    // KHÔNG dùng flex-1 / h-full: bảng cao đúng bằng nội dung, ít sự kiện thì khung
+    // ngắn lại thay vì kéo dài ra hết màn hình.
+    // Mặc định flex-shrink = 1, cộng với min-h-0, nên khi danh sách dài quá chỗ trống
+    // thì khung vẫn tự co lại và phần thân bên trong cuộn — không tràn khỏi viewport.
+    <section className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm">
       <h2 className="shrink-0 px-6 py-2.5 text-lg font-semibold text-foreground">Sự kiện Quản lý Gần đây</h2>
 
-      {/* Vùng cuộn nằm bên trong bảng thay vì đẩy dài cả trang */}
-      <div className="min-h-0 flex-1 overflow-auto">
+      {/* flex-auto (= flex: 1 1 auto) chứ không phải flex-1 (basis 0): cao theo nội dung,
+          chỉ co lại và bật thanh cuộn khi thiếu chỗ. */}
+      <div className="min-h-0 flex-auto overflow-auto">
         <table className="w-full min-w-[720px] border-separate border-spacing-0 text-left">
           {/* bg-card làm nền đục cho hàng tiêu đề khi dính, giữ nguyên tông màu secondary/60 */}
           <thead className="sticky top-0 z-10 bg-card">
