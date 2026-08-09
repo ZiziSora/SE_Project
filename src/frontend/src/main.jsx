@@ -1,13 +1,8 @@
-import { StrictMode } from "react"
-import { createRoot } from "react-dom/client"
-import { BrowserRouter, Routes, Route } from "react-router-dom"
-// Import 2 trang của bạn
-import ManageEvents from "./pages/manage-events"
-import AllEvents from "./pages/all-events"
-import CreateEvent from "./pages/create-event"
-// Trang chỉnh sửa / xem sự kiện — export default nên KHÔNG dùng ngoặc nhọn
-import EditEvent from "./pages/edit-event"
-import ViewEvent from "./pages/view-event"
+import { StrictMode } from 'react'
+import { createRoot } from 'react-dom/client'
+import './index.css'
+
+import App from './App.jsx'
 
 import "./index.css"
 
