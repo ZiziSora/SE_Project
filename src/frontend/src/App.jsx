@@ -1,12 +1,10 @@
-import {
-  BrowserRouter,
-  Link,
-  Route,
-  Routes,
-} from "react-router-dom";
+import { BrowserRouter, Link, Navigate, Route, Routes } from "react-router-dom";
 import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
+import { EventDetailPage } from "./pages/EventDetailPage.jsx";
+import { DEFAULT_EVENT_ID } from "./components/EventDetail/eventDetailUtils";
+import ProtectedRoute from "./components/ProtectedRoute.jsx";
 import AllEvents from "./pages/all-events.jsx";
 import AuthCallbackPage from "./pages/AuthCallbackPage.jsx";
 import CreateEvent from "./pages/create-event.jsx";
@@ -55,15 +53,86 @@ function NotFoundPage() {
   );
 }
 
+function HomePage() {
+  const canManageEvents = localStorage.getItem("can_manage_events") === "true";
+
+  return canManageEvents ? (
+    <ManageEvents />
+  ) : (
+    <Navigate to={`/events/${DEFAULT_EVENT_ID}`} replace />
+  );
+}
+
+function EventsIndexPage() {
+  const canManageEvents = localStorage.getItem("can_manage_events") === "true";
+
+  return canManageEvents ? (
+    <Navigate to="/" replace />
+  ) : (
+    <Navigate to={`/events/${DEFAULT_EVENT_ID}`} replace />
+  );
+}
+
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<ManageEvents />} />
-        <Route path="/create-event" element={<CreateEvent />} />
-        <Route path="/all-events" element={<AllEvents />} />
-        <Route path="/edit-event/:eventId" element={<EditEvent />} />
-        <Route path="/events/:eventId" element={<ViewEvent />} />
+        <Route
+          path="/"
+          element={
+            <ProtectedRoute>
+              <HomePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/create-event"
+          element={
+            <ProtectedRoute>
+              <CreateEvent />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/all-events"
+          element={
+            <ProtectedRoute>
+              <AllEvents />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/edit-event/:eventId"
+          element={
+            <ProtectedRoute>
+              <EditEvent />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/organizer/events/:eventId"
+          element={
+            <ProtectedRoute>
+              <ViewEvent />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/events"
+          element={
+            <ProtectedRoute>
+              <EventsIndexPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/events/:eventId"
+          element={
+            <ProtectedRoute>
+              <EventDetailPage />
+            </ProtectedRoute>
+          }
+        />
 
         <Route path="/auth">
           <Route path="login" element={<LoginPage />} />
@@ -82,7 +151,14 @@ export default function App() {
           <Route path="organizer/profile" element={<OrganizerProfile />} />
         </Route>
 
-        <Route path="/my-events" element={<MyEventsPage />} />
+        <Route
+          path="/my-events"
+          element={
+            <ProtectedRoute>
+              <MyEventsPage />
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="/explore"
           element={
@@ -105,11 +181,7 @@ export default function App() {
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
 
-      <ToastContainer
-        position="top-right"
-        autoClose={2000}
-        theme="light"
-      />
+      <ToastContainer position="top-right" autoClose={2000} theme="light" />
     </BrowserRouter>
   );
 }

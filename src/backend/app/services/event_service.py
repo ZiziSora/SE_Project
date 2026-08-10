@@ -10,15 +10,16 @@ from typing import Any, Optional
 from fastapi import HTTPException, status
 from postgrest.exceptions import APIError
 
-from ..config import settings
-from ..db import get_supabase
-from ..schemas import (
-    CategoryOut,
+from app.core.config import TABLE_CATEGORIES, TABLE_EVENTS, TABLE_REGISTRATIONS
+from app.core.supabase_client import get_supabase
+from app.schemas.category import CategoryOut
+from app.schemas.event import EventOut as PublicEventOut
+from app.schemas.organizer_event import (
     EventCreate,
     EventListOut,
-    EventOut,
     EventStatus,
     EventUpdate,
+    OrganizerEventOut,
     StatsOut,
     missing_required_fields,
 )
@@ -74,7 +75,7 @@ def list_events(
     page_size: int = 5,
 ) -> EventListOut:
     sb = get_supabase()
-    query = sb.table(settings.TABLE_EVENTS).select("*", count="exact")
+    query = sb.table(TABLE_EVENTS).select("*", count="exact")
 
     if search:
         query = query.ilike("title", f"%{search}%")
@@ -97,7 +98,7 @@ def list_events(
 
     categories = _category_map()
     counts = _registration_counts([_row_id(r) for r in rows])
-    items = [_to_event_out(r, categories, counts) for r in rows]
+    items = [_to_organizer_event_out(r, categories, counts) for r in rows]
 
     return EventListOut(
         items=items,
@@ -108,22 +109,27 @@ def list_events(
     )
 
 
-def get_event(event_id: str) -> EventOut:
-    sb = get_supabase()
-    res = _run(
-        sb.table(settings.TABLE_EVENTS).select("*").eq("event_id", event_id).limit(1)
+def get_event(event_id: str, organizer_id: str) -> OrganizerEventOut:
+    row = _get_raw(event_id, organizer_id)
+    return _to_organizer_event_out(
+        row, _category_map(), _registration_counts([_row_id(row)])
     )
-    if not res.data:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy sự kiện."
-        )
-    row = res.data[0]
-    return _to_event_out(row, _category_map(), _registration_counts([_row_id(row)]))
+
+
+def get_event_by_id(event_id: str) -> Optional[PublicEventOut]:
+    """Return the public event representation using the shared event lookup."""
+    row = _find_raw(event_id)
+    if row is None:
+        return None
+
+    data = dict(row)
+    data["category_name"] = _category_map().get(row.get("category_id"))
+    return PublicEventOut(**data)
 
 
 def get_stats(organizer_id: Optional[str] = None) -> StatsOut:
     sb = get_supabase()
-    query = sb.table(settings.TABLE_EVENTS).select("event_status")
+    query = sb.table(TABLE_EVENTS).select("event_status")
     if organizer_id:
         query = query.eq("organizer_id", organizer_id)
     rows = _run(query).data or []
@@ -147,7 +153,7 @@ def get_stats(organizer_id: Optional[str] = None) -> StatsOut:
 def list_categories() -> list[CategoryOut]:
     res = _run(
         get_supabase()
-        .table(settings.TABLE_CATEGORIES)
+        .table(TABLE_CATEGORIES)
         .select("category_id, name")
         .order("name")
     )
@@ -158,7 +164,7 @@ def list_locations() -> list[str]:
     """Gợi ý địa điểm dựa trên các sự kiện đã có."""
     res = _run(
         get_supabase()
-        .table(settings.TABLE_EVENTS)
+        .table(TABLE_EVENTS)
         .select("location")
         .not_.is_("location", "null")
         .limit(500)
@@ -174,22 +180,30 @@ def list_locations() -> list[str]:
 # ─── Ghi ──────────────────────────────────────────────────────────────────────
 
 
-def create_event(payload: EventCreate) -> EventOut:
+def create_event(
+    payload: EventCreate,
+    organizer_id: str,
+) -> OrganizerEventOut:
     data = payload.model_dump(exclude_none=True, mode="json")
     data["event_status"] = payload.event_status.value
+    data["organizer_id"] = organizer_id
     data.setdefault("title", "Sự kiện chưa có tên")
 
-    res = _run(get_supabase().table(settings.TABLE_EVENTS).insert(data))
+    res = _run(get_supabase().table(TABLE_EVENTS).insert(data))
     if not res.data:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Tạo sự kiện thất bại.",
         )
-    return _to_event_out(res.data[0], _category_map(), {})
+    return _to_organizer_event_out(res.data[0], _category_map(), {})
 
 
-def update_event(event_id: str, payload: EventUpdate) -> EventOut:
-    current = _get_raw(event_id)
+def update_event(
+    event_id: str,
+    payload: EventUpdate,
+    organizer_id: str,
+) -> OrganizerEventOut:
+    current = _get_raw(event_id, organizer_id)
     current_status = (current.get("event_status") or EventStatus.DRAFT.value).upper()
 
     data = payload.model_dump(exclude_unset=True, mode="json")
@@ -197,7 +211,7 @@ def update_event(event_id: str, payload: EventUpdate) -> EventOut:
         data["event_status"] = payload.event_status.value
 
     if not data:
-        return _to_event_out(current, _category_map(), {})
+        return _to_organizer_event_out(current, _category_map(), {})
 
     # Sự kiện đã kết thúc / đã huỷ thì không cho sửa nữa
     if current_status in LOCKED_STATUSES:
@@ -231,28 +245,41 @@ def update_event(event_id: str, payload: EventUpdate) -> EventOut:
                 detail="Thiếu thông tin bắt buộc: " + ", ".join(missing),
             )
 
-    res = _run(
+    query = (
         get_supabase()
-        .table(settings.TABLE_EVENTS)
+        .table(TABLE_EVENTS)
         .update(data)
         .eq("event_id", event_id)
+        .eq("organizer_id", organizer_id)
     )
+    res = _run(query)
     row = res.data[0] if res.data else merged
-    return _to_event_out(row, _category_map(), _registration_counts([event_id]))
+    return _to_organizer_event_out(
+        row, _category_map(), _registration_counts([event_id])
+    )
 
 
-def delete_event(event_id: str) -> None:
-    _get_raw(event_id)
+def delete_event(event_id: str, organizer_id: str) -> None:
+    _get_raw(event_id, organizer_id)
     _run(
         get_supabase()
-        .table(settings.TABLE_EVENTS)
+        .table(TABLE_EVENTS)
         .delete()
         .eq("event_id", event_id)
+        .eq("organizer_id", organizer_id)
     )
 
 
-def change_status(event_id: str, new_status: EventStatus) -> EventOut:
-    return update_event(event_id, EventUpdate(event_status=new_status))
+def change_status(
+    event_id: str,
+    new_status: EventStatus,
+    organizer_id: str,
+) -> OrganizerEventOut:
+    return update_event(
+        event_id,
+        EventUpdate(event_status=new_status),
+        organizer_id,
+    )
 
 
 # ─── Internal helpers ─────────────────────────────────────────────────────────
@@ -274,19 +301,29 @@ def _run(query):
         ) from exc
 
 
-def _get_raw(event_id: str) -> dict[str, Any]:
-    res = _run(
+def _find_raw(
+    event_id: str,
+    organizer_id: Optional[str] = None,
+) -> Optional[dict[str, Any]]:
+    query = (
         get_supabase()
-        .table(settings.TABLE_EVENTS)
+        .table(TABLE_EVENTS)
         .select("*")
         .eq("event_id", event_id)
-        .limit(1)
     )
-    if not res.data:
+    if organizer_id is not None:
+        query = query.eq("organizer_id", organizer_id)
+    res = _run(query.limit(1))
+    return res.data[0] if res.data else None
+
+
+def _get_raw(event_id: str, organizer_id: str) -> dict[str, Any]:
+    row = _find_raw(event_id, organizer_id)
+    if row is None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="Không tìm thấy sự kiện."
         )
-    return res.data[0]
+    return row
 
 
 def _row_id(row: dict[str, Any]) -> str:
@@ -297,7 +334,7 @@ def _category_map() -> dict[int, str]:
     try:
         res = (
             get_supabase()
-            .table(settings.TABLE_CATEGORIES)
+            .table(TABLE_CATEGORIES)
             .select("category_id, name")
             .execute()
         )
@@ -317,7 +354,7 @@ def _registration_counts(event_ids: list[str]) -> dict[str, int]:
     try:
         res = (
             get_supabase()
-            .table(settings.TABLE_REGISTRATIONS)
+            .table(TABLE_REGISTRATIONS)
             .select("event_id")
             .in_("event_id", ids)
             .execute()
@@ -380,11 +417,11 @@ def _aware(dt: Optional[datetime]) -> Optional[datetime]:
     return dt
 
 
-def _to_event_out(
+def _to_organizer_event_out(
     row: dict[str, Any],
     categories: dict[int, str],
     counts: dict[str, int],
-) -> EventOut:
+) -> OrganizerEventOut:
     event_id = _row_id(row)
     capacity = row.get("capacity")
     registered = counts.get(event_id, 0)
@@ -399,7 +436,7 @@ def _to_event_out(
         and not is_full
     )
 
-    return EventOut(
+    return OrganizerEventOut(
         event_id=event_id or None,
         title=row.get("title"),
         category_id=row.get("category_id"),

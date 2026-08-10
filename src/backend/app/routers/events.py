@@ -1,84 +1,122 @@
-"""Endpoints quản lý sự kiện dành cho Ban tổ chức (Organizer)."""
 from typing import Optional
 
-from fastapi import APIRouter, Query, Response, status
+from fastapi import APIRouter, Depends, HTTPException, status
+from supabase_auth.types import User
 
-from ..schemas import (
-    EventCreate,
-    EventListOut,
-    EventOut,
-    EventStatusUpdate,
-    EventUpdate,
-    StatsOut,
+from app.core.security import get_current_user, require_current_user
+from app.schemas.event import EventOut
+from app.schemas.registration import RegisterResponseOut, RegistrationStatusOut
+from app.schemas.saved_event import (
+    RemoveSavedEventResponseOut,
+    SavedEventStatusOut,
+    SaveEventResponseOut,
 )
-from ..services import event_service
+from app.services import event_service, registration_service, saved_event_service
 
 router = APIRouter(prefix="/api/events", tags=["events"])
 
 
-@router.get("", response_model=EventListOut, summary="Danh sách sự kiện (lọc/tìm/phân trang)")
-def list_events(
-    search: Optional[str] = Query(None, description="Tìm theo tên sự kiện"),
-    status_filter: Optional[str] = Query(
-        None, alias="status", description="DRAFT | PENDING | PUBLISHED | ONGOING | ENDED | CANCELLED | ALL"
-    ),
-    organizer_id: Optional[str] = Query(None),
-    sort: str = Query("newest", description="newest | oldest | title | created"),
-    page: int = Query(1, ge=1),
-    page_size: int = Query(5, ge=1, le=100),
-):
-    return event_service.list_events(
-        search=search,
-        status_filter=status_filter,
-        organizer_id=organizer_id,
-        sort=sort,
-        page=page,
-        page_size=page_size,
+@router.get("/{event_id}", response_model=EventOut)
+def read_event(event_id: str) -> EventOut:
+    event = event_service.get_event_by_id(event_id)
+    if not event:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f'Không tìm thấy sự kiện với ID "{event_id}".',
+        )
+    return event
+
+
+@router.get("/{event_id}/registration-status", response_model=RegistrationStatusOut)
+def read_registration_status(
+    event_id: str,
+    current_user: Optional[User] = Depends(get_current_user),
+) -> RegistrationStatusOut:
+    event = event_service.get_event_by_id(event_id)
+    if not event:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f'Không tìm thấy sự kiện với ID "{event_id}".',
+        )
+
+    count = registration_service.get_registration_count(event_id)
+    registered = (
+        registration_service.is_user_registered(event_id, current_user.id)
+        if current_user
+        else False
     )
 
-
-@router.get("/stats", response_model=StatsOut, summary="Số liệu thống kê Dashboard")
-def get_stats(organizer_id: Optional[str] = Query(None)):
-    return event_service.get_stats(organizer_id)
+    return RegistrationStatusOut(count=count, capacity=event.capacity, registered=registered)
 
 
-@router.get("/locations", response_model=list[str], summary="Gợi ý địa điểm")
-def list_locations():
-    return event_service.list_locations()
+@router.post("/{event_id}/register", response_model=RegisterResponseOut)
+def register_for_event(
+    event_id: str,
+    current_user: User = Depends(require_current_user),
+) -> RegisterResponseOut:
+    event = event_service.get_event_by_id(event_id)
+    if not event:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f'Không tìm thấy sự kiện với ID "{event_id}".',
+        )
+
+    count = registration_service.get_registration_count(event_id)
+    already_registered = registration_service.is_user_registered(event_id, current_user.id)
+
+    if not already_registered and event.capacity is not None and count >= event.capacity:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Sự kiện đã đủ số lượng đăng ký.",
+        )
+
+    already_registered = registration_service.register_user(event_id, current_user.id)
+    if not already_registered:
+        count += 1
+
+    return RegisterResponseOut(already_registered=already_registered, count=count)
 
 
-@router.get("/{event_id}", response_model=EventOut, summary="Chi tiết sự kiện")
-def get_event(event_id: str):
-    return event_service.get_event(event_id)
+@router.get("/{event_id}/saved-status", response_model=SavedEventStatusOut)
+def read_saved_status(
+    event_id: str,
+    current_user: Optional[User] = Depends(get_current_user),
+) -> SavedEventStatusOut:
+    event = event_service.get_event_by_id(event_id)
+    if not event:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f'Không tìm thấy sự kiện với ID "{event_id}".',
+        )
+
+    saved = (
+        saved_event_service.is_event_saved(event_id, current_user.id)
+        if current_user
+        else False
+    )
+    return SavedEventStatusOut(saved=saved)
 
 
-@router.post(
-    "",
-    response_model=EventOut,
-    status_code=status.HTTP_201_CREATED,
-    summary="Tạo sự kiện (DRAFT hoặc PENDING chờ duyệt)",
-)
-def create_event(payload: EventCreate):
-    return event_service.create_event(payload)
+@router.post("/{event_id}/save", response_model=SaveEventResponseOut)
+def bookmark_event(
+    event_id: str,
+    current_user: User = Depends(require_current_user),
+) -> SaveEventResponseOut:
+    event = event_service.get_event_by_id(event_id)
+    if not event:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f'Không tìm thấy sự kiện với ID "{event_id}".',
+        )
+
+    already_saved = saved_event_service.save_event(event_id, current_user.id)
+    return SaveEventResponseOut(saved=True, already_saved=already_saved)
 
 
-@router.put("/{event_id}", response_model=EventOut, summary="Cập nhật sự kiện")
-def update_event(event_id: str, payload: EventUpdate):
-    return event_service.update_event(event_id, payload)
-
-
-@router.patch(
-    "/{event_id}/status", response_model=EventOut, summary="Đổi trạng thái sự kiện"
-)
-def change_status(event_id: str, payload: EventStatusUpdate):
-    return event_service.change_status(event_id, payload.event_status)
-
-
-@router.delete(
-    "/{event_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
-    summary="Xoá sự kiện",
-)
-def delete_event(event_id: str):
-    event_service.delete_event(event_id)
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{event_id}/save", response_model=RemoveSavedEventResponseOut)
+def unbookmark_event(
+    event_id: str,
+    current_user: User = Depends(require_current_user),
+) -> RemoveSavedEventResponseOut:
+    removed = saved_event_service.remove_saved_event(event_id, current_user.id)
+    return RemoveSavedEventResponseOut(removed=removed)

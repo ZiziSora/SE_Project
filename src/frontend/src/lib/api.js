@@ -1,14 +1,22 @@
 /**
  * Lớp giao tiếp duy nhất giữa Frontend và Backend Python (FastAPI).
  *
- * Toàn bộ code gọi Supabase đã được chuyển sang backend.
- * Các component chỉ import từ file này, không import supabase-js nữa.
+ * Dữ liệu nghiệp vụ luôn đi qua backend; Supabase chỉ được dùng để lấy
+ * access token của phiên đăng nhập cho header Authorization.
  *
  * Cấu hình: tạo file .env ở thư mục frontend với dòng
  *   VITE_API_BASE_URL=http://localhost:8000
  */
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000"
+import { supabase } from "./supabase"
+
+const configuredBaseUrl =
+  import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000"
+
+// Chấp nhận cả `http://localhost:8000` và URL cũ có hậu tố `/api`.
+const API_BASE_URL = configuredBaseUrl
+  .replace(/\/+$/, "")
+  .replace(/\/api$/, "")
 
 // ─── Hình dạng dữ liệu (chỉ để tham khảo, không ràng buộc lúc chạy) ───────────
 //
@@ -50,14 +58,29 @@ export class ApiError extends Error {
  * @returns {Promise<any>}
  */
 async function request(path, init = {}) {
+  const headers = new Headers(init.headers ?? {})
+  const isFormData = init.body instanceof FormData
+
+  if (init.body && !isFormData && !headers.has("Content-Type")) {
+    headers.set("Content-Type", "application/json")
+  }
+
+  try {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+    if (session?.access_token && !headers.has("Authorization")) {
+      headers.set("Authorization", `Bearer ${session.access_token}`)
+    }
+  } catch {
+    // Public endpoints vẫn có thể được gọi khi Supabase session không khả dụng.
+  }
+
   let response
   try {
     response = await fetch(`${API_BASE_URL}${path}`, {
       ...init,
-      headers:
-        init.body instanceof FormData
-          ? init.headers
-          : { "Content-Type": "application/json", ...(init.headers ?? {}) },
+      headers,
     })
   } catch {
     throw new ApiError("Không kết nối được tới máy chủ. Kiểm tra backend đã chạy chưa.", 0)
@@ -101,49 +124,49 @@ function toQueryString(params) {
 
 export const eventsApi = {
   /**
-   * @param {{ search?: string, status?: string, organizer_id?: string,
+   * @param {{ search?: string, status?: string,
    *           sort?: "newest"|"oldest"|"title"|"created",
    *           page?: number, page_size?: number }} [params]
    */
   list(params = {}) {
-    return request(`/api/events${toQueryString(params)}`)
+    return request(`/api/organizer/events${toQueryString(params)}`)
   },
 
   get(eventId) {
-    return request(`/api/events/${eventId}`)
+    return request(`/api/organizer/events/${eventId}`)
   },
 
-  stats(organizerId) {
-    return request(`/api/events/stats${toQueryString({ organizer_id: organizerId })}`)
+  stats() {
+    return request("/api/organizer/events/stats")
   },
 
   locations() {
-    return request("/api/events/locations")
+    return request("/api/organizer/events/locations")
   },
 
   create(payload) {
-    return request("/api/events", {
+    return request("/api/organizer/events", {
       method: "POST",
       body: JSON.stringify(payload),
     })
   },
 
   update(eventId, payload) {
-    return request(`/api/events/${eventId}`, {
+    return request(`/api/organizer/events/${eventId}`, {
       method: "PUT",
       body: JSON.stringify(payload),
     })
   },
 
   changeStatus(eventId, eventStatus) {
-    return request(`/api/events/${eventId}/status`, {
+    return request(`/api/organizer/events/${eventId}/status`, {
       method: "PATCH",
       body: JSON.stringify({ event_status: eventStatus }),
     })
   },
 
   remove(eventId) {
-    return request(`/api/events/${eventId}`, { method: "DELETE" })
+    return request(`/api/organizer/events/${eventId}`, { method: "DELETE" })
   },
 }
 
@@ -210,4 +233,18 @@ export function formatDateTime(value) {
 
 export function formatRegistered(event) {
   return `${event.registered_count}/${event.capacity ?? "∞"}`
+}
+
+export const api = {
+  getEvent: (eventId) => request(`/api/events/${eventId}`),
+  getRegistrationStatus: (eventId) =>
+    request(`/api/events/${eventId}/registration-status`),
+  registerForEvent: (eventId) =>
+    request(`/api/events/${eventId}/register`, { method: "POST" }),
+  getSavedStatus: (eventId) =>
+    request(`/api/events/${eventId}/saved-status`),
+  saveEvent: (eventId) =>
+    request(`/api/events/${eventId}/save`, { method: "POST" }),
+  unsaveEvent: (eventId) =>
+    request(`/api/events/${eventId}/save`, { method: "DELETE" }),
 }
