@@ -1,7 +1,7 @@
 """Endpoints upload ảnh bìa và tệp kế hoạch sự kiện."""
 from fastapi import APIRouter, File, UploadFile
 
-from ..schemas import UploadOut
+from app.schemas.upload import UploadOut
 from ..services import storage_service
 
 router = APIRouter(prefix="/api/uploads", tags=["uploads"])

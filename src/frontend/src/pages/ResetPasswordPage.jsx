@@ -11,7 +11,7 @@ import {
 
 import hcmus from "../assets/hcmus.png";
 import InputField from "../components/InputField";
-import { supabase } from "../libs/supabaseClient";
+import { supabase } from "../lib/supabase";
 
 const INVALID_LINK_MESSAGE =
   "Liên kết đặt lại mật khẩu không hợp lệ hoặc đã hết hạn.";

@@ -17,7 +17,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { signupOrganizer } from "../api/authApi";
 import { toast } from "react-toastify";
-import { supabase } from "../libs/supabaseClient";
+import { supabase } from "../lib/supabase";
 
 const SignupPage = () => {
   const [showPassword, setShowPassword] = useState(false);

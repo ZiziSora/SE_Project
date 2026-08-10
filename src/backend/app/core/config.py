@@ -17,3 +17,7 @@ CORS_ORIGINS = [
     for origin in os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",")
     if origin.strip()
 ]
+
+TABLE_EVENTS = "events"
+TABLE_CATEGORIES = "event_categories"
+TABLE_REGISTRATIONS = "registrations"

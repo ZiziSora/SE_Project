@@ -1,7 +1,7 @@
 """Endpoint danh mục sự kiện."""
 from fastapi import APIRouter
 
-from ..schemas import CategoryOut
+from app.schemas.category import CategoryOut
 from ..services import event_service
 
 router = APIRouter(prefix="/api/categories", tags=["categories"])

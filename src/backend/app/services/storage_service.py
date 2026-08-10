@@ -17,7 +17,7 @@ from fastapi import HTTPException, UploadFile, status
 
 from ..config import settings
 from ..db import get_supabase
-from ..schemas import UploadOut
+from app.schemas.upload import UploadOut
 
 # Thư mục con bên trong mỗi bucket, gom tệp theo tháng cho dễ quản lý
 BANNER_FOLDER = "banners"

@@ -240,7 +240,7 @@ export function FullEventsTable() {
                             </Link>
                           )}
                           <Link
-                            to={`/events/${row.event_id}`}
+                              to={`/organizer/events/${row.event_id}`}
                             aria-label={`Xem ${row.title}`}
                             className="hover:text-foreground"
                           >
