@@ -37,7 +37,7 @@ Use `npx eslint src/pages/ExamplePage.jsx` or `pytest tests/test_example.py -q` 
 
 Use four spaces for Python and follow PEP 8. Python modules, functions, and variables use `snake_case`; classes use `PascalCase`. Keep routers thin: validation belongs in Pydantic schemas and business logic in services.
 
-Use two-space indentation for React code and treat ESLint as authoritative. Components and page files use `PascalCase` (`EventCard.jsx`); variables and hooks use `camelCase`. Use Tailwind CSS utilities and `lucide-react` icons. Keep user-facing text in Vietnamese and reuse existing API/Supabase clients instead of creating new ones.
+Use two-space indentation for React code and treat ESLint as authoritative. Components and page files use `PascalCase` (`EventCard.jsx`); variables and hooks use `camelCase`. A `.jsx` file must contain only one React component; extract every supporting component into its own file inside the relevant feature folder. Each component file must use a direct `default export`, and consumers must import from that `.jsx` file. Do not create barrel `index.js` files solely to re-export components. Use Tailwind CSS utilities and `lucide-react` icons. Keep user-facing text in Vietnamese and reuse existing API/Supabase clients instead of creating new ones.
 
 ## Testing Guidelines
 
