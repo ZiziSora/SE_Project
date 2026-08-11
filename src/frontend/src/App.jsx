@@ -16,6 +16,7 @@ import MyEventsPage from "./pages/MyEventsPage.jsx";
 import OrganizerProfile from "./pages/profile/OrganizerProfile.jsx";
 import StudentProfile from "./pages/profile/StudentProfile.jsx";
 import ResetPasswordPage from "./pages/ResetPasswordPage.jsx";
+import AdminStatisticsPage from "./pages/AdminStatisticsPage.jsx";
 import ReviewOrganizerRequest from "./pages/ReviewOrganizerRequest.jsx";
 import SelectRolePage from "./pages/SelectRolePage.jsx";
 import SignupOrganizerPage from "./pages/SignupOrganizerPage.jsx";
@@ -165,6 +166,14 @@ export default function App() {
           element={
             <ProtectedRoute>
               <ReviewOrganizerRequest />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/statistics"
+          element={
+            <ProtectedRoute>
+              <AdminStatisticsPage />
             </ProtectedRoute>
           }
         />
