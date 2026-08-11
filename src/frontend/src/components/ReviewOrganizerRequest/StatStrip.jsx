@@ -1,6 +1,6 @@
 import { Clock3, Inbox, UserCheck } from "lucide-react";
 
-export default function StatStrip({ totalRequests, pendingRequests, processedToday }) {
+export default function StatStrip({ totalRequests, pendingRequests, processedRequests }) {
   const stats = [
     {
       label: "Tổng yêu cầu",
@@ -17,9 +17,9 @@ export default function StatStrip({ totalRequests, pendingRequests, processedTod
       iconClass: "bg-[#fff3cf] text-[#9a6800]",
     },
     {
-      label: "Đã xử lý hôm nay",
-      value: processedToday,
-      detail: "Hồ sơ đã có kết quả",
+      label: "Đã xử lý",
+      value: processedRequests,
+      detail: "Đã chấp nhận hoặc từ chối",
       icon: UserCheck,
       iconClass: "bg-[#e7f6ef] text-[#137154]",
     },

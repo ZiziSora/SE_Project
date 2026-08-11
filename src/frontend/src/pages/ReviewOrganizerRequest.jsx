@@ -1,14 +1,20 @@
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Check,
   ChevronLeft,
   ChevronRight,
   FileCheck2,
+  LoaderCircle,
+  RefreshCw,
   Search,
   X,
 } from "lucide-react";
 import { toast } from "react-toastify";
 
+import {
+  getOrganizerRequests,
+  reviewOrganizerRequest,
+} from "../api/organizerRequestApi.js";
 import AdminHeader from "../components/ReviewOrganizerRequest/AdminHeader.jsx";
 import ConfirmActionDialog from "../components/ReviewOrganizerRequest/ConfirmActionDialog.jsx";
 import EvidenceDialog from "../components/ReviewOrganizerRequest/EvidenceDialog.jsx";
@@ -23,146 +29,110 @@ import "@fontsource/manrope/600.css";
 import "@fontsource/manrope/700.css";
 
 const PAGE_SIZE = 3;
-const TOTAL_REQUESTS = 124;
-const INITIAL_PENDING_REQUESTS = 118;
-const INITIAL_PROCESSED_TODAY = 6;
+const EMPTY_SUMMARY = { total: 0, pending: 0, approved: 0, rejected: 0 };
 
-const INITIAL_REQUESTS = [
-  {
-    id: 1,
-    name: "Joane Smith",
-    email: "jane.smith@university.edu",
-    initials: "JS",
-    avatarClass: "bg-[#7c3aed] text-white",
-    organization: "Câu lạc bộ Truyền thông Sinh viên",
-    reason:
-      "Đăng ký quyền ban tổ chức để quản lý các hoạt động và workshop dành cho sinh viên.",
-    evidence: ["Giấy xác nhận câu lạc bộ.pdf", "Quyết định thành lập.pdf"],
-    submittedAt: "2026-08-11T09:42:00+07:00",
-    status: "pending",
-  },
-  {
-    id: 2,
-    name: "Michael Johnson",
-    email: "mjohnson@dept.university.edu",
-    initials: "MJ",
-    avatarClass: "bg-[#dce7f8] text-[#526076]",
-    organization: "Khoa Công nghệ Thông tin",
-    reason:
-      "Đại diện khoa đăng ký tổ chức seminar học thuật và ngày hội tuyển dụng.",
-    evidence: ["Thư xác nhận của khoa.pdf"],
-    submittedAt: "2026-08-11T08:15:00+07:00",
-    status: "pending",
-  },
-  {
-    id: 3,
-    name: "Emily Wong",
-    email: "ewong22@students.university.edu",
-    initials: "EW",
-    avatarClass: "bg-[#d9e8ff] text-[#53657d]",
-    organization: "Đội Công tác Xã hội",
-    reason:
-      "Tổ chức các chương trình tình nguyện và hoạt động cộng đồng trong trường.",
-    evidence: ["Minh chứng hoạt động.pdf", "Danh sách ban chủ nhiệm.xlsx"],
-    submittedAt: "2026-08-10T16:28:00+07:00",
-    status: "pending",
-  },
-  {
-    id: 4,
-    name: "Nguyễn Minh Anh",
-    email: "minhanh@alumni.university.edu",
-    initials: "MA",
-    avatarClass: "bg-[#fde7c7] text-[#8b5b00]",
-    organization: "Mạng lưới Cựu sinh viên",
-    reason: "Đăng ký tổ chức chuỗi hoạt động kết nối cựu sinh viên.",
-    evidence: ["Giấy giới thiệu.pdf"],
-    submittedAt: "2026-08-10T13:05:00+07:00",
-    status: "pending",
-  },
-  {
-    id: 5,
-    name: "Trần Quốc Bảo",
-    email: "quocbao@business.university.edu",
-    initials: "QB",
-    avatarClass: "bg-[#dff3e7] text-[#216348]",
-    organization: "Câu lạc bộ Khởi nghiệp",
-    reason: "Tổ chức cuộc thi ý tưởng khởi nghiệp sinh viên năm 2026.",
-    evidence: ["Kế hoạch tổ chức.pdf"],
-    submittedAt: "2026-08-09T10:34:00+07:00",
-    status: "pending",
-  },
-  {
-    id: 6,
-    name: "Lê Thanh Hà",
-    email: "thanhha@arts.university.edu",
-    initials: "TH",
-    avatarClass: "bg-[#f3ddfa] text-[#75458c]",
-    organization: "Câu lạc bộ Nghệ thuật",
-    reason: "Đăng ký quản lý đêm nhạc gây quỹ thường niên của câu lạc bộ.",
-    evidence: ["Hồ sơ câu lạc bộ.pdf"],
-    submittedAt: "2026-08-08T14:20:00+07:00",
-    status: "pending",
-  },
-];
+function getApiErrorMessage(error, fallback) {
+  const detail = error?.response?.data?.detail;
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) {
+    return detail.map((item) => item.msg).filter(Boolean).join(" ") || fallback;
+  }
+  return fallback;
+}
 
 export default function ReviewOrganizerRequest() {
-  const [requests, setRequests] = useState(INITIAL_REQUESTS);
+  const [requests, setRequests] = useState([]);
+  const [summary, setSummary] = useState(EMPTY_SUMMARY);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [pendingAction, setPendingAction] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [refreshKey, setRefreshKey] = useState(0);
 
-  const filteredRequests = useMemo(() => {
-    const normalizedSearch = searchTerm.trim().toLocaleLowerCase("vi");
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setCurrentPage(1);
+      setDebouncedSearch(searchTerm.trim());
+      setIsLoading(true);
+    }, 300);
 
-    if (!normalizedSearch) return requests;
+    return () => window.clearTimeout(timeoutId);
+  }, [searchTerm]);
 
-    return requests.filter((request) =>
-      `${request.name} ${request.email} ${request.organization}`
-        .toLocaleLowerCase("vi")
-        .includes(normalizedSearch),
-    );
-  }, [requests, searchTerm]);
+  useEffect(() => {
+    let isCancelled = false;
 
-  const processedCount = requests.filter((request) => request.status !== "pending").length;
-  const pageCount = Math.max(1, Math.ceil(filteredRequests.length / PAGE_SIZE));
+    getOrganizerRequests({
+      page: currentPage,
+      pageSize: PAGE_SIZE,
+      search: debouncedSearch,
+    })
+      .then((data) => {
+        if (isCancelled) return;
+        setRequests(data.items);
+        setSummary(data.summary);
+        setTotal(data.total);
+        setTotalPages(data.total_pages);
+        setErrorMessage("");
+      })
+      .catch((error) => {
+        if (isCancelled) return;
+        setRequests([]);
+        setErrorMessage(
+          getApiErrorMessage(error, "Không thể tải danh sách yêu cầu."),
+        );
+      })
+      .finally(() => {
+        if (!isCancelled) setIsLoading(false);
+      });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [currentPage, debouncedSearch, refreshKey]);
+
+  const pageCount = Math.max(1, totalPages);
   const safeCurrentPage = Math.min(currentPage, pageCount);
-  const firstItemIndex = (safeCurrentPage - 1) * PAGE_SIZE;
-  const visibleRequests = filteredRequests.slice(
-    firstItemIndex,
-    firstItemIndex + PAGE_SIZE,
-  );
-  const displayTotal = searchTerm.trim() ? filteredRequests.length : TOTAL_REQUESTS;
-  const displayStart = visibleRequests.length ? firstItemIndex + 1 : 0;
-  const displayEnd = visibleRequests.length
-    ? firstItemIndex + visibleRequests.length
-    : 0;
+  const displayStart = requests.length ? (currentPage - 1) * PAGE_SIZE + 1 : 0;
+  const displayEnd = requests.length ? displayStart + requests.length - 1 : 0;
 
-  const handleSearch = (event) => {
-    setSearchTerm(event.target.value);
-    setCurrentPage(1);
+  const handlePageChange = (nextPage) => {
+    setIsLoading(true);
+    setCurrentPage(nextPage);
   };
 
-  const updateRequestStatus = (id, status) => {
-    const request = requests.find((item) => item.id === id);
-    setRequests((currentRequests) =>
-      currentRequests.map((item) =>
-        item.id === id ? { ...item, status } : item,
-      ),
-    );
+  const retryLoading = () => {
+    setIsLoading(true);
+    setRefreshKey((key) => key + 1);
+  };
 
-    if (status === "approved") {
-      toast.success(`Đã chấp nhận yêu cầu của ${request.name}`);
-    } else {
-      toast.info(`Đã từ chối yêu cầu của ${request.name}`);
+  const confirmRequestAction = async () => {
+    if (!pendingAction || isSubmitting) return;
+
+    setIsSubmitting(true);
+    try {
+      const result = await reviewOrganizerRequest(
+        pendingAction.request.id,
+        pendingAction.status,
+      );
+      toast.success(result.message);
+      setPendingAction(null);
+      setIsLoading(true);
+      setCurrentPage(1);
+      setRefreshKey((key) => key + 1);
+    } catch (error) {
+      toast.error(
+        getApiErrorMessage(error, "Không thể cập nhật yêu cầu. Vui lòng thử lại."),
+      );
+    } finally {
+      setIsSubmitting(false);
     }
-  };
-
-  const confirmRequestAction = () => {
-    if (!pendingAction) return;
-
-    updateRequestStatus(pendingAction.request.id, pendingAction.status);
-    setPendingAction(null);
   };
 
   return (
@@ -197,9 +167,9 @@ export default function ReviewOrganizerRequest() {
 
         <div className="relative z-10 mt-10">
           <StatStrip
-            totalRequests={TOTAL_REQUESTS}
-            pendingRequests={INITIAL_PENDING_REQUESTS - processedCount}
-            processedToday={INITIAL_PROCESSED_TODAY + processedCount}
+            totalRequests={summary.total}
+            pendingRequests={summary.pending}
+            processedRequests={summary.approved + summary.rejected}
           />
         </div>
 
@@ -218,7 +188,7 @@ export default function ReviewOrganizerRequest() {
                   Hàng đợi xét duyệt
                 </h2>
                 <span className="rounded-full bg-[#eee7ff] px-2.5 py-1 text-xs font-semibold text-[#6d20df]">
-                  {INITIAL_PENDING_REQUESTS - processedCount}
+                  {summary.pending}
                 </span>
               </div>
               <p className="mt-1 text-sm text-[#7a7183]">Ưu tiên kiểm tra hồ sơ và tài liệu minh chứng.</p>
@@ -234,17 +204,15 @@ export default function ReviewOrganizerRequest() {
               <input
                 type="search"
                 value={searchTerm}
-                onChange={handleSearch}
+                onChange={(event) => setSearchTerm(event.target.value)}
+                maxLength={200}
                 placeholder="Tìm theo tên, email hoặc đơn vị"
                 className="h-11 w-full rounded-xl border border-[#dcd4e3] bg-[#fbfaff] pl-11 pr-10 text-sm text-[#302839] outline-none transition-all duration-200 placeholder:text-[#aaa1b2] focus:border-[#9b71db] focus:bg-white focus:ring-3 focus:ring-[#7c3aed]/10"
               />
               {searchTerm && (
                 <button
                   type="button"
-                  onClick={() => {
-                    setSearchTerm("");
-                    setCurrentPage(1);
-                  }}
+                  onClick={() => setSearchTerm("")}
                   aria-label="Xóa tìm kiếm"
                   className="absolute right-3 top-1/2 grid size-6 -translate-y-1/2 place-items-center rounded-full text-[#918797] hover:bg-[#eee9f2] hover:text-[#5b5163]"
                 >
@@ -267,16 +235,14 @@ export default function ReviewOrganizerRequest() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#e9e4ed]">
-                {visibleRequests.map((request) => (
+                {!isLoading && !errorMessage && requests.map((request) => (
                   <tr
                     key={request.id}
                     className="group h-[86px] text-sm text-[#5d5566] transition-colors duration-200 hover:bg-[#fcfaff]"
                   >
                     <td className="px-6">
                       <div className="flex items-center justify-start gap-3">
-                        <span
-                          className={`grid size-10 shrink-0 place-items-center rounded-[13px] text-xs font-bold shadow-[inset_0_0_0_1px_rgba(20,15,25,0.04)] transition-transform duration-500 ease-out group-hover:scale-105 ${request.avatarClass}`}
-                        >
+                        <span className={`grid size-10 shrink-0 place-items-center rounded-[13px] text-xs font-bold shadow-[inset_0_0_0_1px_rgba(20,15,25,0.04)] transition-transform duration-500 ease-out group-hover:scale-105 ${request.avatarClass}`}>
                           {request.initials}
                         </span>
                         <div className="min-w-0 text-left">
@@ -286,17 +252,13 @@ export default function ReviewOrganizerRequest() {
                       </div>
                     </td>
                     <td className="truncate px-4 text-center text-[13px]">{request.email}</td>
-                    <td className="px-4">
-                      <SubmittedTime value={request.submittedAt} />
-                    </td>
-                    <td className="px-4">
-                      <StatusBadge status={request.status} />
-                    </td>
+                    <td className="px-4"><SubmittedTime value={request.submittedAt} /></td>
+                    <td className="px-4"><StatusBadge status={request.status} /></td>
                     <td className="px-4">
                       <button
                         type="button"
                         onClick={() => setSelectedRequest(request)}
-                        className="group/evidence inline-flex items-center gap-2 rounded-lg px-2.5 py-2 font-semibold text-[#6d20df] transition-colors hover:bg-[#eee7ff]"
+                        className="inline-flex items-center gap-2 rounded-lg px-2.5 py-2 font-semibold text-[#6d20df] transition-colors hover:bg-[#eee7ff]"
                       >
                         <FileCheck2 className="size-4" strokeWidth={1.8} aria-hidden="true" />
                         Xem hồ sơ
@@ -307,9 +269,7 @@ export default function ReviewOrganizerRequest() {
                         <div className="flex items-center justify-center gap-2">
                           <button
                             type="button"
-                            onClick={() =>
-                              setPendingAction({ request, status: "approved" })
-                            }
+                            onClick={() => setPendingAction({ request, status: "approved" })}
                             className="inline-flex h-9 min-w-[92px] items-center justify-center gap-1.5 rounded-[10px] bg-[#6d20df] px-3 text-xs font-semibold text-white shadow-[0_7px_17px_rgba(109,32,223,0.18)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#5915bd] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#6d20df]"
                           >
                             <Check className="size-3.5" strokeWidth={2} aria-hidden="true" />
@@ -317,9 +277,7 @@ export default function ReviewOrganizerRequest() {
                           </button>
                           <button
                             type="button"
-                            onClick={() =>
-                              setPendingAction({ request, status: "rejected" })
-                            }
+                            onClick={() => setPendingAction({ request, status: "rejected" })}
                             className="inline-flex h-9 min-w-[82px] items-center justify-center gap-1.5 rounded-[10px] border border-[#d9b7b7] bg-white px-3 text-xs font-semibold text-[#a03636] transition-all duration-200 hover:-translate-y-0.5 hover:border-[#c84b4b] hover:bg-[#fff5f5] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#c84b4b]"
                           >
                             <X className="size-3.5" strokeWidth={2} aria-hidden="true" />
@@ -327,15 +285,38 @@ export default function ReviewOrganizerRequest() {
                           </button>
                         </div>
                       ) : (
-                        <span className="block text-center text-xs font-medium text-[#8a8192]">
-                          Đã hoàn tất
-                        </span>
+                        <span className="block text-center text-xs font-medium text-[#8a8192]">Đã hoàn tất</span>
                       )}
                     </td>
                   </tr>
                 ))}
 
-                {visibleRequests.length === 0 && (
+                {isLoading && (
+                  <tr>
+                    <td colSpan="6" className="h-44 px-6 text-center text-sm text-[#6b6275]">
+                      <LoaderCircle className="mx-auto size-7 animate-spin text-[#7c3aed]" aria-hidden="true" />
+                      <p className="mt-3 font-semibold">Đang tải danh sách yêu cầu...</p>
+                    </td>
+                  </tr>
+                )}
+
+                {!isLoading && errorMessage && (
+                  <tr>
+                    <td colSpan="6" className="h-44 px-6 text-center">
+                      <p className="text-sm font-semibold text-[#8f3030]">{errorMessage}</p>
+                      <button
+                        type="button"
+                        onClick={retryLoading}
+                        className="mt-3 inline-flex items-center gap-2 rounded-lg border border-[#d8d0df] px-3 py-2 text-xs font-semibold text-[#51495a] hover:bg-[#f7f4fa]"
+                      >
+                        <RefreshCw className="size-3.5" aria-hidden="true" />
+                        Thử lại
+                      </button>
+                    </td>
+                  </tr>
+                )}
+
+                {!isLoading && !errorMessage && requests.length === 0 && (
                   <tr>
                     <td colSpan="6" className="h-44 px-6 text-center">
                       <Search className="mx-auto size-7 text-[#b4aaba]" strokeWidth={1.6} />
@@ -351,27 +332,23 @@ export default function ReviewOrganizerRequest() {
           <footer className="flex min-h-[68px] flex-col items-start justify-between gap-3 border-t border-[#e7e1ec] bg-[#fbfaff] px-5 py-4 text-sm text-[#6b6275] sm:flex-row sm:items-center sm:px-6">
             <p>
               Hiển thị <strong className="font-semibold text-[#302839]">{displayStart}–{displayEnd}</strong> trong{" "}
-              <strong className="font-semibold text-[#302839]">{displayTotal}</strong> yêu cầu
+              <strong className="font-semibold text-[#302839]">{total}</strong> yêu cầu
             </p>
             <div className="flex items-center gap-2 self-end sm:self-auto">
               <button
                 type="button"
-                disabled={safeCurrentPage === 1}
-                onClick={() => setCurrentPage((page) => Math.max(1, page - 1))}
+                disabled={safeCurrentPage === 1 || isLoading}
+                onClick={() => handlePageChange(safeCurrentPage - 1)}
                 className="inline-flex h-9 items-center gap-1.5 rounded-[10px] border border-[#d8d0df] bg-white px-3 text-xs font-semibold text-[#51495a] transition-all hover:border-[#b9aac7] hover:bg-[#f7f4fa] disabled:cursor-not-allowed disabled:opacity-45"
               >
                 <ChevronLeft className="size-4" aria-hidden="true" />
                 Trước
               </button>
-              <span className="grid size-9 place-items-center rounded-[10px] bg-[#1e293b] text-xs font-semibold text-white">
-                {safeCurrentPage}
-              </span>
+              <span className="grid size-9 place-items-center rounded-[10px] bg-[#1e293b] text-xs font-semibold text-white">{safeCurrentPage}</span>
               <button
                 type="button"
-                disabled={safeCurrentPage === pageCount}
-                onClick={() =>
-                  setCurrentPage((page) => Math.min(pageCount, page + 1))
-                }
+                disabled={safeCurrentPage >= pageCount || isLoading}
+                onClick={() => handlePageChange(safeCurrentPage + 1)}
                 className="inline-flex h-9 items-center gap-1.5 rounded-[10px] border border-[#d8d0df] bg-white px-3 text-xs font-semibold text-[#51495a] transition-all hover:border-[#b9aac7] hover:bg-[#f7f4fa] disabled:cursor-not-allowed disabled:opacity-45"
               >
                 Sau
@@ -382,12 +359,10 @@ export default function ReviewOrganizerRequest() {
         </section>
       </main>
 
-      <EvidenceDialog
-        request={selectedRequest}
-        onClose={() => setSelectedRequest(null)}
-      />
+      <EvidenceDialog request={selectedRequest} onClose={() => setSelectedRequest(null)} />
       <ConfirmActionDialog
         action={pendingAction}
+        isSubmitting={isSubmitting}
         onCancel={() => setPendingAction(null)}
         onConfirm={confirmRequestAction}
       />

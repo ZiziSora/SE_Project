@@ -1,6 +1,4 @@
 import { ChevronRight, FileCheck2, FileText, X } from "lucide-react";
-import { toast } from "react-toastify";
-
 import SubmittedTime from "./SubmittedTime.jsx";
 
 export default function EvidenceDialog({ request, onClose }) {
@@ -67,19 +65,25 @@ export default function EvidenceDialog({ request, onClose }) {
             Tệp đính kèm <span className="text-[#8a8192]">({request.evidence.length})</span>
           </h3>
           <div className="mt-3 space-y-2.5">
+            {request.evidence.length === 0 && (
+              <p className="rounded-xl border border-dashed border-[#d8d0df] bg-[#fbfaff] px-4 py-5 text-center text-sm text-[#7a7183]">
+                Yêu cầu này không có tệp đính kèm.
+              </p>
+            )}
             {request.evidence.map((file) => (
-              <button
-                key={file}
-                type="button"
-                onClick={() => toast.info(`Đang mở ${file}`)}
+              <a
+                key={file.id}
+                href={file.url}
+                target="_blank"
+                rel="noreferrer"
                 className="group flex w-full items-center gap-3 rounded-xl border border-[#e1dae7] bg-white px-3.5 py-3 text-left text-[#51485d] transition-all duration-200 hover:-translate-y-0.5 hover:border-[#bca9d4] hover:shadow-[0_8px_22px_rgba(61,39,83,0.07)]"
               >
                 <span className="grid size-9 shrink-0 place-items-center rounded-[10px] bg-[#f0e9ff] text-[#6d20df] transition-transform duration-500 ease-out group-hover:scale-105">
                   <FileText className="size-[17px]" aria-hidden="true" />
                 </span>
-                <span className="min-w-0 truncate text-sm font-medium">{file}</span>
+                <span className="min-w-0 truncate text-sm font-medium">{file.name}</span>
                 <ChevronRight className="ml-auto size-4 text-[#aaa1b2] group-hover:text-[#6d20df]" />
-              </button>
+              </a>
             ))}
           </div>
         </div>

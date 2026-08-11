@@ -7,7 +7,13 @@ from app.core.auth import get_current_user
 from app.core.config import CORS_ORIGINS
 from app.models.enum import UserRole, UserStatus
 from app.models.user import User
-from app.routers import categories, events, organizer_events, uploads
+from app.routers import (
+    categories,
+    events,
+    organizer_events,
+    organizer_requests,
+    uploads,
+)
 from app.routers.auth_router import router as auth_router
 from app.routers.my_event import router as history_router
 from app.routers.profile_router import router as user_router
@@ -33,6 +39,7 @@ app.include_router(user_router)
 app.include_router(history_router)
 app.include_router(events.router)
 app.include_router(organizer_events.router)
+app.include_router(organizer_requests.router)
 app.include_router(categories.router)
 app.include_router(uploads.router)
 
