@@ -1,5 +1,5 @@
-import { TopNav } from "../components/top-nav"
-import { FullEventsTable } from "../components/full-events-table"
+import { TopNav } from "../components/TopNav"
+import { FullEventsTable } from "../components/FullEventTable"
 
 export default function AllEvents() {
   return (
