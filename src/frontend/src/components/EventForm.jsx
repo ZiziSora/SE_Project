@@ -20,7 +20,7 @@ import {
   FilePlus,
   AlertTriangle,
 } from 'lucide-react';
-import { TopNav } from './top-nav';
+import { TopNav } from './TopNav.jsx';
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 

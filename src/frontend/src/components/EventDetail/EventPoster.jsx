@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { FALLBACK_POSTER_IMAGE } from "./eventDetailUtils";
+import { FALLBACK_POSTER_IMAGE } from "../../utils/eventDetailUtils.js";
 
 /* =========================================================
    EventPoster Component - Xử lý ảnh & Fallback chuẩn

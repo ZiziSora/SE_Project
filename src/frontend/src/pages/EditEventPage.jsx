@@ -1,5 +1,5 @@
 import { useParams } from 'react-router-dom';
-import { EventForm } from '../components/event-form';
+import { EventForm } from '../components/EventForm.jsx';
 
 /**
  * Trang chỉnh sửa sự kiện — route: /edit-event/:eventId

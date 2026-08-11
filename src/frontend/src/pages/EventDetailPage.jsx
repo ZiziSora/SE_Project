@@ -27,7 +27,7 @@ import {
   DEFAULT_EVENT_ID,
   formatVietnameseDate,
   formatVietnameseTime,
-} from "../components/EventDetail/eventDetailUtils";
+} from "../utils/eventDetailUtils.js";
 
 /* =========================================================
    EventDetailPage Component (Dynamic Page based on route /events/:eventId)
