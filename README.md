@@ -331,6 +331,14 @@ test: cover saved event service
 
 Một commit chỉ nên chứa một thay đổi logic. Pull Request cần mô tả mục tiêu, phạm vi ảnh hưởng, cách kiểm tra và ảnh chụp nếu có thay đổi giao diện.
 
+Quy trình Pull Request:
+
+1. Sau khi hoàn thành và kiểm tra thay đổi, developer tự push branch của mình lên remote.
+2. Developer tự tạo Pull Request và chọn branch đích là `develop`.
+3. Yêu cầu ít nhất một thành viên khác review Pull Request.
+4. Chỉ được merge vào `develop` sau khi Pull Request đã được review, approve và các góp ý bắt buộc đã được xử lý.
+5. Người tạo Pull Request không tự ý merge khi chưa có approve, kể cả khi kiểm tra tự động đã thành công.
+
 ## 8. Checklist trước khi mở Pull Request
 
 - [ ] File mới nằm đúng thư mục và đúng convention đặt tên.
@@ -343,6 +351,7 @@ Một commit chỉ nên chứa một thay đổi logic. Pull Request cần mô t
 - [ ] Frontend đã lint; đã build nếu thay đổi ảnh hưởng luồng tích hợp.
 - [ ] Text hiển thị cho người dùng thống nhất bằng tiếng Việt.
 - [ ] Migration mới đã được review trước khi áp dụng lên database dùng chung.
+- [ ] Pull Request nhắm đúng branch `develop` và đã được ít nhất một thành viên khác approve trước khi merge.
 
 ## 9. Nguồn tham chiếu
 
