@@ -3,6 +3,7 @@ import hcmus from "../assets/hcmus.png";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { login } from "../api/authApi";
 import InputField from "../components/InputField";
+import { supabase } from "../lib/supabase.js";
 import { useState } from "react";
 import { Mail, Lock } from "lucide-react";
 import { toast } from "react-toastify";
@@ -35,10 +36,26 @@ const LoginPage = () => {
         email: data.email.trim().toLowerCase(),
       });
 
+      const { data: sessionData, error: sessionError } =
+        await supabase.auth.setSession({
+          access_token: result.access_token,
+          refresh_token: result.refresh_token,
+        });
+
+      if (sessionError || !sessionData.session) {
+        throw new Error("Không thể khởi tạo phiên đăng nhập. Vui lòng thử lại.");
+      }
+
       toast.success("Đăng nhập thành công");
 
-      localStorage.setItem("access_token", result.access_token);
-      localStorage.setItem("refresh_token", result.refresh_token);
+      localStorage.setItem(
+        "access_token",
+        sessionData.session.access_token,
+      );
+      localStorage.setItem(
+        "refresh_token",
+        sessionData.session.refresh_token,
+      );
       localStorage.setItem("user_id", result.user_id);
       localStorage.setItem("email", result.email);
       localStorage.setItem("role", result.role);
@@ -56,7 +73,9 @@ const LoginPage = () => {
       }, 800);
     } catch (error) {
       toast.error(
-        error.response?.data?.detail || "Đã xảy ra lỗi. Vui lòng thử lại",
+        error.response?.data?.detail ||
+          error.message ||
+          "Đã xảy ra lỗi. Vui lòng thử lại",
       );
     } finally {
       setLoading(false);

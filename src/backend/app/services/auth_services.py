@@ -350,6 +350,15 @@ def login_service(body: LoginRequest, db: Session):
         )
 
     if (
+        db_user.role == UserRole.ORGANIZER
+        and db_user.status != UserStatus.ACTIVE
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Tài khoản ban tổ chức đang chờ quản trị viên phê duyệt.",
+        )
+
+    if (
         db_user.role != UserRole.ORGANIZER
         and db_user.status != UserStatus.ACTIVE
     ):
@@ -440,6 +449,10 @@ def verify_email(
             db.refresh(db_user)
 
         message = "Email đã được xác minh và tài khoản sinh viên đã được kích hoạt."
+    elif db_user.status == UserStatus.ACTIVE:
+        message = (
+            "Email đã được xác minh và tài khoản ban tổ chức đã được phê duyệt."
+        )
     else:
         message = (
             "Email đã được xác minh. Tài khoản ban tổ chức đang chờ quản trị viên phê duyệt."
