@@ -175,6 +175,7 @@ tests/test_ticket_router.py
 | Biến, hàm | `camelCase` | `eventList`, `formatDateTime()` |
 | Component React | `PascalCase` | `EventCard`, `ProtectedRoute` |
 | File component | `PascalCase.jsx` | `EventCard.jsx` |
+| Export component | `default export` trực tiếp từ file `.jsx` | `export default function EventCard()` |
 | File page | `PascalCasePage.jsx` | `EventDetailPage.jsx` |
 | Custom hook | `use` + `PascalCase` | `useCurrentUser.js`, `useCurrentUser()` |
 | Hàm xử lý trong component | `handle` + hành động | `handleSubmit`, `handleDeleteEvent` |
@@ -185,12 +186,14 @@ tests/test_ticket_router.py
 | Thư mục kỹ thuật | chữ thường | `components`, `pages`, `utils` |
 | Nhóm component theo tính năng | `PascalCase` | `EventDetail/` |
 
+Mỗi file `.jsx` chỉ được chứa một component React. Không định nghĩa nhiều component chính/phụ trong cùng một file; component phụ phải được tách thành file riêng trong feature folder tương ứng, ví dụ `components/ReviewOrganizerRequest/`. Mỗi file component dùng `default export` và được import trực tiếp từ file tương ứng. Không tạo barrel `index.js` chỉ để re-export các component trong cùng feature folder.
+
 Ví dụ:
 
 ```jsx
 const DEFAULT_PAGE_SIZE = 10
 
-function EventList({ events, isLoading, onEventSelected }) {
+export default function EventList({ events, isLoading, onEventSelected }) {
   const handleSelectEvent = (eventId) => {
     onEventSelected(eventId)
   }

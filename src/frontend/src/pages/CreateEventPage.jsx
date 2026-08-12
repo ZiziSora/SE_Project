@@ -1,4 +1,4 @@
-import { EventForm } from '../components/event-form';
+import { EventForm } from '../components/EventForm.jsx';
 
 /**
  * Trang tạo sự kiện mới.

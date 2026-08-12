@@ -48,9 +48,11 @@ const LoginPage = () => {
         String(result.can_manage_events),
       );
 
+      const redirectPath =
+        result.role === "admin" ? "/admin/organizer-requests" : "/events";
 
       setTimeout(() => {
-        navigate("/events");
+        navigate(redirectPath, { replace: true });
       }, 800);
     } catch (error) {
       toast.error(

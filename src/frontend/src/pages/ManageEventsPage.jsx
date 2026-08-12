@@ -1,6 +1,6 @@
-import { TopNav } from "../components/top-nav"
-import { StatCards } from "../components/stat-cards"
-import { EventsTable } from "../components/events-table"
+import { TopNav } from "../components/TopNav.jsx"
+import { StatCards } from "../components/StatCard.jsx"
+import { EventsTable } from "../components/EventsTable.jsx"
 
 export default function ManageEvents() {
   return (

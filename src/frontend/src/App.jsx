@@ -3,23 +3,25 @@ import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
 import { EventDetailPage } from "./pages/EventDetailPage.jsx";
-import { DEFAULT_EVENT_ID } from "./components/EventDetail/eventDetailUtils";
+import { DEFAULT_EVENT_ID } from "./utils/eventDetailUtils.js";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
-import AllEvents from "./pages/all-events.jsx";
+import AllEvents from "./pages/AllEventsPage.jsx";
 import AuthCallbackPage from "./pages/AuthCallbackPage.jsx";
-import CreateEvent from "./pages/create-event.jsx";
-import EditEvent from "./pages/edit-event.jsx";
+import CreateEvent from "./pages/CreateEventPage.jsx";
+import EditEvent from "./pages/EditEventPage.jsx";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage.jsx";
 import LoginPage from "./pages/LoginPage.jsx";
-import ManageEvents from "./pages/manage-events.jsx";
+import ManageEvents from "./pages/ManageEventsPage.jsx";
 import MyEventsPage from "./pages/MyEventsPage.jsx";
 import OrganizerProfile from "./pages/profile/OrganizerProfile.jsx";
 import StudentProfile from "./pages/profile/StudentProfile.jsx";
 import ResetPasswordPage from "./pages/ResetPasswordPage.jsx";
+import AdminStatisticsPage from "./pages/AdminStatisticsPage.jsx";
+import ReviewOrganizerRequest from "./pages/ReviewOrganizerRequest.jsx";
 import SelectRolePage from "./pages/SelectRolePage.jsx";
 import SignupOrganizerPage from "./pages/SignupOrganizerPage.jsx";
 import SignupStudentPage from "./pages/SignupStudentPage.jsx";
-import ViewEvent from "./pages/view-event.jsx";
+import ViewEvent from "./pages/ViewEventPage.jsx";
 
 function PlaceholderPage({ title, description }) {
   return (
@@ -158,6 +160,30 @@ export default function App() {
               <MyEventsPage />
             </ProtectedRoute>
           }
+        />
+        <Route
+          path="/admin/organizer-requests"
+          element={
+            <ProtectedRoute>
+              <ReviewOrganizerRequest />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin/statistics"
+          element={
+            <ProtectedRoute>
+              <AdminStatisticsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/review-organizer-request"
+          element={<Navigate to="/admin/organizer-requests" replace />}
+        />
+        <Route
+          path="/admin/events"
+          element={<Navigate to="/all-events" replace />}
         />
         <Route
           path="/explore"
