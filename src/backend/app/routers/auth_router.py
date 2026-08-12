@@ -2,9 +2,9 @@ from fastapi import APIRouter, status, Depends, Response, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials
 from app.database import get_db
 from app.core.auth import security
-from app.schemas.auth import EmailVerificationResponse, LoginResponse, LoginRequest, SignUpResponse, StudentSignUpRequest, OrganizerSignUpRequest, ForgotPasswordRequest, ForgotPasswordResponse
+from app.schemas.auth import EmailVerificationResponse, LoginResponse, LoginRequest, SignUpResponse, StudentSignUpRequest, OrganizerSignUpRequest, ForgotPasswordRequest, ForgotPasswordResponse, ResendVerificationRequest, ResendVerificationResponse, VerificationStatusRequest
 from sqlalchemy.orm import Session
-from app.services.auth_services import signup_student, signup_organizer, login_service, logout_service, verify_email, forgot_password_service
+from app.services.auth_services import signup_student, signup_organizer, login_service, logout_service, verify_email, forgot_password_service, resend_verification_email, get_email_verification_status
 
 router = APIRouter(prefix="/auth", tags=["Xác thực"])
 
@@ -34,6 +34,30 @@ def verify_email_route(
     db: Session = Depends(get_db),
 ):
     return verify_email(credentials, db)
+
+
+@router.post(
+    "/resend-verification",
+    response_model=ResendVerificationResponse,
+    summary="Gửi lại email xác thực",
+)
+def resend_verification_route(
+    body: ResendVerificationRequest,
+    db: Session = Depends(get_db),
+):
+    return resend_verification_email(body, db)
+
+
+@router.post(
+    "/verification-status",
+    response_model=EmailVerificationResponse,
+    summary="Đối soát trạng thái xác thực email",
+)
+def verification_status_route(
+    body: VerificationStatusRequest,
+    db: Session = Depends(get_db),
+):
+    return get_email_verification_status(body, db)
 
 
 @router.post("/logout", summary="Đăng xuất", status_code=status.HTTP_204_NO_CONTENT)

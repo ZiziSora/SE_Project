@@ -105,3 +105,49 @@ def test_verify_email_reports_already_approved_organizer(monkeypatch):
 
     assert "đã được phê duyệt" in result.message
     assert "đang chờ" not in result.message
+    assert result.role == "organizer"
+    assert result.status == "active"
+
+
+def test_verification_state_round_trip():
+    state = auth_services.create_verification_state(
+        "Organizer@University.edu",
+        UserRole.ORGANIZER,
+    )
+
+    payload = auth_services.decode_verification_state(state)
+
+    assert payload["email"] == "organizer@university.edu"
+    assert payload["role"] == "organizer"
+
+
+def test_verification_status_recovers_consumed_email_link(monkeypatch):
+    user_id = uuid4()
+    db_user = SimpleNamespace(
+        user_id=user_id,
+        email="organizer@university.edu",
+        role=UserRole.ORGANIZER,
+        status=UserStatus.PENDING,
+    )
+    db = _db_with_user(db_user)
+    auth_user = _auth_response(user_id).user
+    monkeypatch.setattr(
+        auth_services.supabase_admin.auth.admin,
+        "get_user_by_id",
+        lambda _user_id: SimpleNamespace(user=auth_user),
+    )
+    state = auth_services.create_verification_state(
+        db_user.email,
+        UserRole.ORGANIZER,
+    )
+
+    result = auth_services.get_email_verification_status(
+        auth_services.VerificationStatusRequest(
+            verification_state=state,
+        ),
+        db,
+    )
+
+    assert result.role == "organizer"
+    assert result.status == "pending"
+    assert "đang chờ" in result.message

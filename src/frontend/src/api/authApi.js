@@ -29,6 +29,20 @@ export const verifyEmail = async (accessToken) => {
     return response.data;
 }
 
+export const resendVerificationEmail = async (email) => {
+    const response = await api.post("/auth/resend-verification", {
+        email: email.trim().toLowerCase(),
+    });
+    return response.data;
+}
+
+export const getEmailVerificationStatus = async (verificationState) => {
+    const response = await api.post("/auth/verification-status", {
+        verification_state: verificationState,
+    });
+    return response.data;
+}
+
 
 export async function forgotPassword(email) {
     try {
