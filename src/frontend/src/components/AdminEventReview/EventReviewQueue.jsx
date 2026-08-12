@@ -129,7 +129,7 @@ export default function EventReviewQueue({
               )}
             </div>
 
-            <div className="flex items-center justify-start">
+            <div className="flex items-center justify-center">
               <Link
                 to={`/admin/events/${event.id}`}
                 aria-label={`Xem chi tiết ${event.title}`}

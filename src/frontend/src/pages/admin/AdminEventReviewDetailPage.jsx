@@ -15,21 +15,21 @@ import {
 import { Link, useParams } from "react-router-dom";
 import { toast } from "react-toastify";
 
-import AdminEventDecisionDialog from "../components/AdminEventReview/AdminEventDecisionDialog.jsx";
-import AdminReviewStatusBadge from "../components/AdminEventReview/AdminReviewStatusBadge.jsx";
-import EventReviewInfoItem from "../components/AdminEventReview/EventReviewInfoItem.jsx";
-import EventReviewPoster from "../components/AdminEventReview/EventReviewPoster.jsx";
-import ReviewPolicyMarquee from "../components/AdminEventReview/ReviewPolicyMarquee.jsx";
-import ReviewQueueNavigator from "../components/AdminEventReview/ReviewQueueNavigator.jsx";
-import AdminHeader from "../components/ReviewOrganizerRequest/AdminHeader.jsx";
+import AdminEventDecisionDialog from "../../components/AdminEventReview/AdminEventDecisionDialog.jsx";
+import AdminReviewStatusBadge from "../../components/AdminEventReview/AdminReviewStatusBadge.jsx";
+import EventReviewInfoItem from "../../components/AdminEventReview/EventReviewInfoItem.jsx";
+import EventReviewPoster from "../../components/AdminEventReview/EventReviewPoster.jsx";
+import ReviewPolicyMarquee from "../../components/AdminEventReview/ReviewPolicyMarquee.jsx";
+import ReviewQueueNavigator from "../../components/AdminEventReview/ReviewQueueNavigator.jsx";
+import AdminHeader from "../../components/ReviewOrganizerRequest/AdminHeader.jsx";
 import {
   getAdminReviewEvents,
   saveAdminReviewDecision,
-} from "../lib/adminEventReviewStore.js";
+} from "../../lib/adminEventReviewStore.js";
 import {
   formatAdminReviewDate,
   formatAdminReviewTime,
-} from "../utils/adminEventReviewUtils.js";
+} from "../../utils/adminEventReviewUtils.js";
 
 export default function AdminEventReviewDetailPage() {
   const { eventId } = useParams();
@@ -163,8 +163,6 @@ export default function AdminEventReviewDetailPage() {
           )}
         </section>
       </section>
-
-      <ReviewPolicyMarquee />
 
       <section className="mx-auto grid w-full max-w-[1440px] gap-7 px-5 pb-28 pt-10 sm:px-8 lg:grid-cols-[minmax(0,1.55fr)_minmax(330px,.65fr)] lg:px-16">
         <div className="min-w-0 space-y-6">

@@ -16,13 +16,14 @@ import MyEventsPage from "./pages/MyEventsPage.jsx";
 import OrganizerProfile from "./pages/profile/OrganizerProfile.jsx";
 import StudentProfile from "./pages/profile/StudentProfile.jsx";
 import ResetPasswordPage from "./pages/ResetPasswordPage.jsx";
-import AdminStatisticsPage from "./pages/AdminStatisticsPage.jsx";
-import ReviewOrganizerRequest from "./pages/ReviewOrganizerRequest.jsx";
+import AdminStatisticsPage from "./pages/admin/AdminStatisticsPage.jsx";
+import ReviewOrganizerRequest from "./pages/admin/ReviewOrganizerRequest.jsx";
 import SelectRolePage from "./pages/SelectRolePage.jsx";
 import SignupOrganizerPage from "./pages/SignupOrganizerPage.jsx";
 import SignupStudentPage from "./pages/SignupStudentPage.jsx";
 import ViewEvent from "./pages/ViewEventPage.jsx";
-
+import AdminEventReviewsPage from "./pages/admin/AdminEventReviewsPage.jsx";
+import AdminEventReviewDetailPage from "./pages/admin/AdminEventReviewDetailPage.jsx";
 function PlaceholderPage({ title, description }) {
   return (
     <main className="min-h-screen bg-[#f8f9fa] px-6 py-16 text-center text-gray-900">
@@ -161,30 +162,35 @@ export default function App() {
             </ProtectedRoute>
           }
         />
-        <Route
-          path="/admin/organizer-requests"
-          element={
-            <ProtectedRoute>
-              <ReviewOrganizerRequest />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/admin/statistics"
-          element={
-            <ProtectedRoute>
-              <AdminStatisticsPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/review-organizer-request"
-          element={<Navigate to="/admin/organizer-requests" replace />}
-        />
-        <Route
-          path="/admin/events"
-          element={<Navigate to="/all-events" replace />}
-        />
+
+        <Route path="/admin">
+          <Route
+            path="organizer-requests"
+            element={
+              <ProtectedRoute>
+                <ReviewOrganizerRequest />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="statistics"
+            element={
+              <ProtectedRoute>
+                <AdminStatisticsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="manage-events"
+            element={
+              <ProtectedRoute>
+                <AdminEventReviewsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="events/:eventId" element={<AdminEventReviewDetailPage />} />
+        </Route>
+
         <Route
           path="/explore"
           element={
