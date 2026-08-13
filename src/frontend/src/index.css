@@ -83,6 +83,53 @@ body {
   }
 }
 
+@keyframes signup-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes signup-visual {
+  from {
+    opacity: 0.35;
+    transform: scale(1.06);
+  }
+  to {
+    opacity: 0.7;
+    transform: scale(1);
+  }
+}
+
+.signup-reveal {
+  opacity: 0;
+  animation: signup-reveal 620ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.signup-visual {
+  animation: signup-visual 1200ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.signup-delay-1 {
+  animation-delay: 80ms;
+}
+
+.signup-delay-2 {
+  animation-delay: 150ms;
+}
+
+.signup-delay-3 {
+  animation-delay: 220ms;
+}
+
+.signup-delay-4 {
+  animation-delay: 290ms;
+}
+
 .review-reveal {
   opacity: 0;
   animation: review-reveal 560ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
@@ -102,5 +149,12 @@ body {
   .review-dialog {
     opacity: 1;
     animation: none;
+  }
+
+  .signup-reveal,
+  .signup-visual {
+    opacity: 1;
+    animation: none;
+    transform: none;
   }
 }

@@ -121,7 +121,8 @@ const LoginPage = () => {
             <div className="mx-6 md:mx-8 mb-3 flex items-start gap-2 rounded-lg bg-green-50 border border-green-200 px-4 py-3">
               <CheckCircle className="size-4 text-green-600 mt-0.5 shrink-0" />
               <p className="text-sm text-green-700 font-medium">
-                Email đã được xác nhận! Hãy đăng nhập để tiếp tục.
+                Email đã được xác nhận. Nếu đăng ký Ban tổ chức, bạn có thể đăng
+                nhập sau khi hồ sơ được quản trị viên phê duyệt.
               </p>
             </div>
           )}
