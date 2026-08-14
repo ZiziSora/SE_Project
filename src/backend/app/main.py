@@ -9,6 +9,7 @@ from app.models.enum import UserRole, UserStatus
 from app.models.user import User
 from app.routers import (
     categories,
+    event_review,
     events,
     organizer_events,
     organizer_requests,
@@ -40,6 +41,7 @@ app.include_router(history_router)
 app.include_router(events.router)
 app.include_router(organizer_events.router)
 app.include_router(organizer_requests.router)
+app.include_router(event_review.router)
 app.include_router(categories.router)
 app.include_router(uploads.router)
 
