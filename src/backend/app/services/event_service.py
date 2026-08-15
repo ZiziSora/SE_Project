@@ -62,6 +62,139 @@ SORT_FIELDS = {
 }
 
 
+# ─── Ánh xạ trạng thái: 6 giá trị của API ↔ 2 cột enum của DB ─────────────────
+#
+# Postgres CHỈ có hai enum sau, không thể ghi giá trị ngoài danh sách này:
+#   event_status    : DRAFT | PUBLISHED | CANCELLED | COMPLETED
+#   approval_status : PENDING | APPROVED | REJECTED   (cho phép NULL)
+#
+# Trong khi API và toàn bộ UI làm việc với MỘT trạng thái gộp 6 giá trị:
+#   DRAFT | PENDING | PUBLISHED | ONGOING | ENDED | CANCELLED
+#
+# Vì vậy tầng service chịu trách nhiệm dịch hai chiều. Hợp đồng API không đổi —
+# frontend vẫn nhận và gửi đúng 6 giá trị như trước.
+
+DB_DRAFT = "DRAFT"
+DB_PUBLISHED = "PUBLISHED"
+DB_CANCELLED = "CANCELLED"
+DB_COMPLETED = "COMPLETED"
+
+DB_APPROVAL_PENDING = "PENDING"
+DB_APPROVAL_APPROVED = "APPROVED"
+DB_APPROVAL_REJECTED = "REJECTED"
+
+# Organizer chỉ được tự đặt 3 trạng thái này. PUBLISHED / ONGOING / ENDED là kết
+# quả của việc Admin duyệt và của thời gian trôi qua, không phải thứ Organizer
+# tự bấm — nếu không thì họ tự duyệt sự kiện của chính mình.
+ORGANIZER_SETTABLE_STATUSES = {
+    EventStatus.DRAFT.value,
+    EventStatus.PENDING.value,
+    EventStatus.CANCELLED.value,
+}
+
+
+def _now_naive_utc() -> datetime:
+    """Cột start_time / end_time là `timestamp` KHÔNG timezone.
+
+    Toàn bộ code hiện có coi giá trị naive trong DB là giờ UTC (xem `_aware`),
+    nên khi so sánh với hiện tại cũng phải dùng UTC dạng naive cho khớp.
+    """
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def _derive_ui_status(row: dict[str, Any]) -> str:
+    """Suy ra trạng thái hiển thị (1 trong 6) từ 2 cột enum của DB + thời gian."""
+    db_status = (row.get("event_status") or DB_DRAFT).upper()
+    approval = (row.get("approval_status") or "").upper()
+
+    if db_status == DB_CANCELLED:
+        return EventStatus.CANCELLED.value
+    if db_status == DB_COMPLETED:
+        return EventStatus.ENDED.value
+
+    if db_status == DB_PUBLISHED:
+        # Đã được duyệt: ONGOING / ENDED phụ thuộc mốc thời gian, không lưu trong DB
+        now = _now_naive_utc()
+        start = _naive(_parse_dt(row.get("start_time")))
+        end = _naive(_parse_dt(row.get("end_time")))
+        if end and now > end:
+            return EventStatus.ENDED.value
+        if start and start <= now:
+            return EventStatus.ONGOING.value
+        return EventStatus.PUBLISHED.value
+
+    # Còn lại là DRAFT: đã gửi duyệt hay chưa nằm ở cột approval_status.
+    # REJECTED bị trả về nháp để Organizer sửa rồi gửi lại.
+    if approval == DB_APPROVAL_PENDING:
+        return EventStatus.PENDING.value
+    return EventStatus.DRAFT.value
+
+
+def _ui_status_to_db(ui_status: str) -> dict[str, Any]:
+    """Dịch trạng thái API thành các cột DB tương ứng để ghi xuống."""
+    mapping: dict[str, dict[str, Any]] = {
+        # Nháp: chưa gửi duyệt nên xoá luôn dấu vết duyệt cũ
+        EventStatus.DRAFT.value: {
+            "event_status": DB_DRAFT,
+            "approval_status": None,
+        },
+        # Gửi duyệt: sự kiện vẫn chưa công khai, chỉ khác ở approval_status
+        EventStatus.PENDING.value: {
+            "event_status": DB_DRAFT,
+            "approval_status": DB_APPROVAL_PENDING,
+        },
+        EventStatus.PUBLISHED.value: {
+            "event_status": DB_PUBLISHED,
+            "approval_status": DB_APPROVAL_APPROVED,
+        },
+        # ONGOING không phải trạng thái lưu được — nó là PUBLISHED + đang trong giờ
+        EventStatus.ONGOING.value: {
+            "event_status": DB_PUBLISHED,
+            "approval_status": DB_APPROVAL_APPROVED,
+        },
+        EventStatus.ENDED.value: {
+            "event_status": DB_COMPLETED,
+            "approval_status": DB_APPROVAL_APPROVED,
+        },
+        # Huỷ thì giữ nguyên approval_status để còn biết trước đó đã duyệt hay chưa
+        EventStatus.CANCELLED.value: {"event_status": DB_CANCELLED},
+    }
+    return dict(mapping[ui_status])
+
+
+def _apply_status_filter(query, ui_status: str):
+    """Dịch bộ lọc trạng thái của UI thành điều kiện trên 2 cột DB."""
+    now = _now_naive_utc().isoformat()
+
+    if ui_status == EventStatus.DRAFT.value:
+        return query.eq("event_status", DB_DRAFT).or_(
+            f"approval_status.is.null,approval_status.eq.{DB_APPROVAL_REJECTED}"
+        )
+    if ui_status == EventStatus.PENDING.value:
+        return query.eq("event_status", DB_DRAFT).eq(
+            "approval_status", DB_APPROVAL_PENDING
+        )
+    if ui_status == EventStatus.PUBLISHED.value:
+        # Đã duyệt và chưa tới giờ bắt đầu → đang mở đăng ký
+        return query.eq("event_status", DB_PUBLISHED).or_(
+            f"start_time.gt.{now},start_time.is.null"
+        )
+    if ui_status == EventStatus.ONGOING.value:
+        return (
+            query.eq("event_status", DB_PUBLISHED)
+            .lte("start_time", now)
+            .gte("end_time", now)
+        )
+    if ui_status == EventStatus.ENDED.value:
+        return query.or_(
+            f"event_status.eq.{DB_COMPLETED},"
+            f"and(event_status.eq.{DB_PUBLISHED},end_time.lt.{now})"
+        )
+    if ui_status == EventStatus.CANCELLED.value:
+        return query.eq("event_status", DB_CANCELLED)
+    return query
+
+
 # ─── Đọc ──────────────────────────────────────────────────────────────────────
 
 
@@ -80,7 +213,7 @@ def list_events(
     if search:
         query = query.ilike("title", f"%{search}%")
     if status_filter and status_filter.upper() != "ALL":
-        query = query.eq("event_status", status_filter.upper())
+        query = _apply_status_filter(query, status_filter.upper())
     if organizer_id:
         query = query.eq("organizer_id", organizer_id)
 
@@ -129,7 +262,10 @@ def get_event_by_id(event_id: str) -> Optional[PublicEventOut]:
 
 def get_stats(organizer_id: Optional[str] = None) -> StatsOut:
     sb = get_supabase()
-    query = sb.table(TABLE_EVENTS).select("event_status")
+    # Cần đủ 4 cột để suy ra trạng thái hiển thị (xem `_derive_ui_status`)
+    query = sb.table(TABLE_EVENTS).select(
+        "event_status, approval_status, start_time, end_time"
+    )
     if organizer_id:
         query = query.eq("organizer_id", organizer_id)
     rows = _run(query).data or []
@@ -144,7 +280,7 @@ def get_stats(organizer_id: Optional[str] = None) -> StatsOut:
         EventStatus.CANCELLED.value: "cancelled",
     }
     for row in rows:
-        key = bucket.get((row.get("event_status") or "").upper())
+        key = bucket.get(_derive_ui_status(row))
         if key:
             setattr(stats, key, getattr(stats, key) + 1)
     return stats
@@ -185,9 +321,26 @@ def create_event(
     organizer_id: str,
 ) -> OrganizerEventOut:
     data = payload.model_dump(exclude_none=True, mode="json")
-    data["event_status"] = payload.event_status.value
+    target_status = payload.event_status.value
+    data.pop("event_status", None)
     data["organizer_id"] = organizer_id
+
+    # Gửi duyệt (PENDING) thì phải đủ trường bắt buộc. Kiểm tra ở đây — trước
+    # dòng `setdefault` bên dưới — để sự kiện chưa đặt tên không bị âm thầm
+    # điền tên mặc định rồi lọt qua vòng gửi duyệt.
+    if target_status == EventStatus.PENDING.value:
+        missing = missing_required_fields(data)
+        if missing:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Thiếu thông tin bắt buộc: " + ", ".join(missing),
+            )
+
+    # Chỉ bản nháp mới được phép để trống tên.
     data.setdefault("title", "Sự kiện chưa có tên")
+
+    # Dịch trạng thái API → cột DB ngay trước khi ghi
+    data.update(_ui_status_to_db(target_status))
 
     res = _run(get_supabase().table(TABLE_EVENTS).insert(data))
     if not res.data:
@@ -204,14 +357,26 @@ def update_event(
     organizer_id: str,
 ) -> OrganizerEventOut:
     current = _get_raw(event_id, organizer_id)
-    current_status = (current.get("event_status") or EventStatus.DRAFT.value).upper()
+    current_status = _derive_ui_status(current)
 
     data = payload.model_dump(exclude_unset=True, mode="json")
-    if payload.event_status is not None:
-        data["event_status"] = payload.event_status.value
+    # `event_status` không phải cột ghi thẳng được nữa — giữ riêng, dịch ở cuối
+    data.pop("event_status", None)
+    target_status = (
+        payload.event_status.value if payload.event_status is not None else None
+    )
 
-    if not data:
+    if not data and target_status is None:
         return _to_organizer_event_out(current, _category_map(), {})
+
+    if target_status is not None and target_status not in ORGANIZER_SETTABLE_STATUSES:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                "Ban tổ chức chỉ được đặt trạng thái Bản nháp, Chờ duyệt hoặc "
+                "Đã huỷ. Việc công khai sự kiện do Quản trị viên quyết định."
+            ),
+        )
 
     # Sự kiện đã kết thúc / đã huỷ thì không cho sửa nữa
     if current_status in LOCKED_STATUSES:
@@ -228,7 +393,7 @@ def update_event(
         field in data and data[field] != current.get(field) for field in CONTENT_FIELDS
     )
     if current_status in REAPPROVAL_STATUSES and content_changed:
-        data["event_status"] = EventStatus.PENDING.value
+        target_status = EventStatus.PENDING.value
 
     # Kiểm tra lại ràng buộc ngày tháng sau khi trộn dữ liệu cũ + mới
     merged = {**current, **data}
@@ -237,13 +402,19 @@ def update_event(
 
     # Nếu kết quả cuối cùng là PENDING (gửi duyệt / duyệt lại) thì bản ghi SAU KHI
     # trộn phải đủ thông tin bắt buộc — kể cả tệp kế hoạch sự kiện.
-    if merged.get("event_status") == EventStatus.PENDING.value:
+    final_status = target_status or current_status
+    if final_status == EventStatus.PENDING.value:
         missing = missing_required_fields(merged)
         if missing:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail="Thiếu thông tin bắt buộc: " + ", ".join(missing),
             )
+
+    # Dịch trạng thái API → cột DB ngay trước khi ghi
+    if target_status is not None:
+        data.update(_ui_status_to_db(target_status))
+        merged.update(_ui_status_to_db(target_status))
 
     query = (
         get_supabase()
@@ -417,6 +588,13 @@ def _aware(dt: Optional[datetime]) -> Optional[datetime]:
     return dt
 
 
+def _naive(dt: Optional[datetime]) -> Optional[datetime]:
+    """Ngược lại của `_aware` — đưa về naive UTC để so sánh với `_now_naive_utc`."""
+    if dt and dt.tzinfo is not None:
+        return dt.astimezone(timezone.utc).replace(tzinfo=None)
+    return dt
+
+
 def _to_organizer_event_out(
     row: dict[str, Any],
     categories: dict[int, str],
@@ -425,7 +603,8 @@ def _to_organizer_event_out(
     event_id = _row_id(row)
     capacity = row.get("capacity")
     registered = counts.get(event_id, 0)
-    event_status = (row.get("event_status") or EventStatus.DRAFT.value).upper()
+    # Trạng thái trả ra API là giá trị gộp 6 mức, suy từ 2 cột enum của DB
+    event_status = _derive_ui_status(row)
 
     deadline = _aware(_parse_dt(row.get("registration_deadline")))
     now = datetime.now(timezone.utc)

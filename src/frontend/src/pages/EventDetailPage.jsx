@@ -8,7 +8,7 @@ import {
 } from "react-router-dom";
 import Header from "../components/Header";
 import { supabase } from "../lib/supabase";
-import { api, ApiError } from "../lib/api";
+import { publicEventApi } from "../api/eventApi.js";
 import {
   Calendar,
   Users,
@@ -62,15 +62,17 @@ export function EventDetailPage() {
     setEventError(null);
 
     try {
-      const data = await api.getEvent(id);
+      const data = await publicEventApi.getEvent(id);
       setEvent(data);
     } catch (err) {
       console.error("Lỗi khi tải chi tiết sự kiện:", err);
       setEvent(null);
       setEventError(
-        err instanceof ApiError && err.status === 404
+        err.response?.status === 404
           ? `Không tìm thấy sự kiện với ID "${id}" trên hệ thống.`
-          : err.message || "Không thể kết nối đến máy chủ.",
+          : err.response?.data?.detail ||
+              err.message ||
+              "Không thể kết nối đến máy chủ.",
       );
     } finally {
       setEventLoading(false);
@@ -79,6 +81,8 @@ export function EventDetailPage() {
 
   // Fetch Event khi currentEventId thay đổi
   useEffect(() => {
+    // Tải lại dữ liệu là chủ đích của effect khi eventId thay đổi.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchEventDetails(currentEventId);
   }, [currentEventId, fetchEventDetails]);
 
@@ -94,10 +98,8 @@ export function EventDetailPage() {
 
         let activeSession = session;
 
-        // Đăng nhập qua LoginPage gọi thẳng backend (/auth/login) và chỉ lưu
-        // token vào localStorage, chưa đồng bộ vào Supabase client SDK.
-        // Khôi phục lại phiên đăng nhập từ token đã lưu để supabase.auth
-        // nhận diện đúng user (và để lib/api.js đính kèm Bearer token).
+        // Khôi phục phiên Supabase từ token đã lưu để nhận diện đúng user
+        // sau khi tải lại trang.
         if (!activeSession) {
           const storedAccessToken = localStorage.getItem("access_token");
           const storedRefreshToken = localStorage.getItem("refresh_token");
@@ -151,7 +153,9 @@ export function EventDetailPage() {
     async function fetchRegistrationStatus() {
       setDataLoading(true);
       try {
-        const status = await api.getRegistrationStatus(currentEventId);
+        const status = await publicEventApi.getRegistrationStatus(
+          currentEventId,
+        );
         if (isMounted) {
           setCount(status.count);
           setRegistered(status.registered);
@@ -183,7 +187,7 @@ export function EventDetailPage() {
       }
 
       try {
-        const status = await api.getSavedStatus(currentEventId);
+        const status = await publicEventApi.getSavedStatus(currentEventId);
         if (isMounted) {
           setSaved(status.saved);
         }
@@ -206,10 +210,10 @@ export function EventDetailPage() {
     setBookmarkLoading(true);
     try {
       if (saved) {
-        const result = await api.unsaveEvent(currentEventId);
+        const result = await publicEventApi.unsaveEvent(currentEventId);
         setSaved(!result.removed);
       } else {
-        await api.saveEvent(currentEventId);
+        await publicEventApi.saveEvent(currentEventId);
         setSaved(true);
       }
     } catch (err) {
@@ -237,7 +241,7 @@ export function EventDetailPage() {
     setRegisterLoading(true);
 
     try {
-      const result = await api.registerForEvent(currentEventId);
+      const result = await publicEventApi.registerForEvent(currentEventId);
       setCount(result.count);
       setRegistered(true);
       setFeedback(
@@ -250,7 +254,7 @@ export function EventDetailPage() {
             },
       );
     } catch (err) {
-      if (err instanceof ApiError && err.status === 401) {
+      if (err.response?.status === 401) {
         setFeedback({
           type: "warning",
           message:
@@ -259,7 +263,11 @@ export function EventDetailPage() {
       } else {
         setFeedback({
           type: "error",
-          message: `Đăng ký thất bại: ${err.message || "Vui lòng thử lại sau."}`,
+          message: `Đăng ký thất bại: ${
+            err.response?.data?.detail ||
+            err.message ||
+            "Vui lòng thử lại sau."
+          }`,
         });
       }
     } finally {

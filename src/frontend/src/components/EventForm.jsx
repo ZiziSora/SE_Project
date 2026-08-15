@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
 import { Link, useNavigate } from "react-router-dom";
+import { toast } from 'react-toastify';
 import {
   categoriesApi,
   eventsApi,
-  getStatusDisplay,
   uploadsApi,
-} from '../lib/api';
+} from '../api/eventApi.js';
+import { getStatusDisplay } from '../utils/eventManagementUtils.js';
 
 import {
   ArrowLeft,
@@ -70,6 +71,31 @@ function isoToTimePart(iso) {
 /** datetime-local cần đúng định dạng "yyyy-MM-ddTHH:mm" */
 function isoToDatetimeLocal(iso) {
   return iso ? iso.slice(0, 16) : '';
+}
+
+// ─── Trường bắt buộc khi gửi yêu cầu xét duyệt ────────────────────────────────
+
+/**
+ * Phải khớp `REQUIRED_FOR_SUBMIT` trong
+ * `backend/app/schemas/organizer_event.py` — sửa một bên thì sửa cả hai.
+ * Sức chứa và mô tả KHÔNG bắt buộc (để trống = không giới hạn).
+ */
+const REQUIRED_FOR_SUBMIT = [
+  ['title', 'Tên sự kiện'],
+  ['category_id', 'Lĩnh vực / Danh mục'],
+  ['location', 'Địa điểm'],
+  ['start_time', 'Ngày và giờ bắt đầu'],
+  ['end_time', 'Ngày và giờ kết thúc'],
+  ['registration_deadline', 'Hạn chót đăng ký'],
+  ['file_url', 'Tệp kế hoạch sự kiện'],
+];
+
+/** @returns {string[]} nhãn tiếng Việt của các trường còn trống */
+function missingRequiredFields(payload) {
+  return REQUIRED_FOR_SUBMIT.filter(([field]) => {
+    const value = payload[field];
+    return value === null || value === undefined || (typeof value === 'string' && !value.trim());
+  }).map(([, label]) => label);
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -218,7 +244,7 @@ export function EventForm({ mode, eventId }) {
       setBannerUrl(result.url);
     } catch (err) {
       console.error('Lỗi tải ảnh bìa:', err);
-      alert(err instanceof Error ? err.message : 'Không tải được ảnh bìa.');
+      toast.error(err instanceof Error ? err.message : 'Không tải được ảnh bìa.');
       // Trả về ảnh cũ thay vì xoá trắng — quan trọng khi đang sửa sự kiện có ảnh sẵn
       setCoverImage(previousUrl);
       setBannerUrl(previousUrl);
@@ -254,7 +280,7 @@ export function EventForm({ mode, eventId }) {
       setPlanFileName(file.name);
     } catch (err) {
       console.error('Lỗi tải tệp kế hoạch:', err);
-      alert(err instanceof Error ? err.message : 'Không tải được tệp kế hoạch.');
+      toast.error(err instanceof Error ? err.message : 'Không tải được tệp kế hoạch.');
     } finally {
       setUploadingPlan(false);
     }
@@ -266,10 +292,6 @@ export function EventForm({ mode, eventId }) {
    */
   const handleSave = async (targetStatus) => {
     if (submitting) return;
-
-    // Không kiểm tra riêng lẻ ở client. Backend trả về MỘT thông báo liệt kê đầy đủ
-    // mọi trường còn thiếu (đã bao gồm tệp kế hoạch), người dùng bấm OK là quay lại
-    // form với dữ liệu đang nhập còn nguyên.
 
     // Ghép ngày + giờ thành chuỗi ISO không timezone, khớp cột `timestamp` của DB
     const startDateTime =
@@ -301,23 +323,43 @@ export function EventForm({ mode, eventId }) {
       payload.event_status = targetStatus;
     }
 
+    // Gửi yêu cầu xét duyệt thì bắt buộc phải đủ thông tin. Kiểm tra ngay tại
+    // client để người dùng thấy thiếu gì mà không cần chờ round-trip; backend
+    // vẫn kiểm tra lại lần nữa và là nơi quyết định cuối cùng.
+    const willSubmitForApproval =
+      targetStatus === 'PENDING' || (targetStatus === 'KEEP' && requiresReapproval);
+
+    if (willSubmitForApproval) {
+      const missing = missingRequiredFields(payload);
+      if (missing.length > 0) {
+        toast.error(`Thiếu thông tin bắt buộc: ${missing.join(', ')}`);
+        return;
+      }
+    }
+
     setSubmitting(true);
     try {
       if (isEdit && eventId) {
         const updated = await eventsApi.update(eventId, payload);
-        alert(
-          updated.event_status === 'PENDING' && requiresReapproval
-            ? 'Đã lưu. Sự kiện được chuyển sang trạng thái chờ duyệt lại.'
-            : 'Đã cập nhật sự kiện thành công!',
-        );
+        if (updated.event_status === 'PENDING' && requiresReapproval) {
+          toast.success('Đã gửi yêu cầu duyệt lại sự kiện thành công');
+        } else if (updated.event_status === 'PENDING') {
+          toast.success('Đã gửi yêu cầu xét duyệt sự kiện thành công');
+        } else {
+          toast.success('Đã cập nhật sự kiện thành công');
+        }
       } else {
         await eventsApi.create(payload);
-        alert(targetStatus === 'DRAFT' ? 'Đã lưu bản nháp thành công!' : 'Tạo sự kiện thành công!');
+        toast.success(
+          targetStatus === 'DRAFT'
+            ? 'Đã lưu bản nháp thành công'
+            : 'Đã gửi yêu cầu xét duyệt sự kiện thành công',
+        );
       }
       navigate('/');
     } catch (err) {
       console.error('Lỗi khi lưu sự kiện:', err);
-      alert('Có lỗi xảy ra: ' + (err instanceof Error ? err.message : String(err)));
+      toast.error(err instanceof Error ? err.message : 'Không lưu được sự kiện.');
     } finally {
       setSubmitting(false);
     }

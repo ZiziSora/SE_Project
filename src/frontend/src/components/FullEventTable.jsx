@@ -1,14 +1,15 @@
 import { useEffect, useState } from "react"
 import { ChevronDown, ChevronLeft, ChevronRight, Eye, Pencil, Search, Trash2 } from "lucide-react"
 import { Link } from "react-router-dom"
+import { toast } from "react-toastify"
 import { cn } from "../lib/utils"
+import { eventsApi } from "../api/eventApi.js"
 import {
-  eventsApi,
   FILTER_TO_STATUS,
   formatDateTime,
   formatRegistered,
   getStatusDisplay,
-} from "../lib/api" // Backend Python (FastAPI) — lọc / tìm kiếm / phân trang chạy phía server
+} from "../utils/eventManagementUtils.js"
 
 const filters = ["Tất cả", "Đang mở đăng ký", "Đang diễn ra", "Chờ duyệt", "Bản nháp", "Đã kết thúc", "Đã hủy"]
 const headers = ["TÊN SỰ KIỆN", "THỜI GIAN", "TRẠNG THÁI", "NGƯỜI ĐĂNG KÝ", "THAO TÁC"]
@@ -74,8 +75,12 @@ export function FullEventsTable() {
     try {
       await eventsApi.remove(event.event_id)
       setEvents((prev) => prev.filter((row) => row.event_id !== event.event_id))
+      toast.success("Đã xoá sự kiện thành công")
     } catch (err) {
-      alert("Không xoá được sự kiện: " + (err instanceof Error ? err.message : String(err)))
+      console.error("Lỗi xoá sự kiện:", err)
+      toast.error(
+        "Không xoá được sự kiện: " + (err instanceof Error ? err.message : String(err)),
+      )
     }
   }
 

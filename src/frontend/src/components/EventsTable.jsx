@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react"
 import { ArrowRight, Eye, Pencil, Trash2 } from "lucide-react"
 import { Link } from "react-router-dom"
+import { toast } from "react-toastify"
 import { cn } from "../lib/utils"
+import { eventsApi } from "../api/eventApi.js"
 import {
-  eventsApi,
   formatDateTime,
   formatRegistered,
   getStatusDisplay,
-} from "../lib/api" // Backend Python (FastAPI) — không còn gọi Supabase trực tiếp
+} from "../utils/eventManagementUtils.js"
 
 const headers = ["TÊN SỰ KIỆN", "THỜI GIAN", "TRẠNG THÁI", "NGƯỜI ĐĂNG KÝ", "THAO TÁC"]
 
@@ -48,8 +49,12 @@ export function EventsTable() {
     try {
       await eventsApi.remove(event.event_id)
       setRows((prev) => prev.filter((row) => row.event_id !== event.event_id))
+      toast.success("Đã xoá sự kiện thành công")
     } catch (err) {
-      alert("Không xoá được sự kiện: " + (err instanceof Error ? err.message : String(err)))
+      console.error("Lỗi xoá sự kiện:", err)
+      toast.error(
+        "Không xoá được sự kiện: " + (err instanceof Error ? err.message : String(err)),
+      )
     }
   }
 

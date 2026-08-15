@@ -3,7 +3,7 @@ import { Bell, Menu, ShieldCheck, X } from "lucide-react";
 import { Link, NavLink } from "react-router-dom";
 
 const ADMIN_NAV_ITEMS = [
-  { label: "Xét duyệt sự kiện", to: "/admin/events" },
+  { label: "Xét duyệt sự kiện", to: "/admin/manage-events" },
   { label: "Xét duyệt Ban tổ chức", to: "/admin/organizer-requests" },
   { label: "Thống kê", to: "/admin/statistics" },
 ];
