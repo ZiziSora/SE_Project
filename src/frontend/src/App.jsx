@@ -198,7 +198,14 @@ export default function App() {
               </ProtectedRoute>
             }
           />
-          <Route path="events/:eventId" element={<AdminEventReviewDetailPage />} />
+          <Route
+            path="events/:eventId"
+            element={
+              <ProtectedRoute>
+                <AdminEventReviewDetailPage />
+              </ProtectedRoute>
+            }
+          />
         </Route>
 
         <Route

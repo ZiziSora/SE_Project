@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { Check, LoaderCircle, ShieldCheck, CircleAlert, X } from "lucide-react";
 
 export default function AdminEventDecisionDialog({
@@ -8,7 +8,6 @@ export default function AdminEventDecisionDialog({
   onClose,
   onConfirm,
 }) {
-  const [reason, setReason] = useState("");
   const isRejecting = action === "reject";
 
   useEffect(() => {
@@ -23,7 +22,7 @@ export default function AdminEventDecisionDialog({
 
   if (!event || !action) return null;
 
-  const canSubmit = !isSubmitting && (!isRejecting || reason.trim().length >= 10);
+  const canSubmit = !isSubmitting;
 
   return (
     <div
@@ -74,7 +73,7 @@ export default function AdminEventDecisionDialog({
         </h2>
         <p className="mt-2 text-sm leading-6 text-[#6f6678]">
           {isRejecting
-            ? "Ban tổ chức sẽ nhận được lý do để chỉnh sửa hồ sơ trước khi gửi duyệt lại."
+            ? "Sự kiện sẽ được chuyển về bản nháp để Ban tổ chức chỉnh sửa và gửi duyệt lại."
             : "Sự kiện sẽ được phép chuyển sang trạng thái công khai cho sinh viên đăng ký."}
         </p>
 
@@ -84,27 +83,6 @@ export default function AdminEventDecisionDialog({
           </p>
           <p className="mt-1 text-xs text-[#857c8d]">{event.id}</p>
         </div>
-
-        {isRejecting && (
-          <label className="mt-5 block">
-            <span className="text-xs font-semibold text-[#4f4658]">
-              Lý do từ chối
-            </span>
-            <textarea
-              value={reason}
-              onChange={(changeEvent) => setReason(changeEvent.target.value)}
-              rows={4}
-              maxLength={500}
-              autoFocus
-              placeholder="Nêu rõ thông tin cần bổ sung hoặc điều chỉnh..."
-              className="mt-2 w-full resize-none rounded-xl border border-[#dcd4e3] bg-white px-4 py-3 text-sm leading-6 text-[#302839] outline-none transition-all placeholder:text-[#aaa1b2] focus:border-[#9b71db] focus:ring-3 focus:ring-[#7c3aed]/10"
-            />
-            <span className="mt-1.5 flex justify-between text-[11px] text-[#918897]">
-              <span>Tối thiểu 10 ký tự</span>
-              <span>{reason.length}/500</span>
-            </span>
-          </label>
-        )}
 
         <div className="mt-6 flex flex-col-reverse gap-2.5 sm:flex-row sm:justify-end">
           <button
@@ -117,7 +95,7 @@ export default function AdminEventDecisionDialog({
           </button>
           <button
             type="button"
-            onClick={() => onConfirm(reason.trim())}
+            onClick={onConfirm}
             disabled={!canSubmit}
             className={`inline-flex h-11 items-center justify-center gap-2 rounded-xl px-5 text-sm font-semibold text-white shadow-sm transition-all disabled:cursor-not-allowed disabled:opacity-45 ${
               isRejecting

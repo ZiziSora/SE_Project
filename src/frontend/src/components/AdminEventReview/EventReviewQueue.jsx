@@ -34,10 +34,10 @@ export default function EventReviewQueue({
             <CalendarDays className="size-6" strokeWidth={1.7} aria-hidden="true" />
           </span>
           <h3 className="mt-4 font-['Cabinet_Grotesk','Manrope',sans-serif] text-lg font-bold text-[#1f2b3c]">
-            Không tìm thấy sự kiện
+            Không có sự kiện chờ duyệt
           </h3>
           <p className="mt-1 text-sm text-[#817889]">
-            Hãy thử từ khóa khác hoặc thay đổi bộ lọc trạng thái.
+            Hàng chờ đang trống hoặc không có kết quả phù hợp với từ khóa.
           </p>
         </div>
       </div>

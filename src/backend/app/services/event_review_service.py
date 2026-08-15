@@ -31,6 +31,7 @@ def _serialize_event(event: Event) -> dict:
         "event_status": event.event_status,
         "approval_status": event.approval_status,
         "banner_url": event.banner_url,
+        "file_url": getattr(event, "file_url", None),
     }
 
 

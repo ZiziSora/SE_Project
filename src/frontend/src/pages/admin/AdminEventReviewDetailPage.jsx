@@ -1,12 +1,14 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ArrowLeft,
   CalendarDays,
   Check,
   Clock3,
-  Download,
+  ExternalLink,
   FileText,
+  LoaderCircle,
   MapPin,
+  RefreshCw,
   ShieldCheck,
   Tag,
   UsersRound,
@@ -19,13 +21,13 @@ import AdminEventDecisionDialog from "../../components/AdminEventReview/AdminEve
 import AdminReviewStatusBadge from "../../components/AdminEventReview/AdminReviewStatusBadge.jsx";
 import EventReviewInfoItem from "../../components/AdminEventReview/EventReviewInfoItem.jsx";
 import EventReviewPoster from "../../components/AdminEventReview/EventReviewPoster.jsx";
-import ReviewPolicyMarquee from "../../components/AdminEventReview/ReviewPolicyMarquee.jsx";
 import ReviewQueueNavigator from "../../components/AdminEventReview/ReviewQueueNavigator.jsx";
 import AdminHeader from "../../components/ReviewOrganizerRequest/AdminHeader.jsx";
 import {
-  getAdminReviewEvents,
-  saveAdminReviewDecision,
-} from "../../lib/adminEventReviewStore.js";
+  approveEventReview,
+  getPendingEventReviews,
+  rejectEventReview,
+} from "../../api/adminEventReviewApi.js";
 import {
   formatAdminReviewDate,
   formatAdminReviewTime,
@@ -33,25 +35,38 @@ import {
 
 export default function AdminEventReviewDetailPage() {
   const { eventId } = useParams();
-  const [events, setEvents] = useState(getAdminReviewEvents);
+  const [events, setEvents] = useState([]);
+  const [event, setEvent] = useState(null);
   const [decisionAction, setDecisionAction] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
+
+  const loadEvent = useCallback(async () => {
+    setIsLoading(true);
+    setLoadError("");
+    try {
+      const result = await getPendingEventReviews();
+      setEvents(result.items);
+      setEvent(
+        result.items.find((eventItem) => eventItem.id === eventId) ?? null,
+      );
+    } catch (error) {
+      setLoadError(
+        error.response?.data?.detail ||
+          "Không thể tải hồ sơ sự kiện. Vui lòng thử lại.",
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  }, [eventId]);
 
   useEffect(() => {
-    const refreshEvents = () => setEvents(getAdminReviewEvents());
-    window.addEventListener("storage", refreshEvents);
-    window.addEventListener("unievent:admin-review-updated", refreshEvents);
+    // Tải hồ sơ từ hàng chờ khi trang được mở hoặc eventId thay đổi.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadEvent();
+  }, [loadEvent]);
 
-    return () => {
-      window.removeEventListener("storage", refreshEvents);
-      window.removeEventListener("unievent:admin-review-updated", refreshEvents);
-    };
-  }, []);
-
-  const event = useMemo(
-    () => events.find((eventItem) => eventItem.id === eventId) ?? null,
-    [eventId, events],
-  );
   const pendingEvents = useMemo(
     () => events.filter((eventItem) => eventItem.status === "PENDING"),
     [events],
@@ -60,22 +75,65 @@ export default function AdminEventReviewDetailPage() {
   const previousEvent = queueIndex > 0 ? pendingEvents[queueIndex - 1] : null;
   const nextEvent = queueIndex >= 0 ? pendingEvents[queueIndex + 1] ?? null : pendingEvents[0] ?? null;
 
-  const confirmDecision = (reason) => {
+  const confirmDecision = async () => {
     if (!event || !decisionAction || isSubmitting) return;
 
     setIsSubmitting(true);
-    window.setTimeout(() => {
-      const status = decisionAction === "approve" ? "APPROVED" : "REJECTED";
-      saveAdminReviewDecision(event.id, status, reason);
-      toast.success(
-        status === "APPROVED"
-          ? "Sự kiện đã được phê duyệt và sẵn sàng xuất bản."
-          : "Đã gửi phản hồi từ chối đến Ban tổ chức.",
+    try {
+      const result =
+        decisionAction === "approve"
+          ? await approveEventReview(event.id)
+          : await rejectEventReview(event.id);
+      setEvent(result.event);
+      setEvents((currentEvents) =>
+        currentEvents.filter((eventItem) => eventItem.id !== event.id),
       );
+      toast.success(result.message);
       setDecisionAction(null);
+    } catch (error) {
+      toast.error(
+        error.response?.data?.detail ||
+          "Không thể cập nhật kết quả xét duyệt.",
+      );
+    } finally {
       setIsSubmitting(false);
-    }, 350);
+    }
   };
+
+  if (isLoading) {
+    return (
+      <main className="min-h-screen bg-[#f8f9ff] font-['Inter',sans-serif] text-[#172235]">
+        <AdminHeader />
+        <section className="grid min-h-[70vh] place-items-center text-center text-sm font-semibold text-[#766e80]">
+          <div>
+            <LoaderCircle className="mx-auto mb-3 size-8 animate-spin text-[#6d20df]" />
+            Đang tải hồ sơ sự kiện...
+          </div>
+        </section>
+      </main>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <main className="min-h-screen bg-[#f8f9ff] font-['Inter',sans-serif] text-[#172235]">
+        <AdminHeader />
+        <section className="grid min-h-[70vh] place-items-center px-5 text-center">
+          <div>
+            <p className="text-sm font-semibold text-red-600">{loadError}</p>
+            <button
+              type="button"
+              onClick={loadEvent}
+              className="mt-4 inline-flex h-10 items-center gap-2 rounded-xl border border-[#d8d0df] bg-white px-4 text-xs font-semibold text-[#51495b]"
+            >
+              <RefreshCw className="size-4" aria-hidden="true" />
+              Thử lại
+            </button>
+          </div>
+        </section>
+      </main>
+    );
+  }
 
   if (!event) {
     return (
@@ -93,7 +151,7 @@ export default function AdminEventReviewDetailPage() {
               Hồ sơ có thể đã bị xóa hoặc đường dẫn không còn hợp lệ.
             </p>
             <Link
-              to="/admin/events"
+              to="/admin/manage-events"
               className="mt-6 inline-flex h-11 items-center gap-2 rounded-xl bg-[#6d20df] px-5 text-sm font-semibold text-white"
             >
               <ArrowLeft className="size-4" aria-hidden="true" />
@@ -113,7 +171,7 @@ export default function AdminEventReviewDetailPage() {
         <div className="pointer-events-none absolute -right-24 top-0 size-[400px] rounded-full bg-[#d9c5ff]/25 blur-[110px]" aria-hidden="true" />
 
         <Link
-          to="/admin/events"
+          to="/admin/manage-events"
           className="review-reveal relative z-10 inline-flex items-center gap-2 rounded-lg text-sm font-semibold text-[#6d20df] transition-colors hover:text-[#5315b4] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#7c3aed]"
         >
           <ArrowLeft className="size-4" strokeWidth={2} aria-hidden="true" />
@@ -136,8 +194,13 @@ export default function AdminEventReviewDetailPage() {
                 {event.organizerInitials}
               </span>
               Gửi bởi <strong className="font-semibold text-[#3e3547]">{event.organizerName}</strong>
-              <span aria-hidden="true">·</span>
-              {formatAdminReviewDate(event.submittedAt)} lúc {formatAdminReviewTime(event.submittedAt)}
+              {event.submittedAt && (
+                <>
+                  <span aria-hidden="true">·</span>
+                  {formatAdminReviewDate(event.submittedAt)} lúc{" "}
+                  {formatAdminReviewTime(event.submittedAt)}
+                </>
+              )}
             </p>
           </div>
 
@@ -179,7 +242,7 @@ export default function AdminEventReviewDetailPage() {
                   <p className="mt-1 text-sm leading-6 text-[#675e70]">
                     {event.status === "APPROVED"
                       ? "Sự kiện đã đủ điều kiện chuyển sang trạng thái công khai cho sinh viên."
-                      : event.rejectionReason || "Ban tổ chức cần cập nhật hồ sơ trước khi gửi duyệt lại."}
+                      : "Sự kiện đã được chuyển về bản nháp để Ban tổ chức cập nhật trước khi gửi duyệt lại."}
                   </p>
                 </div>
               </div>
@@ -214,7 +277,11 @@ export default function AdminEventReviewDetailPage() {
                 <p className="mt-0.5 font-normal text-[#71687a]">{formatAdminReviewTime(event.registrationDeadline)}</p>
               </EventReviewInfoItem>
               <EventReviewInfoItem icon={UsersRound} label="Sức chứa">
-                <p>{event.capacity.toLocaleString("vi-VN")} sinh viên</p>
+                <p>
+                  {event.capacity
+                    ? `${event.capacity.toLocaleString("vi-VN")} sinh viên`
+                    : "Không giới hạn"}
+                </p>
               </EventReviewInfoItem>
               <EventReviewInfoItem icon={MapPin} label="Địa điểm">
                 <p>{event.location}</p>
@@ -225,27 +292,51 @@ export default function AdminEventReviewDetailPage() {
             </div>
           </section>
 
-          <section className="review-reveal overflow-hidden rounded-2xl border border-[#ded7e7] bg-white shadow-[0_14px_42px_rgba(44,29,59,0.055)]" style={{ animationDelay: "190ms" }}>
+          <section
+            className="review-reveal overflow-hidden rounded-2xl border border-[#ded7e7] bg-white shadow-[0_14px_42px_rgba(44,29,59,0.055)]"
+            style={{ animationDelay: "190ms" }}
+          >
             <div className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">
               <div className="flex min-w-0 items-center gap-3.5">
                 <span className="grid size-11 shrink-0 place-items-center rounded-[14px] bg-[#eef3fb] text-[#536b91]">
-                  <FileText className="size-5" strokeWidth={1.8} aria-hidden="true" />
+                  <FileText
+                    className="size-5"
+                    strokeWidth={1.8}
+                    aria-hidden="true"
+                  />
                 </span>
                 <div className="min-w-0">
-                  <h2 className="truncate text-sm font-bold text-[#2d3747]">{event.fileName}</h2>
-                  <p className="mt-1 text-xs text-[#857c8d]">Tài liệu kế hoạch · {event.fileSize}</p>
+                  <h2 className="text-sm font-bold text-[#2d3747]">
+                    Kế hoạch sự kiện
+                  </h2>
+                  <p className="mt-1 truncate text-xs text-[#857c8d]">
+                    {event.fileName || "Ban tổ chức chưa tải lên tài liệu"}
+                  </p>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => toast.info("Bản demo chưa gắn tệp kế hoạch từ backend.")}
-                className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-[#d8d0df] bg-white px-4 text-xs font-semibold text-[#51495b] transition-all hover:border-[#bda8d6] hover:bg-[#f7f3fb] hover:text-[#6d20df]"
-              >
-                <Download className="size-4" strokeWidth={1.9} aria-hidden="true" />
-                Xem tài liệu
-              </button>
+
+              {event.fileUrl ? (
+                <a
+                  href={event.fileUrl}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-xl bg-[#6d20df] px-4 text-xs font-semibold text-white transition-all hover:-translate-y-0.5 hover:bg-[#5b16c2]"
+                >
+                  <ExternalLink
+                    className="size-4"
+                    strokeWidth={1.9}
+                    aria-hidden="true"
+                  />
+                  Xem kế hoạch
+                </a>
+              ) : (
+                <span className="inline-flex h-10 shrink-0 items-center rounded-xl bg-[#f1eef4] px-4 text-xs font-semibold text-[#817889]">
+                  Chưa có tài liệu
+                </span>
+              )}
             </div>
           </section>
+
         </div>
 
         <aside className="min-w-0 space-y-5 lg:sticky lg:top-[96px] lg:self-start">

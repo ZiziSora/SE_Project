@@ -53,6 +53,7 @@ class Event(Base):
     )
 
     banner_url = Column(String)
+    file_url = Column(Text)
 
     organizer = relationship(
         "User",

@@ -23,6 +23,7 @@ class EventReviewResponse(BaseModel):
     event_status: EventStatus | None = None
     approval_status: ApprovalStatus
     banner_url: str | None = None
+    file_url: str | None = None
 
 
 class EventReviewListResponse(BaseModel):

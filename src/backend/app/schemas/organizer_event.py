@@ -38,6 +38,21 @@ class EventBase(BaseModel):
             return value or None
         return value
 
+    @field_validator("banner_url", "file_url", mode="before")
+    @classmethod
+    def _normalize_url(cls, value: Any) -> Any:
+        if not isinstance(value, str):
+            return value
+
+        value = value.strip()
+        if (
+            len(value) >= 2
+            and value[0] in ("'", '"')
+            and value[-1] == value[0]
+        ):
+            value = value[1:-1].strip()
+        return value or None
+
     @field_validator("category_id", "capacity", mode="before")
     @classmethod
     def _empty_str_to_none(cls, value: Any) -> Any:

@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   CalendarCheck2,
   CalendarClock,
   CircleX,
   ClipboardList,
-  Filter,
+  LoaderCircle,
+  RefreshCw,
   Search,
   ShieldCheck,
   X,
@@ -14,46 +15,62 @@ import { toast } from "react-toastify";
 import AdminEventDecisionDialog from "../../components/AdminEventReview/AdminEventDecisionDialog.jsx";
 import AdminReviewStatCard from "../../components/AdminEventReview/AdminReviewStatCard.jsx";
 import EventReviewQueue from "../../components/AdminEventReview/EventReviewQueue.jsx";
-import EventReviewPoster from "../../components/AdminEventReview/EventReviewPoster.jsx";
-import ReviewPolicyMarquee from "../../components/AdminEventReview/ReviewPolicyMarquee.jsx";
 import AdminHeader from "../../components/ReviewOrganizerRequest/AdminHeader.jsx";
 import {
-  getAdminReviewEvents,
-  getAdminReviewSummary,
-  saveAdminReviewDecision,
-} from "../../lib/adminEventReviewStore.js";
+  approveEventReview,
+  getPendingEventReviews,
+  rejectEventReview,
+} from "../../api/adminEventReviewApi.js";
 
 const PAGE_SIZE = 4;
 
 export default function AdminEventReviewsPage() {
-  const [events, setEvents] = useState(getAdminReviewEvents);
+  const [events, setEvents] = useState([]);
+  const [totalPending, setTotalPending] = useState(0);
+  const [processed, setProcessed] = useState({ approved: 0, rejected: 0 });
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("ALL");
   const [currentPage, setCurrentPage] = useState(1);
   const [decision, setDecision] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState("");
 
-  useEffect(() => {
-    const refreshEvents = () => setEvents(getAdminReviewEvents());
-    window.addEventListener("storage", refreshEvents);
-    window.addEventListener("unievent:admin-review-updated", refreshEvents);
-
-    return () => {
-      window.removeEventListener("storage", refreshEvents);
-      window.removeEventListener(
-        "unievent:admin-review-updated",
-        refreshEvents,
+  const loadEvents = useCallback(async () => {
+    setIsLoading(true);
+    setLoadError("");
+    try {
+      const result = await getPendingEventReviews();
+      setEvents(result.items);
+      setTotalPending(result.total);
+    } catch (error) {
+      setLoadError(
+        error.response?.data?.detail ||
+          "Không thể tải hàng chờ xét duyệt. Vui lòng thử lại.",
       );
-    };
+    } finally {
+      setIsLoading(false);
+    }
   }, []);
 
-  const summary = useMemo(() => getAdminReviewSummary(events), [events]);
+  useEffect(() => {
+    // Tải hàng chờ khi trang được mở.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadEvents();
+  }, [loadEvents]);
+
+  const summary = useMemo(
+    () => ({
+      pending: totalPending,
+      processed: processed.approved + processed.rejected,
+      approved: processed.approved,
+      rejected: processed.rejected,
+    }),
+    [processed, totalPending],
+  );
   const filteredEvents = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLocaleLowerCase("vi");
 
     return events.filter((event) => {
-      const matchesStatus =
-        statusFilter === "ALL" || event.status === statusFilter;
       const searchableText = [
         event.title,
         event.id,
@@ -65,12 +82,9 @@ export default function AdminEventReviewsPage() {
         .join(" ")
         .toLocaleLowerCase("vi");
 
-      return (
-        matchesStatus &&
-        (!normalizedSearch || searchableText.includes(normalizedSearch))
-      );
+      return !normalizedSearch || searchableText.includes(normalizedSearch);
     });
-  }, [events, searchTerm, statusFilter]);
+  }, [events, searchTerm]);
 
   const totalPages = Math.max(1, Math.ceil(filteredEvents.length / PAGE_SIZE));
   const safeCurrentPage = Math.min(currentPage, totalPages);
@@ -79,34 +93,40 @@ export default function AdminEventReviewsPage() {
     pageStartIndex,
     pageStartIndex + PAGE_SIZE,
   );
-  const featuredEvent =
-    events.find((event) => event.status === "PENDING") ?? events[0];
-
   const updateSearchTerm = (value) => {
     setCurrentPage(1);
     setSearchTerm(value);
   };
 
-  const updateStatusFilter = (value) => {
-    setCurrentPage(1);
-    setStatusFilter(value);
-  };
-
-  const confirmDecision = (reason) => {
+  const confirmDecision = async () => {
     if (!decision || isSubmitting) return;
 
     setIsSubmitting(true);
-    window.setTimeout(() => {
-      const status = decision.action === "approve" ? "APPROVED" : "REJECTED";
-      saveAdminReviewDecision(decision.event.id, status, reason);
-      toast.success(
-        status === "APPROVED"
-          ? "Đã phê duyệt sự kiện."
-          : "Đã từ chối và lưu phản hồi cho Ban tổ chức.",
+    try {
+      const isApproving = decision.action === "approve";
+      const result = isApproving
+        ? await approveEventReview(decision.event.id)
+        : await rejectEventReview(decision.event.id);
+
+      setEvents((currentEvents) =>
+        currentEvents.filter((event) => event.id !== decision.event.id),
       );
+      setTotalPending((total) => Math.max(total - 1, 0));
+      setProcessed((current) => ({
+        ...current,
+        [isApproving ? "approved" : "rejected"]:
+          current[isApproving ? "approved" : "rejected"] + 1,
+      }));
+      toast.success(result.message);
       setDecision(null);
+    } catch (error) {
+      toast.error(
+        error.response?.data?.detail ||
+          "Không thể cập nhật kết quả xét duyệt.",
+      );
+    } finally {
       setIsSubmitting(false);
-    }, 350);
+    }
   };
 
   return (
@@ -143,8 +163,8 @@ export default function AdminEventReviewsPage() {
           </div>
           <aside className="border-l-2 border-[#7c3aed] pl-5 lg:mb-1 lg:justify-self-end lg:max-w-[340px]">
             <p className="text-sm leading-6 text-[#6b6275]">
-              Hồ sơ chờ duyệt lâu nhất đã được gửi hơn 24 giờ. Ưu tiên xử lý
-              theo thời gian gửi để bảo đảm trải nghiệm cho Ban tổ chức.
+              Hàng chờ được đồng bộ trực tiếp từ hệ thống. Mỗi quyết định sẽ
+              cập nhật trạng thái sự kiện ngay sau khi xác nhận.
             </p>
           </aside>
         </section>
@@ -155,29 +175,29 @@ export default function AdminEventReviewsPage() {
           aria-label="Tổng quan kiểm duyệt"
         >
           <AdminReviewStatCard
-            label="Tổng hồ sơ"
-            value={summary.total}
-            helper="Tất cả yêu cầu đã tiếp nhận"
+            label="Hàng chờ hiện tại"
+            value={summary.pending}
+            helper="Dữ liệu trực tiếp từ hệ thống"
             icon={ClipboardList}
             tone="blue"
           />
           <AdminReviewStatCard
-            label="Đang chờ"
-            value={summary.pending}
-            helper="Cần quản trị viên xử lý"
+            label="Đã xử lý"
+            value={summary.processed}
+            helper="Trong phiên làm việc hiện tại"
             icon={CalendarClock}
           />
           <AdminReviewStatCard
             label="Đã duyệt"
             value={summary.approved}
-            helper="Đủ điều kiện xuất bản"
+            helper="Trong phiên làm việc hiện tại"
             icon={CalendarCheck2}
             tone="green"
           />
           <AdminReviewStatCard
             label="Đã từ chối"
             value={summary.rejected}
-            helper="Đã gửi phản hồi chỉnh sửa"
+            helper="Trong phiên làm việc hiện tại"
             icon={CircleX}
             tone="red"
           />
@@ -200,7 +220,7 @@ export default function AdminEventReviewsPage() {
                 </span>
               </div>
               <p className="mt-1 text-sm text-[#7a7183]">
-                Sắp xếp theo thời gian gửi mới nhất.
+                Danh sách sự kiện đang chờ quản trị viên xử lý.
               </p>
             </div>
 
@@ -231,40 +251,46 @@ export default function AdminEventReviewsPage() {
                   </button>
                 )}
               </label>
-              <label className="relative block min-w-[190px]">
-                <span className="sr-only">Lọc trạng thái</span>
-                <Filter
-                  className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-[#83798d]"
-                  aria-hidden="true"
-                />
-                <select
-                  value={statusFilter}
-                  onChange={(changeEvent) =>
-                    updateStatusFilter(changeEvent.target.value)
-                  }
-                  className="h-11 w-full appearance-none rounded-xl border border-[#dcd4e3] bg-[#fbfaff] pl-10 pr-9 text-sm font-medium text-[#51495b] outline-none focus:border-[#9b71db] focus:bg-white focus:ring-3 focus:ring-[#7c3aed]/10"
-                >
-                  <option value="ALL">Tất cả trạng thái</option>
-                  <option value="PENDING">Đang chờ duyệt</option>
-                  <option value="APPROVED">Đã phê duyệt</option>
-                  <option value="REJECTED">Đã từ chối</option>
-                </select>
-              </label>
             </div>
           </div>
 
-          <EventReviewQueue
-            events={visibleEvents}
-            currentPage={safeCurrentPage}
-            totalPages={totalPages}
-            displayStart={filteredEvents.length ? pageStartIndex + 1 : 0}
-            displayEnd={
-              filteredEvents.length ? pageStartIndex + visibleEvents.length : 0
-            }
-            totalResults={filteredEvents.length}
-            onPageChange={setCurrentPage}
-            onDecision={(event, action) => setDecision({ event, action })}
-          />
+          {isLoading ? (
+            <div className="grid min-h-[330px] place-items-center text-sm font-semibold text-[#766e80]">
+              <div className="text-center">
+                <LoaderCircle className="mx-auto mb-3 size-7 animate-spin text-[#6d20df]" />
+                Đang tải hàng chờ xét duyệt...
+              </div>
+            </div>
+          ) : loadError ? (
+            <div className="grid min-h-[330px] place-items-center px-6 text-center">
+              <div>
+                <p className="text-sm font-semibold text-red-600">{loadError}</p>
+                <button
+                  type="button"
+                  onClick={loadEvents}
+                  className="mt-4 inline-flex h-10 items-center gap-2 rounded-xl border border-[#d8d0df] bg-white px-4 text-xs font-semibold text-[#51495b] hover:bg-[#f7f4fa]"
+                >
+                  <RefreshCw className="size-4" aria-hidden="true" />
+                  Thử lại
+                </button>
+              </div>
+            </div>
+          ) : (
+            <EventReviewQueue
+              events={visibleEvents}
+              currentPage={safeCurrentPage}
+              totalPages={totalPages}
+              displayStart={filteredEvents.length ? pageStartIndex + 1 : 0}
+              displayEnd={
+                filteredEvents.length
+                  ? pageStartIndex + visibleEvents.length
+                  : 0
+              }
+              totalResults={filteredEvents.length}
+              onPageChange={setCurrentPage}
+              onDecision={(event, action) => setDecision({ event, action })}
+            />
+          )}
         </div>
       </section>
 

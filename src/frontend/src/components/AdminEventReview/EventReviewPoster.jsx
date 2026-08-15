@@ -3,6 +3,20 @@ import { Sparkles } from "lucide-react";
 import { getBannerThemeClasses } from "../../utils/adminEventReviewUtils.js";
 
 export default function EventReviewPoster({ event, compact = false }) {
+  if (event.bannerUrl) {
+    return (
+      <img
+        src={event.bannerUrl}
+        alt={`Poster sự kiện ${event.title}`}
+        className={`object-cover ${
+          compact
+            ? "size-11 rounded-xl"
+            : "aspect-[4/5] min-h-[420px] w-full rounded-b-2xl"
+        }`}
+      />
+    );
+  }
+
   return (
     <div
       className={`group relative isolate overflow-hidden bg-gradient-to-br ${getBannerThemeClasses(event.bannerTheme)} ${
