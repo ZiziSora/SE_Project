@@ -3,6 +3,7 @@ import hcmus from "../assets/hcmus.png";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { login } from "../api/authApi";
 import InputField from "../components/InputField";
+import { supabase } from "../lib/supabase.js";
 import { useState } from "react";
 import { Mail, Lock } from "lucide-react";
 import { toast } from "react-toastify";
@@ -35,10 +36,26 @@ const LoginPage = () => {
         email: data.email.trim().toLowerCase(),
       });
 
+      const { data: sessionData, error: sessionError } =
+        await supabase.auth.setSession({
+          access_token: result.access_token,
+          refresh_token: result.refresh_token,
+        });
+
+      if (sessionError || !sessionData.session) {
+        throw new Error("Không thể khởi tạo phiên đăng nhập. Vui lòng thử lại.");
+      }
+
       toast.success("Đăng nhập thành công");
 
-      localStorage.setItem("access_token", result.access_token);
-      localStorage.setItem("refresh_token", result.refresh_token);
+      localStorage.setItem(
+        "access_token",
+        sessionData.session.access_token,
+      );
+      localStorage.setItem(
+        "refresh_token",
+        sessionData.session.refresh_token,
+      );
       localStorage.setItem("user_id", result.user_id);
       localStorage.setItem("email", result.email);
       localStorage.setItem("role", result.role);
@@ -56,7 +73,9 @@ const LoginPage = () => {
       }, 800);
     } catch (error) {
       toast.error(
-        error.response?.data?.detail || "Đã xảy ra lỗi. Vui lòng thử lại",
+        error.response?.data?.detail ||
+          error.message ||
+          "Đã xảy ra lỗi. Vui lòng thử lại",
       );
     } finally {
       setLoading(false);
@@ -102,7 +121,8 @@ const LoginPage = () => {
             <div className="mx-6 md:mx-8 mb-3 flex items-start gap-2 rounded-lg bg-green-50 border border-green-200 px-4 py-3">
               <CheckCircle className="size-4 text-green-600 mt-0.5 shrink-0" />
               <p className="text-sm text-green-700 font-medium">
-                Email đã được xác nhận! Hãy đăng nhập để tiếp tục.
+                Email đã được xác nhận. Nếu đăng ký Ban tổ chức, bạn có thể đăng
+                nhập sau khi hồ sơ được quản trị viên phê duyệt.
               </p>
             </div>
           )}

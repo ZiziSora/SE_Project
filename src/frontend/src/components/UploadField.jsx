@@ -28,26 +28,24 @@ const UploadField = ({ label, onFilesChange }) => {
   };
 
   return (
-    <div className="space-y-2">
-      <label className="text-gray-500 font-bold font-inter">{label}</label>
+    <div className="space-y-1.5">
+      <span className="block text-sm font-semibold text-slate-700">{label}</span>
 
       <label
-        className="
-          flex flex-col items-center justify-center
-          w-full h-36
-          border-2 border-dashed border-gray-300
-          rounded-lg
-          cursor-pointer
-          hover:border-purple-600
-          hover:bg-purple-50
-          transition
-        "
+        className="group flex min-h-32 w-full cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50/70 px-5 py-5 text-center transition-all duration-200 hover:border-violet-400 hover:bg-violet-50 focus-within:border-violet-500 focus-within:ring-4 focus-within:ring-violet-100"
       >
-        <UploadCloud className="w-9 h-9 text-gray-400" />
-        <p className="mt-2 text-sm text-gray-500">Nhấn vào đây để chọn tệp</p>
+        <span className="flex size-10 items-center justify-center rounded-xl bg-white text-violet-600 shadow-sm transition-transform duration-300 group-hover:-translate-y-1">
+          <UploadCloud className="size-5" aria-hidden="true" />
+        </span>
+        <p className="mt-3 text-sm font-semibold text-slate-700">
+          Chọn tài liệu minh chứng
+        </p>
+        <p className="mt-1 text-xs text-slate-400">
+          PDF, Word hoặc hình ảnh · tối đa 5 tệp, mỗi tệp 5MB
+        </p>
         <input
           type="file"
-          accept="image/*,.pdf,.doc,.docx"
+          accept="image/jpeg,image/png,image/webp,image/gif,.pdf,.doc,.docx"
           onChange={handleUpload}
           className="hidden"
           multiple
@@ -55,22 +53,22 @@ const UploadField = ({ label, onFilesChange }) => {
       </label>
 
       {files.length > 0 && (
-        <div className="max-h-32 overflow-y-auto space-y-1 pr-1">
+        <div className="max-h-32 space-y-2 overflow-y-auto pr-1">
           {files.map((file, index) => (
             <div
               key={`${file.name}-${file.lastModified}`}
-              className="flex items-center justify-between gap-2 rounded-md border border-gray-200 bg-gray-50 px-3 py-1.5"
+              className="flex items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm"
             >
               <div className="flex items-center gap-2 min-w-0">
-                <FileText className="w-4 h-4 text-purple-500 shrink-0" />
-                <span className="text-sm text-gray-700 truncate">
+                <FileText className="size-4 shrink-0 text-violet-500" />
+                <span className="truncate text-sm text-slate-700">
                   {file.name}
                 </span>
               </div>
               <button
                 type="button"
                 onClick={() => handleRemove(index)}
-                className="shrink-0 text-gray-400 hover:text-red-500 transition-colors"
+                className="flex size-7 shrink-0 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-red-50 hover:text-red-500"
                 aria-label="Xóa tệp"
               >
                 <X className="w-4 h-4" />

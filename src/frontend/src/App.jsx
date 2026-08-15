@@ -20,7 +20,9 @@ import AdminStatisticsPage from "./pages/admin/AdminStatisticsPage.jsx";
 import ReviewOrganizerRequest from "./pages/admin/ReviewOrganizerRequest.jsx";
 import SelectRolePage from "./pages/SelectRolePage.jsx";
 import SignupOrganizerPage from "./pages/SignupOrganizerPage.jsx";
+import OrganizerSignupCompletePage from "./pages/OrganizerSignupCompletePage.jsx";
 import SignupStudentPage from "./pages/SignupStudentPage.jsx";
+import StudentSignupCompletePage from "./pages/StudentSignupCompletePage.jsx";
 import ViewEvent from "./pages/ViewEventPage.jsx";
 import AdminEventReviewsPage from "./pages/admin/AdminEventReviewsPage.jsx";
 import AdminEventReviewDetailPage from "./pages/admin/AdminEventReviewDetailPage.jsx";
@@ -145,7 +147,15 @@ export default function App() {
           <Route path="signup">
             <Route index element={<SelectRolePage />} />
             <Route path="student" element={<SignupStudentPage />} />
+            <Route
+              path="student/complete"
+              element={<StudentSignupCompletePage />}
+            />
             <Route path="organizer" element={<SignupOrganizerPage />} />
+            <Route
+              path="organizer/complete"
+              element={<OrganizerSignupCompletePage />}
+            />
           </Route>
         </Route>
 
