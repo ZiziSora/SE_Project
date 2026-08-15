@@ -10,14 +10,14 @@ import {
   Info,
 } from "lucide-react";
 import hcmus from "../assets/hcmus.png";
-import InputField from "../components/InputField";
-import SelectedField from "../components/SelectedField";
-import UploadField from "../components/UploadField";
+import InputField from "../../components/InputField";
+import SelectedField from "../../components/SelectedField";
+import UploadField from "../../components/UploadField";
 import { Link, useNavigate } from "react-router-dom";
 import { useState } from "react";
-import { signupOrganizer } from "../api/authApi";
+import { signupOrganizer } from "../../api/authApi";
 import { toast } from "react-toastify";
-import { supabase } from "../lib/supabase";
+import { supabase } from "../../lib/supabase";
 
 const SignupPage = () => {
   const [showPassword, setShowPassword] = useState(false);

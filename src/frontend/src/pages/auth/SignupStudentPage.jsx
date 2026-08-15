@@ -8,13 +8,13 @@ import {
   MailCheck,
 } from "lucide-react";
 import hcmus from "../assets/hcmus.png";
-import InputField from "../components/InputField";
-import SelectedField from "../components/SelectedField";
+import InputField from "../../components/InputField";
+import SelectedField from "../../components/SelectedField";
 import { Link } from "react-router-dom";
 import { useState } from "react";
-import { signupStudent } from "../api/authApi";
+import { signupStudent } from "../../api/authApi";
 import { toast } from "react-toastify";
-import { validateStudentEmail } from "../utils/validateStudentEmail";
+import { validateStudentEmail } from "../../utils/validateStudentEmail";
 
 const SignupPage = () => {
   const [showPassword, setShowPassword] = useState(false);

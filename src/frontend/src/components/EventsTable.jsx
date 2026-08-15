@@ -2,12 +2,12 @@ import { useEffect, useState } from "react"
 import { ArrowRight, Eye, Pencil, Trash2 } from "lucide-react"
 import { Link } from "react-router-dom"
 import { cn } from "../lib/utils"
+import { eventsApi } from "../api/eventApi.js"
 import {
-  eventsApi,
   formatDateTime,
   formatRegistered,
   getStatusDisplay,
-} from "../lib/api" // Backend Python (FastAPI) — không còn gọi Supabase trực tiếp
+} from "../utils/eventManagementUtils.js"
 
 const headers = ["TÊN SỰ KIỆN", "THỜI GIAN", "TRẠNG THÁI", "NGƯỜI ĐĂNG KÝ", "THAO TÁC"]
 

@@ -1,9 +1,9 @@
 import { GraduationCap, CheckCircle } from "lucide-react";
 import hcmus from "../assets/hcmus.png";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
-import { login } from "../api/authApi";
-import InputField from "../components/InputField";
-import { supabase } from "../lib/supabase.js";
+import { login } from "../../api/authApi.js";
+import InputField from "../../components/InputField.jsx";
+import { supabase } from "../../lib/supabase.js";
 import { useState } from "react";
 import { Mail, Lock } from "lucide-react";
 import { toast } from "react-toastify";

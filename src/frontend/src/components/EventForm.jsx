@@ -3,9 +3,9 @@ import { Link, useNavigate } from "react-router-dom";
 import {
   categoriesApi,
   eventsApi,
-  getStatusDisplay,
   uploadsApi,
-} from '../lib/api';
+} from '../api/eventApi.js';
+import { getStatusDisplay } from '../utils/eventManagementUtils.js';
 
 import {
   ArrowLeft,

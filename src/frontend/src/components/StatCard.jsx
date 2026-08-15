@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { Calendar, CircleCheck, FileText, Send } from "lucide-react"
-import { eventsApi } from "../lib/api" // Backend Python (FastAPI)
+import { eventsApi } from "../api/eventApi.js"
 
 const EMPTY_STATS = {
   total: 0,
