@@ -1,11 +1,13 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { AlertTriangle, Loader2, Calendar } from "lucide-react";
 import Toast from "../components/Toast";
 import TabNavigation from "../components/TabNavigation";
 import EventCard from "../components/EventCard";
 import CancelModal from "../components/CancelModal";
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
+import {
+  cancelRegistration,
+  getMyEvents,
+} from "../api/registrationApi.js";
 
 export default function MyEventsPage() {
   const [activeTab, setActiveTab] = useState("Sắp diễn ra");
@@ -22,12 +24,7 @@ export default function MyEventsPage() {
       setLoading(true);
       setError(null);
 
-      const response = await fetch(`${API_BASE_URL}/api/my-events`);
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const data = await response.json();
+      const data = await getMyEvents();
       setRegistrations(data || []);
     } catch (err) {
       console.error("Lỗi khi tải danh sách sự kiện:", err);
@@ -38,6 +35,8 @@ export default function MyEventsPage() {
   };
 
   useEffect(() => {
+    // Tải danh sách lần đầu là chủ đích của effect khi trang được mount.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchMyEvents();
   }, []);
 
@@ -65,21 +64,9 @@ export default function MyEventsPage() {
     try {
       setIsCanceling(true);
 
-      const response = await fetch(
-        `${API_BASE_URL}/api/registrations/${selectedRegistration.registration_id}/cancel`,
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-          },
-        }
+      await cancelRegistration(
+        selectedRegistration.registration_id,
       );
-
-      const resData = await response.json().catch(() => ({}));
-
-      if (!response.ok) {
-        throw new Error(resData.detail || `Hủy đăng ký thất bại (Mã lỗi: ${response.status})`);
-      }
 
       setRegistrations((prev) =>
         prev.map((item) =>
@@ -99,7 +86,10 @@ export default function MyEventsPage() {
       console.error("Lỗi khi hủy đăng ký:", err);
       setToast({
         type: "error",
-        message: err.message || "Không thể hủy đăng ký. Vui lòng thử lại sau.",
+        message:
+          err.response?.data?.detail ||
+          err.message ||
+          "Không thể hủy đăng ký. Vui lòng thử lại sau.",
       });
     } finally {
       setIsCanceling(false);

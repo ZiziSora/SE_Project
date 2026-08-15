@@ -4,9 +4,9 @@ import { toast } from 'react-toastify';
 import {
   categoriesApi,
   eventsApi,
-  getStatusDisplay,
   uploadsApi,
-} from '../lib/api';
+} from '../api/eventApi.js';
+import { getStatusDisplay } from '../utils/eventManagementUtils.js';
 
 import {
   ArrowLeft,

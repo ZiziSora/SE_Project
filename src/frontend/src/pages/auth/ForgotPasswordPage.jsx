@@ -1,8 +1,8 @@
 import { GraduationCap, Mail } from "lucide-react";
-import InputField from "../components/InputField";
+import InputField from "../../components/InputField";
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
-import { forgotPassword } from "../api/authApi";
+import { forgotPassword } from "../../api/authApi";
 
 const ForgotPasswordPage = () => {
   const navigate = useNavigate();
