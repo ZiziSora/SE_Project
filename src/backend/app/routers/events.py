@@ -16,6 +16,12 @@ from app.services import event_service, registration_service, saved_event_servic
 router = APIRouter(prefix="/api/events", tags=["events"])
 
 
+@router.get("/ongoing", response_model=list[EventOut])
+def read_ongoing_events() -> list[EventOut]:
+    """List every approved event that is currently in progress."""
+    return event_service.list_ongoing_events()
+
+
 @router.get("/{event_id}", response_model=EventOut)
 def read_event(event_id: str) -> EventOut:
     event = event_service.get_event_by_id(event_id)
