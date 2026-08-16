@@ -69,7 +69,7 @@ const LoginPage = () => {
         result.role === "admin"
           ? "/admin/organizer-requests"
           : result.role === "organizer"
-            ? "/"
+            ? "/organizer"
             : "/explore";
 
       setTimeout(() => {

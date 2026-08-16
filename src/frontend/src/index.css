@@ -1,7 +1,9 @@
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Be Vietnam Pro", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-inter: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-manrope: "Manrope", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, monospace;
 
   --color-background: var(--background);
@@ -58,6 +60,23 @@ body {
   color: var(--foreground);
   --font-inter: "Inter", sans-serif;
   --font-manrope: "Manrope", sans-serif;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+@keyframes landing-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.landing-marquee {
+  animation: landing-marquee 24s linear infinite;
 }
 
 @keyframes review-reveal {
@@ -148,6 +167,14 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .landing-marquee {
+    animation-play-state: paused;
+  }
+
   .review-reveal,
   .review-backdrop,
   .review-dialog {

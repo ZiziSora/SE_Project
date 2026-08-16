@@ -11,6 +11,7 @@ import CreateEvent from "./pages/CreateEventPage.jsx";
 import EditEvent from "./pages/EditEventPage.jsx";
 import ForgotPasswordPage from "./pages/auth/ForgotPasswordPage.jsx";
 import LoginPage from "./pages/auth/LoginPage.jsx";
+import LandingPage from "./pages/LandingPage.jsx";
 import ManageEvents from "./pages/ManageEventsPage.jsx";
 import MyEventsPage from "./pages/MyEventsPage.jsx";
 import OrganizerProfile from "./pages/profile/OrganizerProfile.jsx";
@@ -72,7 +73,7 @@ function EventsIndexPage() {
   const canManageEvents = localStorage.getItem("can_manage_events") === "true";
 
   return canManageEvents ? (
-    <Navigate to="/" replace />
+    <Navigate to="/organizer" replace />
   ) : (
     <Navigate to={`/events/${DEFAULT_EVENT_ID}`} replace />
   );
@@ -82,8 +83,9 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
+        <Route path="/" element={<LandingPage />} />
         <Route
-          path="/"
+          path="/organizer"
           element={
             <ProtectedRoute>
               <HomePage />
