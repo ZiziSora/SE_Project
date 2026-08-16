@@ -5,6 +5,7 @@ import { toast } from "react-toastify"
 import { cn } from "../lib/utils"
 import { eventsApi } from "../api/eventApi.js"
 import {
+  extractApiErrorMessage,
   FILTER_TO_STATUS,
   formatDateTime,
   formatRegistered,
@@ -18,7 +19,7 @@ const ITEMS_PER_PAGE = 5 // Số lượng sự kiện hiển thị tối đa tr�
 
 // Dùng border-separate + border-t trên từng ô để thead sticky hoạt động ổn định
 // (border-collapse làm hỏng viền khi header dính).
-const cellCls = "border-t border-border px-6 py-2.5"
+const cellCls = "border-t border-border px-6 py-3 [@media(min-height:820px)]:py-4"
 
 const sortOptions = [
   { label: "Mới nhất", value: "newest" },
@@ -78,9 +79,7 @@ export function FullEventsTable() {
       toast.success("Đã xoá sự kiện thành công")
     } catch (err) {
       console.error("Lỗi xoá sự kiện:", err)
-      toast.error(
-        "Không xoá được sự kiện: " + (err instanceof Error ? err.message : String(err)),
-      )
+      toast.error(extractApiErrorMessage(err, "Không xoá được sự kiện."))
     }
   }
 
@@ -103,7 +102,7 @@ export function FullEventsTable() {
             }}
             placeholder="Tìm kiếm tên sự kiện..."
             aria-label="Tìm kiếm tên sự kiện"
-            className="h-9 w-full rounded-lg border border-border bg-card pl-9 pr-3 text-sm text-foreground shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="h-10 w-full rounded-lg border border-border bg-card pl-9 pr-3 text-sm text-foreground shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           />
         </div>
 
@@ -119,7 +118,7 @@ export function FullEventsTable() {
                   setPage(1) // Về trang 1 khi đổi bộ lọc
                 }}
                 className={cn(
-                  "rounded-full cursor-pointer border px-4 py-1 font-mono text-xs font-medium transition-colors",
+                  "rounded-full cursor-pointer border px-4 py-1.5 font-mono text-[0.8125rem] font-medium transition-colors",
                   isActive
                     ? "border-primary bg-primary text-primary-foreground"
                     : "border-border bg-card text-muted-foreground hover:text-foreground",
@@ -161,7 +160,7 @@ export function FullEventsTable() {
       <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border border-border bg-card shadow-sm">
         {/* min-h-0 + overflow-auto: scrollbar nằm trong bảng thay vì đẩy dài cả trang */}
         <div className="min-h-0 flex-1 overflow-auto">
-          <table className="w-full min-w-[720px] border-separate border-spacing-0 text-left">
+          <table className="w-full min-w-[820px] border-separate border-spacing-0 text-left">
             {/* bg-card làm nền đục cho hàng tiêu đề khi dính, giữ nguyên tông màu secondary/60 */}
             <thead className="sticky top-0 z-10 bg-card">
               <tr className="bg-secondary/60">
@@ -169,7 +168,7 @@ export function FullEventsTable() {
                   <th
                     key={header}
                     className={cn(
-                      "px-6 py-2.5 font-mono text-xs font-medium tracking-wider text-muted-foreground",
+                      "px-6 py-3 font-mono text-[0.8125rem] font-medium tracking-wider text-muted-foreground [@media(min-height:820px)]:py-4",
                       (i === 3 || i === 4) && "text-right",
                     )}
                   >
@@ -203,12 +202,12 @@ export function FullEventsTable() {
                   return (
                     <tr key={row.event_id ?? row.title}>
                       {/* Giới hạn chiều rộng cột Tên sự kiện để tự xuống dòng gọn gàng */}
-                      <td className={cn(cellCls, "text-sm font-medium text-foreground max-w-[280px]")}>
+                      <td className={cn(cellCls, "text-[0.9375rem] font-medium text-foreground max-w-[320px]")}>
                         <div className="line-clamp-2">{row.title}</div>
                       </td>
 
                       {/* Thời gian không bị xuống dòng */}
-                      <td className={cn(cellCls, "text-xs text-muted-foreground whitespace-nowrap")}>
+                      <td className={cn(cellCls, "text-sm text-muted-foreground whitespace-nowrap")}>
                         {formatDateTime(row.start_time)}
                       </td>
 
@@ -216,7 +215,7 @@ export function FullEventsTable() {
                       <td className={cn(cellCls, "whitespace-nowrap")}>
                         <span
                           className={cn(
-                            "inline-flex rounded-md px-2.5 py-1 font-mono text-xs font-medium",
+                            "inline-flex rounded-md px-3 py-1.5 font-mono text-[0.8125rem] font-medium",
                             statusInfo.className,
                           )}
                         >
@@ -227,7 +226,7 @@ export function FullEventsTable() {
                       <td
                         className={cn(
                           cellCls,
-                          "text-right font-mono text-sm font-medium text-foreground whitespace-nowrap",
+                          "text-right font-mono text-[0.9375rem] font-medium text-foreground whitespace-nowrap",
                         )}
                       >
                         {formatRegistered(row)}
@@ -241,7 +240,7 @@ export function FullEventsTable() {
                               aria-label={`Chỉnh sửa ${row.title}`}
                               className="hover:text-primary"
                             >
-                              <Pencil className="size-4" aria-hidden="true" />
+                              <Pencil className="size-[18px]" aria-hidden="true" />
                             </Link>
                           )}
                           <Link
@@ -249,16 +248,18 @@ export function FullEventsTable() {
                             aria-label={`Xem ${row.title}`}
                             className="hover:text-foreground"
                           >
-                            <Eye className="size-4" aria-hidden="true" />
+                            <Eye className="size-[18px]" aria-hidden="true" />
                           </Link>
-                          <button
-                            type="button"
-                            onClick={() => handleDelete(row)}
-                            aria-label={`Xóa ${row.title}`}
-                            className="hover:text-destructive"
-                          >
-                            <Trash2 className="size-4" aria-hidden="true" />
-                          </button>
+                          {row.can_delete !== false && (
+                            <button
+                              type="button"
+                              onClick={() => handleDelete(row)}
+                              aria-label={`Xóa ${row.title}`}
+                              className="hover:text-destructive"
+                            >
+                              <Trash2 className="size-[18px]" aria-hidden="true" />
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -270,7 +271,7 @@ export function FullEventsTable() {
         </div>
 
         {/* Pagination — tổng số trang do backend tính và trả về trong total_pages */}
-        <div className="flex shrink-0 items-center justify-end gap-3 border-t border-border px-6 py-2">
+        <div className="flex shrink-0 items-center justify-end gap-3 border-t border-border px-6 py-3">
           <button
             type="button"
             aria-label="Trang trước"
@@ -280,7 +281,7 @@ export function FullEventsTable() {
           >
             <ChevronLeft className="size-4" aria-hidden="true" />
           </button>
-          <span className="font-mono text-sm text-muted-foreground">
+          <span className="font-mono text-[0.9375rem] text-muted-foreground">
             Trang {page} / {totalPages}
           </span>
           <button

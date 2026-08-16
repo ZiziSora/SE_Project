@@ -48,3 +48,28 @@ export function formatDateTime(value) {
 export function formatRegistered(event) {
   return `${event.registered_count}/${event.capacity ?? "∞"}`;
 }
+/**
+ * Lấy thông báo lỗi dễ đọc từ lỗi axios.
+ *
+ * FastAPI trả lỗi nghiệp vụ ở `detail` (chuỗi), còn lỗi validate của Pydantic là
+ * mảng `[{ msg: "Value error, ..." }]`. Nếu chỉ dùng `err.message` thì người dùng
+ * chỉ thấy "Request failed with status code 422" — không biết sai ở đâu.
+ */
+export function extractApiErrorMessage(error, fallback = "Đã xảy ra lỗi. Vui lòng thử lại.") {
+  const detail = error?.response?.data?.detail;
+
+  if (typeof detail === "string" && detail.trim()) return detail;
+
+  if (Array.isArray(detail)) {
+    const messages = detail
+      .map((item) => String(item?.msg ?? "").replace(/^Value error,\s*/, "").trim())
+      .filter(Boolean);
+    if (messages.length) return messages.join(" ");
+  }
+
+  // Không có phản hồi từ server (mất mạng, backend chưa chạy...) thì message gốc
+  // của axios vẫn có ích hơn câu mặc định.
+  if (!error?.response && error instanceof Error && error.message) return error.message;
+
+  return fallback;
+}

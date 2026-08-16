@@ -4,7 +4,7 @@
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
 from fastapi import HTTPException, status
@@ -24,19 +24,25 @@ from app.schemas.organizer_event import (
     missing_required_fields,
 )
 
-# Trạng thái Organizer được phép mở form sửa
+# Trạng thái Organizer được phép mở form sửa.
+# ONGOING không nằm ở đây: sự kiện đã bắt đầu thì mọi thay đổi (giờ, địa điểm,
+# sức chứa...) đều gây rối cho người đang tham dự.
 EDITABLE_STATUSES = {
     EventStatus.DRAFT.value,
     EventStatus.PENDING.value,
     EventStatus.PUBLISHED.value,
-    EventStatus.ONGOING.value,
 }
 
-# Sự kiện đã công khai: sửa xong PHẢI quay lại chờ Admin duyệt lại
-REAPPROVAL_STATUSES = {EventStatus.PUBLISHED.value, EventStatus.ONGOING.value}
+# Sự kiện đã công khai nhưng CHƯA bắt đầu: sửa xong PHẢI quay lại chờ Admin duyệt lại
+REAPPROVAL_STATUSES = {EventStatus.PUBLISHED.value}
 
-# Sự kiện đã đóng: không còn gì để duyệt lại nên khoá luôn
-LOCKED_STATUSES = {EventStatus.ENDED.value, EventStatus.CANCELLED.value}
+# Sự kiện đang diễn ra / đã đóng: khoá hoàn toàn, không sửa nội dung cũng không
+# đổi trạng thái (kể cả huỷ) và không xoá được.
+LOCKED_STATUSES = {
+    EventStatus.ONGOING.value,
+    EventStatus.ENDED.value,
+    EventStatus.CANCELLED.value,
+}
 
 # Các cột thuộc "nội dung sự kiện". Chỉ khi một trong số này thay đổi thì mới
 # cần duyệt lại — đổi riêng event_status thì không tính.
@@ -378,13 +384,11 @@ def update_event(
             ),
         )
 
-    # Sự kiện đã kết thúc / đã huỷ thì không cho sửa nữa
+    # Đang diễn ra / đã kết thúc / đã huỷ thì khoá mọi thay đổi, kể cả đổi trạng thái
     if current_status in LOCKED_STATUSES:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=(
-                "Sự kiện đã kết thúc hoặc đã huỷ nên không thể chỉnh sửa."
-            ),
+            detail=_locked_message(current_status),
         )
 
     # Sự kiện đang công khai: mọi thay đổi nội dung đều phải chờ Admin duyệt lại,
@@ -398,6 +402,7 @@ def update_event(
     # Kiểm tra lại ràng buộc ngày tháng sau khi trộn dữ liệu cũ + mới
     merged = {**current, **data}
     _validate_merged_dates(merged)
+    _validate_changed_dates_not_past(data, current)
     _validate_capacity_against_registrations(event_id, merged.get("capacity"))
 
     # Nếu kết quả cuối cùng là PENDING (gửi duyệt / duyệt lại) thì bản ghi SAU KHI
@@ -431,7 +436,16 @@ def update_event(
 
 
 def delete_event(event_id: str, organizer_id: str) -> None:
-    _get_raw(event_id, organizer_id)
+    current = _get_raw(event_id, organizer_id)
+
+    # Sự kiện đang diễn ra thì không được xoá — xoá là mất luôn dữ liệu đăng ký
+    # và điểm danh của người đang tham dự.
+    if _derive_ui_status(current) == EventStatus.ONGOING.value:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Sự kiện đang diễn ra nên không thể xoá.",
+        )
+
     _run(
         get_supabase()
         .table(TABLE_EVENTS)
@@ -566,6 +580,51 @@ def _validate_merged_dates(merged: dict[str, Any]) -> None:
         )
 
 
+def _locked_message(current_status: str) -> str:
+    """Câu thông báo tương ứng với lý do sự kiện bị khoá."""
+    if current_status == EventStatus.ONGOING.value:
+        return "Sự kiện đang diễn ra nên không thể chỉnh sửa hay đổi trạng thái."
+    return "Sự kiện đã kết thúc hoặc đã huỷ nên không thể chỉnh sửa."
+
+
+def _validate_changed_dates_not_past(
+    data: dict[str, Any], current: dict[str, Any]
+) -> None:
+    """Chặn Organizer ĐỔI thời gian bắt đầu / hạn đăng ký sang mốc đã trôi qua.
+
+    Chỉ xét những trường thực sự thay đổi: sự kiện đang diễn ra vốn có start_time
+    nằm trong quá khứ, nếu kiểm tra cả trường không đổi thì mọi thao tác sửa nội
+    dung khác đều bị chặn oan.
+
+    Lưu ý múi giờ: DB lưu `timestamp` không timezone và toàn bộ code coi giá trị
+    naive là giờ UTC (xem `_now_naive_utc`), trong khi form gửi lên giờ địa phương.
+    Giờ VN (UTC+7) luôn lớn hơn giờ UTC nên phép so sánh này không bao giờ báo nhầm
+    mốc tương lai thành quá khứ; phần kiểm tra sát giờ người dùng nằm ở EventForm.
+    """
+    now = _now_naive_utc()
+    labels = {
+        "start_time": "Thời gian bắt đầu sự kiện",
+        "registration_deadline": "Hạn chót đăng ký",
+    }
+
+    for field, label in labels.items():
+        if field not in data:
+            continue
+        new_value = _naive(_parse_dt(data.get(field)))
+        old_value = _naive(_parse_dt(current.get(field)))
+        if new_value is None:
+            continue
+        # Sai lệch dưới 1 giây coi như không đổi — tránh chặn oan khi client gửi
+        # lại đúng mốc cũ nhưng chuỗi ISO chênh nhau phần mili giây.
+        if old_value is not None and abs(new_value - old_value) < timedelta(seconds=1):
+            continue
+        if new_value <= now:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"{label} không được ở trong quá khứ.",
+            )
+
+
 def _validate_capacity_against_registrations(
     event_id: str, capacity: Any
 ) -> None:
@@ -634,6 +693,8 @@ def _to_organizer_event_out(
         file_url=row.get("file_url"),
         event_status=event_status,
         can_edit=event_status in EDITABLE_STATUSES,
+        # Sự kiện đang diễn ra thì ẩn luôn nút xoá ở phía giao diện
+        can_delete=event_status != EventStatus.ONGOING.value,
         # Sửa sự kiện đang công khai thì phải chờ Admin duyệt lại → UI cảnh báo trước
         requires_reapproval=event_status in REAPPROVAL_STATUSES,
         created_at=_parse_dt(row.get("created_at")),

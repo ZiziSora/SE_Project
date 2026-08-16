@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Optional
 
@@ -69,6 +69,10 @@ class EventCreate(EventBase):
                 "Sự kiện mới chỉ được tạo ở trạng thái DRAFT hoặc PENDING."
             )
         _check_dates(self.start_time, self.end_time, self.registration_deadline)
+        # Sự kiện MỚI thì mọi mốc thời gian phải còn ở tương lai. Khi cập nhật thì
+        # không kiểm tra ở đây được — sự kiện đang diễn ra vốn có start_time trong
+        # quá khứ (xem `_validate_changed_dates_not_past` bên event_service).
+        _check_not_past(self.start_time, self.registration_deadline)
         if self.event_status == EventStatus.PENDING:
             missing = missing_required_fields(self)
             if missing:
@@ -110,6 +114,7 @@ class OrganizerEventOut(BaseModel):
     file_url: Optional[str] = None
     event_status: str = EventStatus.DRAFT.value
     can_edit: bool = False
+    can_delete: bool = True
     requires_reapproval: bool = False
     created_at: Optional[datetime] = None
 
@@ -153,6 +158,23 @@ def missing_required_fields(data: Any) -> list[str]:
         if (value := getter(field)) is None
         or (isinstance(value, str) and not value.strip())
     ]
+
+
+def _as_utc(value: datetime) -> datetime:
+    """Giá trị naive được coi là giờ UTC — đúng quy ước đang dùng ở event_service."""
+    return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value
+
+
+def _check_not_past(
+    start: Optional[datetime],
+    deadline: Optional[datetime],
+) -> None:
+    """Chặn sự kiện đặt thời gian bắt đầu / hạn đăng ký đã trôi qua."""
+    now = datetime.now(timezone.utc)
+    if start and _as_utc(start) <= now:
+        raise ValueError("Thời gian bắt đầu sự kiện không được ở trong quá khứ.")
+    if deadline and _as_utc(deadline) <= now:
+        raise ValueError("Hạn chót đăng ký không được ở trong quá khứ.")
 
 
 def _check_dates(

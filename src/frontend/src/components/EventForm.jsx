@@ -6,7 +6,10 @@ import {
   eventsApi,
   uploadsApi,
 } from '../api/eventApi.js';
-import { getStatusDisplay } from '../utils/eventManagementUtils.js';
+import {
+  extractApiErrorMessage,
+  getStatusDisplay,
+} from '../utils/eventManagementUtils.js';
 
 import {
   ArrowLeft,
@@ -98,6 +101,48 @@ function missingRequiredFields(payload) {
   }).map(([, label]) => label);
 }
 
+// ─── Kiểm tra mốc thời gian ───────────────────────────────────────────────────
+
+/**
+ * Chuỗi "2026-08-20T07:20:00" KHÔNG có hậu tố Z nên `new Date()` hiểu là giờ địa
+ * phương — đúng với giờ người dùng vừa chọn trên form, nên so sánh với thời điểm
+ * hiện tại là chính xác. (Backend so theo UTC nên chỉ chặn được mốc quá khứ rõ
+ * ràng; kiểm tra sát giờ người dùng nằm ở đây.)
+ */
+function toLocalDate(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+/**
+ * Trả về câu lỗi đầu tiên tìm được, hoặc null nếu mốc thời gian hợp lệ.
+ *
+ * `checkStartPast` / `checkDeadlinePast` chỉ bật khi người dùng thực sự nhập mới
+ * hoặc đổi giá trị: sự kiện đang diễn ra vốn có thời gian bắt đầu trong quá khứ,
+ * chặn luôn thì không sửa được các trường khác.
+ */
+function validateEventDates(payload, { checkStartPast, checkDeadlinePast }) {
+  const start = toLocalDate(payload.start_time);
+  const end = toLocalDate(payload.end_time);
+  const deadline = toLocalDate(payload.registration_deadline);
+  const now = new Date();
+
+  if (checkStartPast && start && start <= now) {
+    return 'Thời gian bắt đầu sự kiện không được ở trong quá khứ.';
+  }
+  if (checkDeadlinePast && deadline && deadline <= now) {
+    return 'Hạn chót đăng ký không được ở trong quá khứ.';
+  }
+  if (start && end && end <= start) {
+    return 'Thời gian kết thúc phải sau thời gian bắt đầu.';
+  }
+  if (start && deadline && deadline > start) {
+    return 'Hạn chót đăng ký phải trước thời điểm sự kiện bắt đầu.';
+  }
+  return null;
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 const emptyForm = {
@@ -152,6 +197,10 @@ export function EventForm({ mode, eventId }) {
   const fileInputRef = useRef(null);
   const planInputRef = useRef(null);
 
+  // Mốc thời gian lúc mới nạp sự kiện — dùng để biết người dùng có ĐỔI ngày giờ
+  // hay không, từ đó mới quyết định có kiểm tra "không được ở quá khứ".
+  const initialDatesRef = useRef({ start_time: '', registration_deadline: '' });
+
   const [categories, setCategories] = useState([]);
   const [suggestedLocations, setSuggestedLocations] = useState([]);
   const [formData, setFormData] = useState(emptyForm);
@@ -192,6 +241,15 @@ export function EventForm({ mode, eventId }) {
         const event = await eventsApi.get(eventId);
         if (cancelled) return;
 
+        // Vào thẳng /edit-event/:id của sự kiện đang diễn ra (hoặc đã đóng) thì
+        // dừng ngay tại đây, không mở form ra rồi mới báo lỗi lúc bấm Lưu.
+        if (isEdit && !event.can_edit) {
+          setLoadError(
+            `Sự kiện đang ở trạng thái "${getStatusDisplay(event.event_status).label}" nên không thể chỉnh sửa.`,
+          );
+          return;
+        }
+
         setFormData({
           title: event.title ?? '',
           category_id: event.category_id != null ? String(event.category_id) : '',
@@ -205,6 +263,13 @@ export function EventForm({ mode, eventId }) {
           description: event.description ?? '',
         });
 
+        initialDatesRef.current = {
+          start_time: isoToDatePart(event.start_time)
+            ? `${isoToDatePart(event.start_time)}T${isoToTimePart(event.start_time)}:00`
+            : '',
+          registration_deadline: isoToDatetimeLocal(event.registration_deadline),
+        };
+
         setBannerUrl(event.banner_url);
         setCoverImage(event.banner_url);
         setPlanFileUrl(event.file_url);
@@ -217,7 +282,7 @@ export function EventForm({ mode, eventId }) {
         setRegisteredLabel(`${event.registered_count}/${event.capacity ?? '∞'}`);
       } catch (err) {
         console.error('Lỗi tải sự kiện:', err);
-        if (!cancelled) setLoadError(err instanceof Error ? err.message : 'Không tải được sự kiện.');
+        if (!cancelled) setLoadError(extractApiErrorMessage(err, 'Không tải được sự kiện.'));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -227,7 +292,7 @@ export function EventForm({ mode, eventId }) {
     return () => {
       cancelled = true;
     };
-  }, [needsLoad, eventId]);
+  }, [needsLoad, isEdit, eventId]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -337,6 +402,20 @@ export function EventForm({ mode, eventId }) {
       }
     }
 
+    // Ràng buộc thời gian — áp dụng cho cả lưu nháp lẫn gửi duyệt.
+    // Tạo mới thì luôn kiểm tra; sửa thì chỉ kiểm tra mốc mà người dùng vừa đổi.
+    const dateError = validateEventDates(payload, {
+      checkStartPast:
+        !isEdit || payload.start_time !== initialDatesRef.current.start_time,
+      checkDeadlinePast:
+        !isEdit ||
+        payload.registration_deadline !== initialDatesRef.current.registration_deadline,
+    });
+    if (dateError) {
+      toast.error(dateError);
+      return;
+    }
+
     setSubmitting(true);
     try {
       if (isEdit && eventId) {
@@ -359,7 +438,7 @@ export function EventForm({ mode, eventId }) {
       navigate('/');
     } catch (err) {
       console.error('Lỗi khi lưu sự kiện:', err);
-      toast.error(err instanceof Error ? err.message : 'Không lưu được sự kiện.');
+      toast.error(extractApiErrorMessage(err, 'Không lưu được sự kiện.'));
     } finally {
       setSubmitting(false);
     }

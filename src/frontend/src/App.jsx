@@ -13,6 +13,8 @@ import ForgotPasswordPage from "./pages/auth/ForgotPasswordPage.jsx";
 import LoginPage from "./pages/auth/LoginPage.jsx";
 import ManageEvents from "./pages/ManageEventsPage.jsx";
 import MyEventsPage from "./pages/MyEventsPage.jsx";
+import ParticipantDetailPage from "./pages/ParticipantDetailPage.jsx";
+import ParticipantEventsPage from "./pages/ParticipantEventsPage.jsx";
 import OrganizerProfile from "./pages/profile/OrganizerProfile.jsx";
 import StudentProfile from "./pages/profile/StudentProfile.jsx";
 import ResetPasswordPage from "./pages/ResetPasswordPage.jsx";
@@ -169,6 +171,24 @@ export default function App() {
           element={
             <ProtectedRoute>
               <MyEventsPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Quản lý người tham gia: chọn sự kiện rồi vào danh sách chi tiết */}
+        <Route
+          path="/participants"
+          element={
+            <ProtectedRoute>
+              <ParticipantEventsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/participants/:eventId"
+          element={
+            <ProtectedRoute>
+              <ParticipantDetailPage />
             </ProtectedRoute>
           }
         />
