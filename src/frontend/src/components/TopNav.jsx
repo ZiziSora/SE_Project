@@ -11,10 +11,8 @@ import {
 import { Link, useLocation, useNavigate } from "react-router-dom"
 import { toast } from "react-toastify"
 
-import { logout } from "../api/authApi.js"
 import { getMyProfile } from "../api/profileApi.js"
-import { supabase } from "../lib/supabase.js"
-import { clearStoredAuthentication } from "../utils/authStorage.js"
+import { logoutCurrentSession } from "../utils/logoutSession.js"
 
 /**
  * Mỗi mục menu quản một NHÓM route, không chỉ một đường dẫn duy nhất.
@@ -126,22 +124,7 @@ export function TopNav({ avatarUrl: providedAvatarUrl }) {
     if (isLoggingOut) return
 
     setIsLoggingOut(true)
-    let logoutFailed = false
-
-    try {
-      await logout()
-    } catch {
-      logoutFailed = true
-    }
-
-    try {
-      const { error } = await supabase.auth.signOut({ scope: "local" })
-      logoutFailed = logoutFailed || Boolean(error)
-    } catch {
-      logoutFailed = true
-    }
-
-    clearStoredAuthentication()
+    const { logoutFailed } = await logoutCurrentSession()
 
     if (logoutFailed) {
       toast.warning(

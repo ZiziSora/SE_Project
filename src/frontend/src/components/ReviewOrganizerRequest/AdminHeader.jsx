@@ -1,6 +1,9 @@
 import { useState } from "react";
-import { Bell, Menu, ShieldCheck, X } from "lucide-react";
-import { Link, NavLink } from "react-router-dom";
+import { Bell, LoaderCircle, LogOut, Menu, ShieldCheck, X } from "lucide-react";
+import { Link, NavLink, useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
+
+import { logoutCurrentSession } from "../../utils/logoutSession.js";
 
 const ADMIN_NAV_ITEMS = [
   { label: "Xét duyệt sự kiện", to: "/admin/manage-events" },
@@ -9,7 +12,26 @@ const ADMIN_NAV_ITEMS = [
 ];
 
 export default function AdminHeader() {
+  const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  const handleLogout = async () => {
+    if (isLoggingOut) return;
+
+    setIsLoggingOut(true);
+    const { logoutFailed } = await logoutCurrentSession();
+
+    if (logoutFailed) {
+      toast.warning(
+        "Đã đăng xuất khỏi thiết bị này, nhưng không thể đồng bộ phiên với máy chủ.",
+      );
+    } else {
+      toast.success("Đăng xuất thành công.");
+    }
+
+    navigate("/auth/login", { replace: true });
+  };
 
   return (
     <header className="sticky top-0 z-30 border-b border-[#e4dfeb] bg-[#f8f9ff]/90 backdrop-blur-xl">
@@ -59,6 +81,26 @@ export default function AdminHeader() {
           >
             <Bell className="size-[18px]" strokeWidth={2} aria-hidden="true" />
             <span className="absolute right-[9px] top-[8px] size-1.5 rounded-full bg-[#7c3aed] ring-2 ring-white" />
+          </button>
+          <button
+            type="button"
+            onClick={handleLogout}
+            disabled={isLoggingOut}
+            aria-label={isLoggingOut ? "Đang đăng xuất" : "Đăng xuất"}
+            aria-busy={isLoggingOut}
+            className="group inline-flex h-10 cursor-pointer items-center justify-center gap-2 rounded-lg border border-error-container bg-error-container px-3 text-sm font-semibold text-on-error-container shadow-sm transition duration-200 ease-in-out hover:-translate-y-0.5 hover:border-destructive/30 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-destructive disabled:cursor-wait disabled:translate-y-0 disabled:opacity-60 disabled:shadow-none"
+          >
+            {isLoggingOut ? (
+              <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
+            ) : (
+              <LogOut
+                className="size-4 transition-transform duration-700 ease-out group-hover:translate-x-0.5"
+                aria-hidden="true"
+              />
+            )}
+            <span className="hidden sm:inline">
+              {isLoggingOut ? "Đang đăng xuất..." : "Đăng xuất"}
+            </span>
           </button>
           <button
             type="button"
