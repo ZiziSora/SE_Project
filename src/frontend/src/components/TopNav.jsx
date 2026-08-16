@@ -1,5 +1,12 @@
-import { Bell, Plus } from "lucide-react"
-import { Link, useLocation } from "react-router-dom"
+import { useEffect, useState } from "react"
+import { Bell, LoaderCircle, LogOut, Plus, UserRound } from "lucide-react"
+import { Link, useLocation, useNavigate } from "react-router-dom"
+import { toast } from "react-toastify"
+
+import { logout } from "../api/authApi.js"
+import { getMyProfile } from "../api/profileApi.js"
+import { supabase } from "../lib/supabase.js"
+import { clearStoredAuthentication } from "../utils/authStorage.js"
 
 /**
  * Mỗi mục menu quản một NHÓM route, không chỉ một đường dẫn duy nhất.
@@ -43,11 +50,73 @@ function isActive(pathname, item) {
   )
 }
 
-export function TopNav() {
+export function TopNav({ avatarUrl: providedAvatarUrl }) {
   const location = useLocation()
+  const navigate = useNavigate()
+  const [fetchedAvatarUrl, setFetchedAvatarUrl] = useState("")
+  const [failedAvatarUrl, setFailedAvatarUrl] = useState("")
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
+  const avatarUrl = providedAvatarUrl ?? fetchedAvatarUrl
+  const displayedAvatarUrl = avatarUrl === failedAvatarUrl ? "" : avatarUrl
 
   // Kiểm tra xem có đang ở trang tạo sự kiện không để ẩn nút
   const isCreateEventPage = location.pathname === "/create-event"
+
+  useEffect(() => {
+    if (providedAvatarUrl !== undefined) {
+      return undefined
+    }
+
+    let isMounted = true
+
+    getMyProfile()
+      .then((profile) => {
+        if (isMounted) {
+          setFetchedAvatarUrl(profile.avatar_url || "")
+        }
+      })
+      .catch(() => {
+        if (isMounted) {
+          setFetchedAvatarUrl("")
+        }
+      })
+
+    return () => {
+      isMounted = false
+    }
+  }, [providedAvatarUrl])
+
+  const handleLogout = async () => {
+    if (isLoggingOut) return
+
+    setIsLoggingOut(true)
+    let logoutFailed = false
+
+    try {
+      await logout()
+    } catch {
+      logoutFailed = true
+    }
+
+    try {
+      const { error } = await supabase.auth.signOut({ scope: "local" })
+      logoutFailed = logoutFailed || Boolean(error)
+    } catch {
+      logoutFailed = true
+    }
+
+    clearStoredAuthentication()
+
+    if (logoutFailed) {
+      toast.warning(
+        "Đã đăng xuất khỏi thiết bị này, nhưng không thể đồng bộ phiên với máy chủ.",
+      )
+    } else {
+      toast.success("Đăng xuất thành công.")
+    }
+
+    navigate("/auth/login", { replace: true })
+  }
 
   return (
     <header className="flex items-center justify-between border-b border-border bg-card px-6 py-2.5 md:px-8">
@@ -96,11 +165,43 @@ export function TopNav() {
         >
           <Bell className="size-5" aria-hidden="true" />
         </button>
-        <img
-          src="/avatar.png"
-          alt="Ảnh đại diện người dùng"
-          className="size-9 rounded-full object-cover ring-2 ring-accent cursor-pointer"
-        />
+        <Link
+          to="/account/organizer/profile"
+          aria-label="Mở trang hồ sơ Ban tổ chức"
+          title="Hồ sơ Ban tổ chức"
+          className="grid size-9 cursor-pointer place-items-center overflow-hidden rounded-full bg-accent text-primary ring-2 ring-accent transition-opacity hover:opacity-80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+        >
+          {displayedAvatarUrl ? (
+            <img
+              src={displayedAvatarUrl}
+              alt="Ảnh đại diện Ban tổ chức"
+              className="size-full object-cover"
+              onError={() => setFailedAvatarUrl(displayedAvatarUrl)}
+            />
+          ) : (
+            <UserRound className="size-5" aria-hidden="true" />
+          )}
+        </Link>
+        <button
+          type="button"
+          onClick={handleLogout}
+          disabled={isLoggingOut}
+          aria-label={isLoggingOut ? "Đang đăng xuất" : "Đăng xuất"}
+          aria-busy={isLoggingOut}
+          className="group inline-flex h-9 cursor-pointer items-center justify-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 text-sm font-semibold text-red-700 shadow-sm transition duration-300 ease-out hover:-translate-y-0.5 hover:border-red-300 hover:bg-red-100 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600 disabled:cursor-wait disabled:translate-y-0 disabled:opacity-60 disabled:shadow-none"
+        >
+          {isLoggingOut ? (
+            <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
+          ) : (
+            <LogOut
+              className="size-4 transition-transform duration-300 ease-out group-hover:translate-x-0.5"
+              aria-hidden="true"
+            />
+          )}
+          <span className="hidden sm:inline">
+            {isLoggingOut ? "Đang đăng xuất..." : "Đăng xuất"}
+          </span>
+        </button>
       </div>
     </header>
   )
