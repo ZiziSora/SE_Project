@@ -1,5 +1,13 @@
-import { useEffect, useState } from "react"
-import { Bell, LoaderCircle, LogOut, Plus, UserRound } from "lucide-react"
+import { useEffect, useRef, useState } from "react"
+import {
+  Bell,
+  ChevronDown,
+  LoaderCircle,
+  LogOut,
+  Plus,
+  Settings2,
+  UserRound,
+} from "lucide-react"
 import { Link, useLocation, useNavigate } from "react-router-dom"
 import { toast } from "react-toastify"
 
@@ -53,8 +61,11 @@ function isActive(pathname, item) {
 export function TopNav({ avatarUrl: providedAvatarUrl }) {
   const location = useLocation()
   const navigate = useNavigate()
+  const accountMenuRef = useRef(null)
+  const accountMenuTriggerRef = useRef(null)
   const [fetchedAvatarUrl, setFetchedAvatarUrl] = useState("")
   const [failedAvatarUrl, setFailedAvatarUrl] = useState("")
+  const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false)
   const [isLoggingOut, setIsLoggingOut] = useState(false)
   const avatarUrl = providedAvatarUrl ?? fetchedAvatarUrl
   const displayedAvatarUrl = avatarUrl === failedAvatarUrl ? "" : avatarUrl
@@ -85,6 +96,31 @@ export function TopNav({ avatarUrl: providedAvatarUrl }) {
       isMounted = false
     }
   }, [providedAvatarUrl])
+
+  useEffect(() => {
+    if (!isAccountMenuOpen) return undefined
+
+    const handlePointerDown = (event) => {
+      if (!accountMenuRef.current?.contains(event.target)) {
+        setIsAccountMenuOpen(false)
+      }
+    }
+
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") {
+        setIsAccountMenuOpen(false)
+        accountMenuTriggerRef.current?.focus()
+      }
+    }
+
+    document.addEventListener("pointerdown", handlePointerDown)
+    document.addEventListener("keydown", handleKeyDown)
+
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown)
+      document.removeEventListener("keydown", handleKeyDown)
+    }
+  }, [isAccountMenuOpen])
 
   const handleLogout = async () => {
     if (isLoggingOut) return
@@ -165,43 +201,77 @@ export function TopNav({ avatarUrl: providedAvatarUrl }) {
         >
           <Bell className="size-5" aria-hidden="true" />
         </button>
-        <Link
-          to="/account/organizer/profile"
-          aria-label="Mở trang hồ sơ Ban tổ chức"
-          title="Hồ sơ Ban tổ chức"
-          className="grid size-9 cursor-pointer place-items-center overflow-hidden rounded-full bg-accent text-primary ring-2 ring-accent transition-opacity hover:opacity-80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-        >
-          {displayedAvatarUrl ? (
-            <img
-              src={displayedAvatarUrl}
-              alt="Ảnh đại diện Ban tổ chức"
-              className="size-full object-cover"
-              onError={() => setFailedAvatarUrl(displayedAvatarUrl)}
-            />
-          ) : (
-            <UserRound className="size-5" aria-hidden="true" />
-          )}
-        </Link>
-        <button
-          type="button"
-          onClick={handleLogout}
-          disabled={isLoggingOut}
-          aria-label={isLoggingOut ? "Đang đăng xuất" : "Đăng xuất"}
-          aria-busy={isLoggingOut}
-          className="group inline-flex h-9 cursor-pointer items-center justify-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 text-sm font-semibold text-red-700 shadow-sm transition duration-300 ease-out hover:-translate-y-0.5 hover:border-red-300 hover:bg-red-100 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600 disabled:cursor-wait disabled:translate-y-0 disabled:opacity-60 disabled:shadow-none"
-        >
-          {isLoggingOut ? (
-            <LoaderCircle className="size-4 animate-spin" aria-hidden="true" />
-          ) : (
-            <LogOut
-              className="size-4 transition-transform duration-300 ease-out group-hover:translate-x-0.5"
+        <div ref={accountMenuRef} className="relative">
+          <button
+            ref={accountMenuTriggerRef}
+            type="button"
+            onClick={() => setIsAccountMenuOpen((isOpen) => !isOpen)}
+            aria-label="Mở menu tài khoản Ban tổ chức"
+            aria-haspopup="menu"
+            aria-expanded={isAccountMenuOpen}
+            className="group flex cursor-pointer items-center gap-1 rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+          >
+            <span className="grid size-9 place-items-center overflow-hidden rounded-full bg-accent text-primary ring-2 ring-accent transition-transform duration-700 ease-out group-hover:scale-105">
+              {displayedAvatarUrl ? (
+                <img
+                  src={displayedAvatarUrl}
+                  alt="Ảnh đại diện Ban tổ chức"
+                  className="size-full object-cover"
+                  onError={() => setFailedAvatarUrl(displayedAvatarUrl)}
+                />
+              ) : (
+                <UserRound className="size-5" aria-hidden="true" />
+              )}
+            </span>
+            <ChevronDown
+              className={`size-4 text-muted-foreground transition-transform duration-300 ${isAccountMenuOpen ? "rotate-180" : ""}`}
               aria-hidden="true"
             />
+          </button>
+
+          {isAccountMenuOpen && (
+            <div
+              role="menu"
+              aria-label="Tùy chọn tài khoản"
+              className="absolute top-full right-0 z-60 mt-3 w-60 overflow-hidden rounded-xl border border-border bg-card p-1.5 shadow-[0_18px_48px_rgba(41,24,75,0.18)]"
+            >
+              <Link
+                to="/account/organizer/profile"
+                role="menuitem"
+                onClick={() => setIsAccountMenuOpen(false)}
+                className="group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold text-foreground transition-colors duration-300 hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"
+              >
+                <span className="grid size-8 place-items-center rounded-lg bg-primary/10 text-primary transition-transform duration-300 group-hover:scale-105">
+                  <Settings2 className="size-4" aria-hidden="true" />
+                </span>
+                Cài đặt tài khoản
+              </Link>
+
+              <div className="mx-3 my-1 h-px bg-border" aria-hidden="true" />
+
+              <button
+                type="button"
+                role="menuitem"
+                onClick={handleLogout}
+                disabled={isLoggingOut}
+                aria-busy={isLoggingOut}
+                className="group flex w-full cursor-pointer items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-semibold text-red-700 transition-colors duration-300 hover:bg-red-50 focus-visible:bg-red-50 focus-visible:outline-none disabled:cursor-wait disabled:opacity-60"
+              >
+                <span className="grid size-8 place-items-center rounded-lg bg-red-50 text-red-700 transition-transform duration-300 group-hover:scale-105">
+                  {isLoggingOut ? (
+                    <LoaderCircle
+                      className="size-4 animate-spin"
+                      aria-hidden="true"
+                    />
+                  ) : (
+                    <LogOut className="size-4" aria-hidden="true" />
+                  )}
+                </span>
+                {isLoggingOut ? "Đang đăng xuất..." : "Đăng xuất"}
+              </button>
+            </div>
           )}
-          <span className="hidden sm:inline">
-            {isLoggingOut ? "Đang đăng xuất..." : "Đăng xuất"}
-          </span>
-        </button>
+        </div>
       </div>
     </header>
   )
