@@ -66,7 +66,11 @@ const LoginPage = () => {
       );
 
       const redirectPath =
-        result.role === "admin" ? "/admin/organizer-requests" : "/events";
+        result.role === "admin"
+          ? "/admin/organizer-requests"
+          : result.role === "organizer"
+            ? "/"
+            : "/explore";
 
       setTimeout(() => {
         navigate(redirectPath, { replace: true });
