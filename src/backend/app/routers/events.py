@@ -16,12 +16,6 @@ from app.services import event_service, registration_service, saved_event_servic
 router = APIRouter(prefix="/api/events", tags=["events"])
 
 
-@router.get("/ongoing", response_model=list[EventOut])
-def read_ongoing_events() -> list[EventOut]:
-    """List every approved event that is currently in progress."""
-    return event_service.list_ongoing_events()
-
-
 @router.get("/{event_id}", response_model=EventOut)
 def read_event(event_id: str) -> EventOut:
     event = event_service.get_event_by_id(event_id)
@@ -126,3 +120,28 @@ def unbookmark_event(
 ) -> RemoveSavedEventResponseOut:
     removed = saved_event_service.remove_saved_event(event_id, current_user.id)
     return RemoveSavedEventResponseOut(removed=removed)
+from fastapi import APIRouter, Query
+from typing import Optional, Dict, Any
+from app.services.event_services import get_filtered_events_service
+
+router = APIRouter(prefix="/api/events", tags=["Events"])
+
+@router.get('')
+@router.get('/')
+def get_events(
+    search_term: Optional[str] = Query(None),
+    faculty: Optional[str] = Query(None),
+    category: Optional[str] = Query(None),
+    sort_by: str = Query('Mới nhất'),
+    page: int = Query(1, ge=1, description="Trang hiện tại (bắt đầu từ 1)"),
+    limit: int = Query(10, ge=1, le=100, description="Số lượng sự kiện mỗi trang (tối đa 100)")
+) -> Dict[str, Any]:
+    
+    return get_filtered_events_service(
+        search_term=search_term,
+        faculty=faculty,
+        category=category,
+        sort_by=sort_by,
+        page=page,
+        limit=limit
+    )

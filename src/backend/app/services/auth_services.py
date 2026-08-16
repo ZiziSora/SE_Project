@@ -500,7 +500,6 @@ def signup_organizer(data: OrganizerSignUpRequest, db: Session):
             detail="Dịch vụ xác thực trả về dữ liệu không hợp lệ.",
         )
     
-
     supabase_user = response.user
     uploaded_paths = []
     upload_warning = None
@@ -515,7 +514,7 @@ def signup_organizer(data: OrganizerSignUpRequest, db: Session):
         )
 
         db.add(user)
-        db.flush()  # Đảm bảo user được ghi vào DB trước khi insert organizer_request
+        db.flush() 
 
         request = OrganizerRequest(
             user_id = supabase_user.id,
@@ -524,7 +523,7 @@ def signup_organizer(data: OrganizerSignUpRequest, db: Session):
         )
 
         db.add(request)
-        db.flush()  # Đảm bảo request_id được generate trước khi insert attachments
+        db.flush() 
 
         try:
             uploaded_urls, uploaded_paths = upload_organizer_proofs(
@@ -569,9 +568,8 @@ def signup_organizer(data: OrganizerSignUpRequest, db: Session):
 
         raise HTTPException(
             status_code=500,
-            detail="Không thể hoàn tất đăng ký tài khoản.",
+            detail=f"Lỗi Database: {str(error)}",
         ) from error
-
         
     
         
