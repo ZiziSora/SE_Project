@@ -27,6 +27,7 @@ import StudentSignupCompletePage from "./pages/StudentSignupCompletePage.jsx";
 import ViewEvent from "./pages/ViewEventPage.jsx";
 import AdminEventReviewsPage from "./pages/admin/AdminEventReviewsPage.jsx";
 import AdminEventReviewDetailPage from "./pages/admin/AdminEventReviewDetailPage.jsx";
+import ExploreEventsPage from "./pages/ExploreEventsPage.jsx";
 function PlaceholderPage({ title, description }) {
   return (
     <main className="min-h-screen bg-[#f8f9fa] px-6 py-16 text-center text-gray-900">
@@ -210,15 +211,7 @@ export default function App() {
           />
         </Route>
 
-        <Route
-          path="/explore"
-          element={
-            <PlaceholderPage
-              title="Khám phá sự kiện"
-              description="Tính năng khám phá các sự kiện mới đang được phát triển."
-            />
-          }
-        />
+        <Route path="/explore" element={<ExploreEventsPage />} />
         <Route
           path="/history"
           element={
