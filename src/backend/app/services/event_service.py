@@ -260,6 +260,32 @@ def get_event_by_id(event_id: str) -> Optional[PublicEventOut]:
     return PublicEventOut(**data)
 
 
+def list_ongoing_events() -> list[PublicEventOut]:
+    """Return approved public events whose scheduled time includes now."""
+    now = _now_naive_utc().isoformat()
+    query = (
+        get_supabase()
+        .table(TABLE_EVENTS)
+        .select("*")
+        .eq("event_status", DB_PUBLISHED)
+        .eq("approval_status", DB_APPROVAL_APPROVED)
+        .lte("start_time", now)
+        .gte("end_time", now)
+        .order("end_time", desc=False)
+    )
+    rows: list[dict[str, Any]] = _run(query).data or []
+    categories = _category_map()
+
+    events: list[PublicEventOut] = []
+    for row in rows:
+        data = dict(row)
+        data["event_id"] = _row_id(row)
+        data["category_name"] = categories.get(row.get("category_id"))
+        data["event_status"] = EventStatus.ONGOING.value
+        events.append(PublicEventOut(**data))
+    return events
+
+
 def get_stats(organizer_id: Optional[str] = None) -> StatsOut:
     sb = get_supabase()
     # Cần đủ 4 cột để suy ra trạng thái hiển thị (xem `_derive_ui_status`)

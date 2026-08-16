@@ -15,11 +15,12 @@ colors:
   inverse-on-surface: '#eaf1ff'
   outline: '#7b7487'
   outline-variant: '#ccc3d8'
-  surface-tint: '#732ee4'
-  primary: '#630ed4'
+  surface-tint: '#7c3aed'
+  primary: '#7c3aed'
+  primary-hover: '#630ed4'
   on-primary: '#ffffff'
-  primary-container: '#7c3aed'
-  on-primary-container: '#ede0ff'
+  primary-container: '#f5f3ff'
+  on-primary-container: '#4c1d95'
   inverse-primary: '#d2bbff'
   secondary: '#545f73'
   on-secondary: '#ffffff'
@@ -127,8 +128,9 @@ The aesthetic leans into **Modern Minimalism** with a **Tactile** edge. It utili
 
 The color palette is anchored by a vibrant **Vivid Violet (#7c3aed)**, which serves as the primary driver for brand identity and call-to-action elements. This is balanced by a slate-based secondary color that provides the necessary professional "weight" expected in academic environments.
 
-- **Primary:** Violet (#7c3aed) - Used for primary buttons, active states, and progress indicators.
-- **Primary Container:** A soft, desaturated tint of violet (#f5f3ff) for background highlighting and subtle grouping.
+- **Primary:** Violet (#7c3aed) - Used for primary buttons, active states, progress indicators, and brand iconography.
+- **Primary Hover:** Deep Violet (#630ed4) - Used for hover and pressed states of primary actions that need stronger contrast.
+- **Primary Container:** A soft, desaturated tint of violet (#f5f3ff) with deep-violet foreground (#4c1d95) for background highlighting and subtle grouping.
 - **Secondary:** Slate (#1e293b) - Used for primary navigation, headings, and foundational UI elements to maintain a serious, grounded feel.
 - **Tertiary:** Teal (#0d9488) - Reserved for success states, collaborative features, or "innovation" markers.
 - **Neutral:** A range of Slate-grays for borders, secondary text, and iconography to ensure high legibility against white backgrounds.
@@ -172,7 +174,7 @@ The shape language is **Rounded**, reflecting a modern and approachable software
 
 ## Components
 
-- **Buttons:** Primary buttons use the #7c3aed violet with white text. Secondary buttons use a Slate-800 outline. Transitions must be smooth (200ms ease-in-out).
+- **Buttons:** Primary buttons use #7c3aed with white text, transitioning to #630ed4 on hover or press. Secondary buttons use a Slate-800 outline. Transitions must be smooth (200ms ease-in-out).
 - **Input Fields:** Use a 1px border (#e2e8f0) that thickens and changes to #7c3aed on focus. Labels should use the `label-md` JetBrains Mono style for a technical feel.
 - **Cards:** Pure white background, 16px corner radius, and a subtle Level 1 shadow. Headers within cards should use `headline-sm`.
 - **Chips/Tags:** For academic categories, use the primary-container tint (#f5f3ff) with violet text (#7c3aed). For status (e.g., "Published"), use the Tertiary Teal palette.

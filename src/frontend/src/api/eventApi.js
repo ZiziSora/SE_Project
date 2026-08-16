@@ -87,6 +87,11 @@ export const uploadsApi = {
 
 
 export const publicEventApi = {
+  async listOngoingEvents() {
+    const response = await api.get("/api/events/ongoing");
+    return response.data;
+  },
+
   async getEvent(eventId) {
     const response = await api.get(`/api/events/${eventId}`);
     return response.data;

@@ -11,6 +11,7 @@ import CreateEvent from "./pages/CreateEventPage.jsx";
 import EditEvent from "./pages/EditEventPage.jsx";
 import ForgotPasswordPage from "./pages/auth/ForgotPasswordPage.jsx";
 import LoginPage from "./pages/auth/LoginPage.jsx";
+import LandingPage from "./pages/LandingPage.jsx";
 import ManageEvents from "./pages/ManageEventsPage.jsx";
 import MyEventsPage from "./pages/MyEventsPage.jsx";
 import OrganizerProfile from "./pages/profile/OrganizerProfile.jsx";
@@ -26,6 +27,7 @@ import StudentSignupCompletePage from "./pages/StudentSignupCompletePage.jsx";
 import ViewEvent from "./pages/ViewEventPage.jsx";
 import AdminEventReviewsPage from "./pages/admin/AdminEventReviewsPage.jsx";
 import AdminEventReviewDetailPage from "./pages/admin/AdminEventReviewDetailPage.jsx";
+import ExploreEventsPage from "./pages/ExploreEventsPage.jsx";
 function PlaceholderPage({ title, description }) {
   return (
     <main className="min-h-screen bg-[#f8f9fa] px-6 py-16 text-center text-gray-900">
@@ -72,7 +74,7 @@ function EventsIndexPage() {
   const canManageEvents = localStorage.getItem("can_manage_events") === "true";
 
   return canManageEvents ? (
-    <Navigate to="/" replace />
+    <Navigate to="/organizer" replace />
   ) : (
     <Navigate to={`/events/${DEFAULT_EVENT_ID}`} replace />
   );
@@ -82,8 +84,9 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
+        <Route path="/" element={<LandingPage />} />
         <Route
-          path="/"
+          path="/organizer"
           element={
             <ProtectedRoute>
               <HomePage />
@@ -208,15 +211,7 @@ export default function App() {
           />
         </Route>
 
-        <Route
-          path="/explore"
-          element={
-            <PlaceholderPage
-              title="Khám phá sự kiện"
-              description="Tính năng khám phá các sự kiện mới đang được phát triển."
-            />
-          }
-        />
+        <Route path="/explore" element={<ExploreEventsPage />} />
         <Route
           path="/history"
           element={

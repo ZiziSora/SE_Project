@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { AlertTriangle, Loader2, Calendar } from "lucide-react";
 import Toast from "../components/Toast";
 import TabNavigation from "../components/TabNavigation";
-import EventCard from "../components/EventCard";
+import RegistrationEventCard from "../components/RegistrationEventCard";
 import CancelModal from "../components/CancelModal";
 import {
   cancelRegistration,
@@ -202,7 +202,7 @@ export default function MyEventsPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
             {filteredRegistrations.map((item) => (
-              <EventCard
+              <RegistrationEventCard
                 key={item.registration_id}
                 item={item}
                 getEffectiveStatus={getEffectiveStatus}

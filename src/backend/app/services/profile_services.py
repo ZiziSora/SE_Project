@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from supabase_auth.errors import AuthApiError
 
+from app.core.supabase_client import get_supabase
 from app.database import supabase, supabase_admin
 from app.models.enum import UserRole
 from app.models.organization_type import OrganizationType
@@ -72,10 +73,10 @@ def delete_avatar_from_storage(avatar_url: str | None) -> None:
         return
 
     try:
-        supabase.storage.from_(AVATAR_BUCKET).remove([avatar_url])
-    except Exception as e:
-        logger.warning(f'The errro occured: {e}')
-        pass
+        get_supabase().storage.from_(AVATAR_BUCKET).remove([avatar_url])
+    except Exception as error:
+        logger.warning("Failed to delete the previous avatar: %s", error)
+
 
 def upload_avatar_service(
     file: UploadFile,
@@ -93,7 +94,8 @@ def upload_avatar_service(
         filename = f"{uuid4()}.{extension}"
         avatar_path = f"{current_user.user_id}/{filename}"
 
-        supabase.storage.from_(AVATAR_BUCKET).upload(
+        avatar_storage = get_supabase().storage.from_(AVATAR_BUCKET)
+        avatar_storage.upload(
             path=avatar_path,
             file=content,
             file_options={
@@ -103,11 +105,7 @@ def upload_avatar_service(
             },
         )
 
-        avatar_url = (
-            supabase.storage
-            .from_(AVATAR_BUCKET)
-            .get_public_url(avatar_path)
-        )
+        avatar_url = avatar_storage.get_public_url(avatar_path)
 
         old_avatar_path = current_user.avatar_url
 
@@ -141,10 +139,8 @@ def get_avatar_url(avatar_path: str | None) -> str | None:
     if not avatar_path:
         return None
 
-    return (
-        supabase.storage
-        .from_(AVATAR_BUCKET)
-        .get_public_url(avatar_path)
+    return get_supabase().storage.from_(AVATAR_BUCKET).get_public_url(
+        avatar_path
     )
 
 

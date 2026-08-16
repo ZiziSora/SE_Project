@@ -5,6 +5,10 @@ export const login = async (data) => {
     return reponse.data;
 }
 
+export const logout = async () => {
+    await api.post("/auth/logout");
+}
+
 
 export const signupStudent = async (data) => {
     const response = await api.post("/auth/signup/student", data);

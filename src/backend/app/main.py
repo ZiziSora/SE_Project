@@ -18,6 +18,7 @@ from app.routers import (
 from app.routers.auth_router import router as auth_router
 from app.routers.my_event import router as history_router
 from app.routers.profile_router import router as user_router
+from app.routers.events import router as events_router
 from app.schemas.profile import UserProfileResponse
 from app.services.profile_services import get_avatar_url
 
