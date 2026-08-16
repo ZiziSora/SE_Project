@@ -15,12 +15,12 @@ import {
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "react-toastify";
-import { resendVerificationEmail, signupOrganizer } from "../api/authApi";
-import InputField from "../components/InputField";
-import SelectedField from "../components/SelectedField";
-import SignupShell from "../components/SignupShell";
-import UploadField from "../components/UploadField";
-import { savePendingVerification } from "../lib/pendingVerification";
+import { resendVerificationEmail, signupOrganizer } from "../../api/authApi";
+import InputField from "../../components/InputField";
+import SelectedField from "../../components/SelectedField";
+import SignupShell from "../../components/SignupShell";
+import UploadField from "../../components/UploadField";
+import { savePendingVerification } from "../../lib/pendingVerification";
 
 const departmentOptions = [
   "Công nghệ Thông tin",

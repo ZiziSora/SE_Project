@@ -12,12 +12,12 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "react-toastify";
-import { resendVerificationEmail, signupStudent } from "../api/authApi";
-import InputField from "../components/InputField";
-import SelectedField from "../components/SelectedField";
-import SignupShell from "../components/SignupShell";
-import { validateStudentEmail } from "../utils/validateStudentEmail";
-import { savePendingVerification } from "../lib/pendingVerification";
+import { resendVerificationEmail, signupStudent } from "../../api/authApi";
+import InputField from "../../components/InputField";
+import SelectedField from "../../components/SelectedField";
+import SignupShell from "../../components/SignupShell";
+import { validateStudentEmail } from "../../utils/validateStudentEmail";
+import { savePendingVerification } from "../../lib/pendingVerification";
 
 const departmentOptions = [
   "Công nghệ Thông tin",

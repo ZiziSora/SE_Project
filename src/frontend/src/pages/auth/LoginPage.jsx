@@ -1,5 +1,5 @@
 import { GraduationCap, CheckCircle } from "lucide-react";
-import hcmus from "../assets/hcmus.png";
+import hcmus from "../../assets/hcmus.png";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { login } from "../../api/authApi.js";
 import InputField from "../../components/InputField.jsx";

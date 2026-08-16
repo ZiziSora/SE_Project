@@ -1,4 +1,4 @@
-import hcmus from "../assets/hcmus.png";
+import hcmus from "../../assets/hcmus.png";
 import { GraduationCap, User, Users, ArrowRight } from "lucide-react";
 import { useNavigate, Link } from "react-router-dom";
 
