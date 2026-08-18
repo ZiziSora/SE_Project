@@ -1,9 +1,11 @@
 import { Calendar, MapPin } from "lucide-react";
+import { Link } from "react-router-dom";
 
 const DEFAULT_IMAGE =
     "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=600&auto=format&fit=crop&q=80";
 
 export default function EventCard({
+    eventId,
     image,
     badgeText,
     title,
@@ -12,6 +14,8 @@ export default function EventCard({
     location,
     isFeatured = false,
 }) {
+    const detailPath = `/events/${eventId}`;
+
     return (
         <div
             className={`bg-white rounded-2xl overflow-hidden flex flex-col transition-all duration-300 group ${
@@ -66,12 +70,18 @@ export default function EventCard({
                 </div>
 
                 <div className="flex gap-2 mt-3">
-                    <button className="flex-1 py-2 px-3 text-xs font-semibold rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition">
+                    <Link
+                        to={detailPath}
+                        className="flex-1 py-2 px-3 text-center text-xs font-semibold rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300 active:scale-[0.98] transition"
+                    >
                         Xem thông tin
-                    </button>
-                    <button className="flex-1 py-2 px-3 text-xs font-semibold rounded-lg text-white bg-[#7C3AED] hover:bg-[#6D28D9] transition shadow-sm">
+                    </Link>
+                    <Link
+                        to={detailPath}
+                        className="flex-1 py-2 px-3 text-center text-xs font-semibold rounded-lg text-white bg-[#7C3AED] hover:bg-[#6D28D9] active:scale-[0.98] transition shadow-sm"
+                    >
                         Đăng ký
-                    </button>
+                    </Link>
                 </div>
             </div>
         </div>
