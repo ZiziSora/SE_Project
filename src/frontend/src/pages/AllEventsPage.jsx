@@ -15,10 +15,10 @@ export default function AllEvents() {
           <h1 className="text-balance text-2xl font-extrabold tracking-tight text-foreground">Tất cả sự kiện</h1>
         </header>
 
-        {/* Bảng chiếm hết chiều cao còn lại */}
-        <div className="flex min-h-0 flex-1 flex-col">
-          <FullEventsTable />
-        </div>
+        {/* min-h-0 + flex-1 để bảng CÓ THỂ co lại và tự cuộn khi danh sách dài,
+            nhưng bản thân bảng cao theo nội dung nên ít sự kiện thì không bị
+            chừa khoảng trống — giống bảng ở trang Dashboard. */}
+        <FullEventsTable />
       </div>
     </div>
   )

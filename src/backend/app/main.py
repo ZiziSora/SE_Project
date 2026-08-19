@@ -8,6 +8,7 @@ from app.core.config import CORS_ORIGINS
 from app.models.enum import UserRole, UserStatus
 from app.models.user import User
 from app.routers import (
+    admin_event_revisions,
     categories,
     event_review,
     events,
@@ -42,6 +43,7 @@ app.include_router(events.router)
 app.include_router(organizer_events.router)
 app.include_router(organizer_requests.router)
 app.include_router(event_review.router)
+app.include_router(admin_event_revisions.router)
 app.include_router(categories.router)
 app.include_router(uploads.router)
 

@@ -74,3 +74,10 @@ class Event(Base):
         "Notification",
         back_populates="event"
     )
+
+    # Các yêu cầu chỉnh sửa đang chờ / đã xử lý của sự kiện này
+    revisions = relationship(
+        "EventRevision",
+        back_populates="event",
+        cascade="all, delete-orphan",
+    )

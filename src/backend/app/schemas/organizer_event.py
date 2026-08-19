@@ -8,6 +8,8 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from app.schemas.event_revision import EventRevisionOut
+
 
 class EventStatus(str, Enum):
     DRAFT = "DRAFT"
@@ -116,6 +118,14 @@ class OrganizerEventOut(BaseModel):
     can_edit: bool = False
     can_delete: bool = True
     requires_reapproval: bool = False
+
+    # Sự kiện đã duyệt mà Ban tổ chức vừa sửa: dữ liệu mới nằm ở bảng
+    # `event_revisions` chờ Admin duyệt, bản ghi này vẫn là bản đang công khai.
+    has_pending_revision: bool = False
+    # Chỉ điền ở API chi tiết (kèm bảng so sánh cũ → mới); API danh sách chỉ trả
+    # cờ `has_pending_revision` cho nhẹ.
+    pending_revision: Optional[EventRevisionOut] = None
+
     created_at: Optional[datetime] = None
 
     model_config = {"extra": "ignore"}

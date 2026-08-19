@@ -25,6 +25,19 @@ export function getStatusDisplay(status) {
 }
 
 
+/**
+ * Nhãn phụ đứng cạnh trạng thái chính khi sự kiện ĐANG CÔNG KHAI nhưng có một
+ * yêu cầu chỉnh sửa nằm chờ Admin duyệt (bảng `event_revisions`).
+ *
+ * Cố tình KHÔNG gộp vào `STATUS_LABELS`: trạng thái thật của sự kiện vẫn là
+ * "Đang mở đăng ký" — sinh viên vẫn đăng ký được bản cũ trong lúc chờ duyệt.
+ */
+export const PENDING_REVISION_BADGE = {
+  label: "Chờ duyệt thay đổi",
+  className: "bg-amber-100 text-amber-700",
+};
+
+
 export const FILTER_TO_STATUS = {
   "Tất cả": undefined,
   "Đang mở đăng ký": "PUBLISHED",

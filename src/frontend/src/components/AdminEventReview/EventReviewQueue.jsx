@@ -5,6 +5,7 @@ import {
   ChevronRight,
   Eye,
   MapPin,
+  PencilLine,
   X,
 } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -15,6 +16,28 @@ import {
 } from "../../utils/adminEventReviewUtils.js";
 import AdminReviewStatusBadge from "./AdminReviewStatusBadge.jsx";
 import EventReviewPoster from "./EventReviewPoster.jsx";
+
+
+/**
+ * Hàng chờ gộp hai loại hồ sơ nên mỗi dòng phải nói rõ mình là loại nào:
+ * sự kiện mới hoàn toàn, hay chỉ là vài thay đổi trên sự kiện đang chạy.
+ */
+function ReviewKindBadge({ item }) {
+  if (item.kind !== "REVISION") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-md bg-[#e8eef9] px-2 py-0.5 text-[10px] font-semibold text-[#4a6b8c]">
+        Sự kiện mới
+      </span>
+    );
+  }
+
+  return (
+    <span className="inline-flex items-center gap-1 rounded-md bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-700">
+      <PencilLine className="size-3" aria-hidden="true" />
+      Yêu cầu sửa · {item.changes.length} thay đổi
+    </span>
+  );
+}
 
 export default function EventReviewQueue({
   events,
@@ -34,7 +57,7 @@ export default function EventReviewQueue({
             <CalendarDays className="size-6" strokeWidth={1.7} aria-hidden="true" />
           </span>
           <h3 className="mt-4 font-['Cabinet_Grotesk','Manrope',sans-serif] text-lg font-bold text-[#1f2b3c]">
-            Không có sự kiện chờ duyệt
+            Không có hồ sơ chờ duyệt
           </h3>
           <p className="mt-1 text-sm text-[#817889]">
             Hàng chờ đang trống hoặc không có kết quả phù hợp với từ khóa.
@@ -66,14 +89,17 @@ export default function EventReviewQueue({
               </div>
               <div className="min-w-0 text-left">
                 <Link
-                  to={`/admin/events/${event.id}`}
+                  to={event.detailPath}
                   className="line-clamp-2 text-sm font-bold leading-5 text-[#18263a] transition-colors hover:text-[#6d20df]"
                 >
                   {event.title}
                 </Link>
                 <p className="mt-1 text-[11px] font-medium text-[#8a8192]">
-                  {event.id} · {event.category}
+                  {event.eventId} · {event.category}
                 </p>
+                <div className="mt-1.5">
+                  <ReviewKindBadge item={event} />
+                </div>
               </div>
             </div>
 
@@ -131,7 +157,7 @@ export default function EventReviewQueue({
 
             <div className="flex items-center justify-center">
               <Link
-                to={`/admin/events/${event.id}`}
+                to={event.detailPath}
                 aria-label={`Xem chi tiết ${event.title}`}
                 className="grid size-9 place-items-center rounded-lg border border-[#ddd5e7] bg-white text-[#625a6c] transition-all hover:-translate-y-0.5 hover:border-[#bda8d6] hover:bg-[#f5f0fb] hover:text-[#6d20df]"
               >
@@ -153,9 +179,12 @@ export default function EventReviewQueue({
                 <EventReviewPoster event={event} compact />
               </div>
               <div className="min-w-0 flex-1">
-                <AdminReviewStatusBadge status={event.status} />
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <AdminReviewStatusBadge status={event.status} />
+                  <ReviewKindBadge item={event} />
+                </div>
                 <Link
-                  to={`/admin/events/${event.id}`}
+                  to={event.detailPath}
                   className="mt-2 block line-clamp-2 text-sm font-bold leading-5 text-[#18263a]"
                 >
                   {event.title}
@@ -186,7 +215,7 @@ export default function EventReviewQueue({
                 </>
               )}
               <Link
-                to={`/admin/events/${event.id}`}
+                to={event.detailPath}
                 className="inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-lg border border-[#ddd5e7] text-xs font-semibold text-[#5e5567]"
               >
                 <Eye className="size-3.5" aria-hidden="true" /> Chi tiết
@@ -198,7 +227,7 @@ export default function EventReviewQueue({
 
       <footer className="flex flex-col gap-3 border-t border-[#e8e2ed] bg-[#faf9fc] px-5 py-4 text-xs text-[#776e80] sm:flex-row sm:items-center sm:justify-between">
         <p>
-          Hiển thị <strong className="text-[#403748]">{displayStart}–{displayEnd}</strong> trong tổng số <strong className="text-[#403748]">{totalResults}</strong> sự kiện
+          Hiển thị <strong className="text-[#403748]">{displayStart}–{displayEnd}</strong> trong tổng số <strong className="text-[#403748]">{totalResults}</strong> hồ sơ
         </p>
         <div className="flex items-center gap-2">
           <button

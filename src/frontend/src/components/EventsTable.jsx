@@ -4,11 +4,13 @@ import { Link } from "react-router-dom"
 import { toast } from "react-toastify"
 import { cn } from "../lib/utils"
 import { eventsApi } from "../api/eventApi.js"
+import ConfirmDialog from "./ConfirmDialog.jsx"
 import {
   extractApiErrorMessage,
   formatDateTime,
   formatRegistered,
   getStatusDisplay,
+  PENDING_REVISION_BADGE,
 } from "../utils/eventManagementUtils.js"
 
 const headers = ["TÊN SỰ KIỆN", "THỜI GIAN", "TRẠNG THÁI", "NGƯỜI ĐĂNG KÝ", "THAO TÁC"]
@@ -21,6 +23,9 @@ export function EventsTable() {
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  // Sự kiện đang chờ xác nhận xoá (null = không mở hộp thoại)
+  const [pendingDelete, setPendingDelete] = useState(null)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -44,16 +49,19 @@ export function EventsTable() {
     }
   }, [])
 
-  const handleDelete = async (event) => {
-    if (!event.event_id) return
-    if (!window.confirm(`Xoá sự kiện "${event.title}"?`)) return
+  const confirmDelete = async () => {
+    if (!pendingDelete?.event_id || isDeleting) return
+    setIsDeleting(true)
     try {
-      await eventsApi.remove(event.event_id)
-      setRows((prev) => prev.filter((row) => row.event_id !== event.event_id))
+      await eventsApi.remove(pendingDelete.event_id)
+      setRows((prev) => prev.filter((row) => row.event_id !== pendingDelete.event_id))
       toast.success("Đã xoá sự kiện thành công")
+      setPendingDelete(null)
     } catch (err) {
       console.error("Lỗi xoá sự kiện:", err)
       toast.error(extractApiErrorMessage(err, "Không xoá được sự kiện."))
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -121,14 +129,27 @@ export function EventsTable() {
 
                     {/* Trạng thái không bị rớt chữ */}
                     <td className={cn(cellCls, "whitespace-nowrap")}>
-                      <span
-                        className={cn(
-                          "inline-flex rounded-md px-3 py-1.5 font-mono text-[0.8125rem] font-medium",
-                          status.className,
+                      <div className="flex flex-col items-start gap-1">
+                        <span
+                          className={cn(
+                            "inline-flex rounded-md px-3 py-1.5 font-mono text-[0.8125rem] font-medium",
+                            status.className,
+                          )}
+                        >
+                          {status.label}
+                        </span>
+                        {/* Bản sửa đang chờ Admin duyệt — sự kiện vẫn chạy bản cũ */}
+                        {row.has_pending_revision && (
+                          <span
+                            className={cn(
+                              "inline-flex rounded-md px-2 py-0.5 font-mono text-[0.6875rem] font-medium",
+                              PENDING_REVISION_BADGE.className,
+                            )}
+                          >
+                            {PENDING_REVISION_BADGE.label}
+                          </span>
                         )}
-                      >
-                        {status.label}
-                      </span>
+                      </div>
                     </td>
 
                     <td
@@ -161,7 +182,7 @@ export function EventsTable() {
                         {row.can_delete !== false && (
                           <button
                             type="button"
-                            onClick={() => handleDelete(row)}
+                            onClick={() => setPendingDelete(row)}
                             aria-label={`Xóa ${row.title}`}
                             className="hover:text-destructive"
                           >
@@ -177,6 +198,21 @@ export function EventsTable() {
           </tbody>
         </table>
       </div>
+
+
+      <ConfirmDialog
+        open={Boolean(pendingDelete)}
+        tone="danger"
+        icon={Trash2}
+        title="Xoá sự kiện?"
+        description="Sự kiện sẽ bị xoá khỏi hệ thống cùng toàn bộ dữ liệu đăng ký và điểm danh đi kèm. Thao tác này không thể hoàn tác."
+        detailTitle={pendingDelete?.title ?? "Sự kiện chưa có tên"}
+        detailSubtitle={pendingDelete?.event_id}
+        confirmLabel="Xoá sự kiện"
+        isSubmitting={isDeleting}
+        onClose={() => !isDeleting && setPendingDelete(null)}
+        onConfirm={confirmDelete}
+      />
 
       {/* Footer luôn dính đáy bảng, không bị đẩy khỏi màn hình */}
       <div className="flex shrink-0 justify-end border-t border-border px-6 py-3">

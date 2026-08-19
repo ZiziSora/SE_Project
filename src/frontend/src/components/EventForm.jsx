@@ -10,6 +10,8 @@ import {
   extractApiErrorMessage,
   getStatusDisplay,
 } from '../utils/eventManagementUtils.js';
+import EventRevisionDiff from './EventRevisionDiff.jsx';
+import ConfirmDialog from './ConfirmDialog.jsx';
 
 import {
   ArrowLeft,
@@ -23,6 +25,8 @@ import {
   Sparkles,
   FilePlus,
   AlertTriangle,
+  Clock,
+  Undo2,
 } from 'lucide-react';
 import { TopNav } from './TopNav.jsx';
 
@@ -191,6 +195,11 @@ export function EventForm({ mode, eventId }) {
   // Trạng thái hiện tại của sự kiện (chỉ có nghĩa ở mode edit / view)
   const [currentStatus, setCurrentStatus] = useState('DRAFT');
   const [requiresReapproval, setRequiresReapproval] = useState(false);
+  // Yêu cầu chỉnh sửa đang nằm chờ Admin duyệt (nếu có). Khi có bản này thì
+  // bảng `events` vẫn đang giữ NỘI DUNG CŨ đã công khai.
+  const [pendingRevision, setPendingRevision] = useState(null);
+  const [cancellingRevision, setCancellingRevision] = useState(false);
+  const [confirmingCancelRevision, setConfirmingCancelRevision] = useState(false);
   const [canEdit, setCanEdit] = useState(false);
   const [registeredLabel, setRegisteredLabel] = useState('');
 
@@ -250,32 +259,39 @@ export function EventForm({ mode, eventId }) {
           return;
         }
 
+        // Nếu đang có yêu cầu chỉnh sửa chờ duyệt thì form phải hiện NỘI DUNG
+        // MỚI mà Ban tổ chức đã gửi, chứ không phải bản cũ đang công khai —
+        // nếu không, mở form ra sẽ tưởng là thay đổi bị mất.
+        const revision = event.pending_revision ?? null;
+        const source = revision ? { ...event, ...revision.values } : event;
+
         setFormData({
-          title: event.title ?? '',
-          category_id: event.category_id != null ? String(event.category_id) : '',
-          location: event.location ?? '',
-          start_date: isoToDatePart(event.start_time),
-          start_time: isoToTimePart(event.start_time),
-          end_date: isoToDatePart(event.end_time),
-          end_time: isoToTimePart(event.end_time),
-          capacity: event.capacity != null ? String(event.capacity) : '',
-          registration_deadline: isoToDatetimeLocal(event.registration_deadline),
-          description: event.description ?? '',
+          title: source.title ?? '',
+          category_id: source.category_id != null ? String(source.category_id) : '',
+          location: source.location ?? '',
+          start_date: isoToDatePart(source.start_time),
+          start_time: isoToTimePart(source.start_time),
+          end_date: isoToDatePart(source.end_time),
+          end_time: isoToTimePart(source.end_time),
+          capacity: source.capacity != null ? String(source.capacity) : '',
+          registration_deadline: isoToDatetimeLocal(source.registration_deadline),
+          description: source.description ?? '',
         });
 
         initialDatesRef.current = {
-          start_time: isoToDatePart(event.start_time)
-            ? `${isoToDatePart(event.start_time)}T${isoToTimePart(event.start_time)}:00`
+          start_time: isoToDatePart(source.start_time)
+            ? `${isoToDatePart(source.start_time)}T${isoToTimePart(source.start_time)}:00`
             : '',
-          registration_deadline: isoToDatetimeLocal(event.registration_deadline),
+          registration_deadline: isoToDatetimeLocal(source.registration_deadline),
         };
 
-        setBannerUrl(event.banner_url);
-        setCoverImage(event.banner_url);
-        setPlanFileUrl(event.file_url);
-        if (event.file_url) {
-          setPlanFileName(decodeURIComponent(event.file_url.split('/').pop() ?? ''));
+        setBannerUrl(source.banner_url);
+        setCoverImage(source.banner_url);
+        setPlanFileUrl(source.file_url);
+        if (source.file_url) {
+          setPlanFileName(decodeURIComponent(source.file_url.split('/').pop() ?? ''));
         }
+        setPendingRevision(revision);
         setCurrentStatus(event.event_status);
         setRequiresReapproval(event.requires_reapproval);
         setCanEdit(event.can_edit);
@@ -351,6 +367,24 @@ export function EventForm({ mode, eventId }) {
     }
   };
 
+  /** Rút lại yêu cầu chỉnh sửa đang chờ duyệt, quay về đúng bản đang công khai. */
+  const handleCancelRevision = async () => {
+    if (!eventId || cancellingRevision) return;
+
+    setCancellingRevision(true);
+    try {
+      await eventsApi.cancelRevision(eventId);
+      toast.success('Đã rút lại yêu cầu chỉnh sửa.');
+      setConfirmingCancelRevision(false);
+      navigate('/');
+    } catch (err) {
+      console.error('Lỗi rút lại yêu cầu chỉnh sửa:', err);
+      toast.error(extractApiErrorMessage(err, 'Không rút được yêu cầu chỉnh sửa.'));
+    } finally {
+      setCancellingRevision(false);
+    }
+  };
+
   /**
    * Lưu: tạo mới hoặc cập nhật.
    * @param {'DRAFT'|'PENDING'|'KEEP'} targetStatus
@@ -420,8 +454,10 @@ export function EventForm({ mode, eventId }) {
     try {
       if (isEdit && eventId) {
         const updated = await eventsApi.update(eventId, payload);
-        if (updated.event_status === 'PENDING' && requiresReapproval) {
-          toast.success('Đã gửi yêu cầu duyệt lại sự kiện thành công');
+        if (updated.has_pending_revision) {
+          toast.success(
+            'Đã gửi yêu cầu chỉnh sửa cho Admin. Sự kiện vẫn công khai nội dung cũ cho tới khi được duyệt.',
+          );
         } else if (updated.event_status === 'PENDING') {
           toast.success('Đã gửi yêu cầu xét duyệt sự kiện thành công');
         } else {
@@ -523,13 +559,49 @@ export function EventForm({ mode, eventId }) {
           </div>
         </div>
 
-        {/* ── Cảnh báo phải duyệt lại ── */}
-        {isEdit && requiresReapproval && (
+        {/* ── Yêu cầu chỉnh sửa đang chờ Admin duyệt ── */}
+        {pendingRevision && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-2">
+                <Clock size={15} className="mt-0.5 shrink-0 text-amber-500" />
+                <div>
+                  <p className="text-xs font-semibold text-amber-800">
+                    Đang chờ Admin duyệt {pendingRevision.changed_fields.length} thay đổi
+                  </p>
+                  <p className="mt-0.5 text-[11px] text-amber-700">
+                    Sinh viên vẫn đang xem <strong>nội dung cũ</strong>. Nội dung dưới đây chỉ được áp dụng
+                    sau khi Admin chấp nhận. Lưu tiếp sẽ thay thế yêu cầu này bằng yêu cầu mới.
+                  </p>
+                </div>
+              </div>
+              {!isView && (
+                <button
+                  type="button"
+                  onClick={() => setConfirmingCancelRevision(true)}
+                  disabled={cancellingRevision}
+                  className="shrink-0 inline-flex items-center gap-1 rounded-lg border border-amber-300 bg-white px-2.5 py-1.5 text-[11px] font-semibold text-amber-700 transition-colors hover:bg-amber-100 disabled:opacity-50"
+                >
+                  <Undo2 size={12} />
+                  {cancellingRevision ? 'Đang rút...' : 'Rút lại'}
+                </button>
+              )}
+            </div>
+
+            <div className="mt-3">
+              <EventRevisionDiff changes={pendingRevision.changes} />
+            </div>
+          </div>
+        )}
+
+        {/* ── Cảnh báo: sửa sự kiện đã công khai thì phải chờ duyệt ── */}
+        {isEdit && requiresReapproval && !pendingRevision && (
           <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
             <AlertTriangle size={15} className="mt-0.5 shrink-0 text-amber-500" />
             <p className="text-xs text-amber-700">
-              Sự kiện này đang được công khai. Mọi thay đổi về nội dung sẽ đưa sự kiện về trạng thái{' '}
-              <strong>Chờ duyệt</strong> và tạm ẩn khỏi danh sách đăng ký cho tới khi Admin duyệt lại.
+              Sự kiện này đang được công khai. Thay đổi của bạn sẽ được gửi cho Admin đối chiếu{' '}
+              <strong>trước khi áp dụng</strong> — sự kiện vẫn giữ nguyên nội dung cũ và sinh viên vẫn
+              đăng ký bình thường trong lúc chờ duyệt.
             </p>
           </div>
         )}
@@ -801,11 +873,24 @@ export function EventForm({ mode, eventId }) {
                   : isDraft
                     ? 'Gửi duyệt'
                     : requiresReapproval
-                      ? 'Lưu và gửi duyệt lại'
+                      ? 'Gửi yêu cầu chỉnh sửa'
                       : 'Lưu thay đổi'}
             </button>
           </div>
         )}
+
+        <ConfirmDialog
+          open={confirmingCancelRevision}
+          icon={Undo2}
+          title="Rút lại yêu cầu chỉnh sửa?"
+          description="Sự kiện giữ nguyên nội dung đang công khai và Admin sẽ không còn thấy yêu cầu này. Bạn vẫn có thể gửi lại yêu cầu khác sau."
+          detailTitle={formData.title || 'Sự kiện chưa có tên'}
+          detailSubtitle={eventId}
+          confirmLabel="Rút lại yêu cầu"
+          isSubmitting={cancellingRevision}
+          onClose={() => !cancellingRevision && setConfirmingCancelRevision(false)}
+          onConfirm={handleCancelRevision}
+        />
 
         <p className="text-center text-[11px] text-slate-400 pb-2">
           © 2024 UniEvent Portal. Nền tảng quản lý sự kiện Đại học.

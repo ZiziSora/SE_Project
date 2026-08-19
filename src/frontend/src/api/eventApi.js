@@ -54,6 +54,14 @@ export const eventsApi = {
     return response.data;
   },
 
+  /** Rút lại yêu cầu chỉnh sửa đang chờ Admin duyệt. */
+  async cancelRevision(eventId) {
+    const response = await api.delete(
+      `/api/organizer/events/${eventId}/revision`,
+    );
+    return response.data;
+  },
+
   async remove(eventId) {
     const response = await api.delete(`/api/organizer/events/${eventId}`);
     return response.data;

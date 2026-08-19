@@ -28,6 +28,7 @@ import StudentSignupCompletePage from "./pages/StudentSignupCompletePage.jsx";
 import ViewEvent from "./pages/ViewEventPage.jsx";
 import AdminEventReviewsPage from "./pages/admin/AdminEventReviewsPage.jsx";
 import AdminEventReviewDetailPage from "./pages/admin/AdminEventReviewDetailPage.jsx";
+import AdminEventChangeDetailPage from "./pages/admin/AdminEventChangeDetailPage.jsx";
 function PlaceholderPage({ title, description }) {
   return (
     <main className="min-h-screen bg-[#f8f9fa] px-6 py-16 text-center text-gray-900">
@@ -223,6 +224,15 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <AdminEventReviewDetailPage />
+              </ProtectedRoute>
+            }
+          />
+          {/* Duyệt YÊU CẦU CHỈNH SỬA một sự kiện đã công khai */}
+          <Route
+            path="event-changes/:revisionId"
+            element={
+              <ProtectedRoute>
+                <AdminEventChangeDetailPage />
               </ProtectedRoute>
             }
           />
