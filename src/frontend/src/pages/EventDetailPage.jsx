@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { toast } from "react-toastify";
 import {
   BrowserRouter,
   Routes,
@@ -52,7 +53,10 @@ export function EventDetailPage() {
   // State quản lý Bookmark (Lưu sự kiện) - chỉ dành cho role Student
   const [saved, setSaved] = useState(false);
   const [bookmarkLoading, setBookmarkLoading] = useState(false);
-  const isStudent = user?.user_metadata?.role === "student";
+  const isStudent =
+    Boolean(user) &&
+    (user?.user_metadata?.role === "student" ||
+      localStorage.getItem("role") === "student");
 
   /**
    * 1. Lấy chi tiết sự kiện từ Backend API (GET /events/:eventId)
@@ -153,9 +157,8 @@ export function EventDetailPage() {
     async function fetchRegistrationStatus() {
       setDataLoading(true);
       try {
-        const status = await publicEventApi.getRegistrationStatus(
-          currentEventId,
-        );
+        const status =
+          await publicEventApi.getRegistrationStatus(currentEventId);
         if (isMounted) {
           setCount(status.count);
           setRegistered(status.registered);
@@ -218,6 +221,12 @@ export function EventDetailPage() {
       }
     } catch (err) {
       console.error("Lỗi khi lưu sự kiện:", err);
+      toast.error(
+        err.response?.status === 401
+          ? "Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại."
+          : err.response?.data?.detail ||
+              "Không thể cập nhật sự kiện đã lưu. Vui lòng thử lại.",
+      );
     } finally {
       setBookmarkLoading(false);
     }
@@ -264,9 +273,7 @@ export function EventDetailPage() {
         setFeedback({
           type: "error",
           message: `Đăng ký thất bại: ${
-            err.response?.data?.detail ||
-            err.message ||
-            "Vui lòng thử lại sau."
+            err.response?.data?.detail || err.message || "Vui lòng thử lại sau."
           }`,
         });
       }
@@ -408,31 +415,3 @@ export function EventDetailPage() {
 
 /* Alias export for backward compatibility */
 export const EventRegistrationPage = EventDetailPage;
-
-/* =========================================================
-   Main App Entry Point with React Router v6
-   ========================================================= */
-export default function App() {
-  return (
-    <BrowserRouter>
-      <Routes>
-        {/* Route mặc định chuyển hướng sang sự kiện tiêu chuẩn */}
-        <Route
-          path="/"
-          element={<Navigate to={`/events/${DEFAULT_EVENT_ID}`} replace />}
-        />
-        <Route
-          path="/events"
-          element={<Navigate to={`/events/${DEFAULT_EVENT_ID}`} replace />}
-        />
-        {/* Dynamic Route hiển thị chi tiết sự kiện theo eventId */}
-        <Route path="/events/:eventId" element={<EventDetailPage />} />
-        {/* Catch-all fallback */}
-        <Route
-          path="*"
-          element={<Navigate to={`/events/${DEFAULT_EVENT_ID}`} replace />}
-        />
-      </Routes>
-    </BrowserRouter>
-  );
-}

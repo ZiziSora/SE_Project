@@ -14,39 +14,7 @@ export default function ExploreEventsPage() {
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
 
-    // Mảng dữ liệu gợi ý cố định
-    const featuredEvents = [
-        {
-            id: 'f1',
-            image: 'https://picsum.photos/seed/physics-ai/600/400',
-            badgeText: '92% Match',
-            title: 'Vật lý lượng tử và ứng dụng trong công nghệ tương lai',
-            faculty: 'Vật lý – Vật lý kỹ thuật',
-            date: '18/7/2026 • 08:00',
-            location: 'Sảnh I',
-            isFeatured: true,
-        },
-        {
-            id: 'f2',
-            image: 'https://picsum.photos/seed/biodiversity/600/400',
-            badgeText: 'High Demand',
-            title: 'Đa dạng sinh học và bảo tồn các loài nguy cấp tại Việt Nam',
-            faculty: 'Sinh học – Công nghệ Sinh học',
-            date: '7/10/2026 • 08:00',
-            location: 'Sảnh I',
-            isFeatured: true,
-        },
-        {
-            id: 'f3',
-            image: 'https://picsum.photos/seed/biotech/600/400',
-            badgeText: 'Based on your major',
-            title: 'Kỹ thuật nuôi cấy mô tế bào thực vật trong công nghệ sinh học',
-            faculty: 'Công nghệ Thông tin',
-            date: '5/10/2026 • 08:00',
-            location: 'Sảnh I',
-            isFeatured: true,
-        },
-    ];
+    const featuredEvents = events.slice(0, 3);
 
     // Gọi API lấy dữ liệu từ FastAPI mỗi khi bộ lọc thay đổi
     useEffect(() => {
@@ -114,9 +82,25 @@ export default function ExploreEventsPage() {
                         <h2 className="text-sm font-bold text-white">Gợi ý cho bạn</h2>
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                        {featuredEvents.map((event) => (
-                            <EventCard key={event.id} {...event} />
-                        ))}
+                        {featuredEvents.length > 0 ? (
+                            featuredEvents.map((event) => (
+                                <EventCard
+                                    key={event.event_id || event.id}
+                                    eventId={event.event_id || event.id}
+                                    image={event.banner_url}
+                                    badgeText="Gợi ý"
+                                    title={event.title}
+                                    faculty={event.department_name || 'Đơn vị tổ chức'}
+                                    date={`${event.start_time || ''}`}
+                                    location={event.location}
+                                    isFeatured
+                                />
+                            ))
+                        ) : (
+                            <p className="col-span-full py-6 text-center text-sm font-medium text-white/80">
+                                Chưa có sự kiện phù hợp để gợi ý.
+                            </p>
+                        )}
                     </div>
                 </section>
 
@@ -146,6 +130,7 @@ export default function ExploreEventsPage() {
                             events.map((event) => (
                                 <EventCard
                                     key={event.event_id || event.id}
+                                    eventId={event.event_id || event.id}
                                     image={event.banner_url || 'https://picsum.photos/seed/default/600/400'}
                                     title={event.title}
                                     faculty={event.department_name || 'Đơn vị tổ chức'}

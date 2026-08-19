@@ -40,6 +40,7 @@ export default function OrganizerHomePage() {
                             events.map((event) => (
                                 <EventCard
                                     key={event.event_id || event.id}
+                                    eventId={event.event_id || event.id}
                                     role="organizer"
                                     image={event.banner_url || 'https://picsum.photos/seed/default/600/400'}
                                     title={event.title}

@@ -3,7 +3,6 @@ import { ToastContainer } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 
 import { EventDetailPage } from "./pages/EventDetailPage.jsx";
-import { DEFAULT_EVENT_ID } from "./utils/eventDetailUtils.js";
 import ProtectedRoute from "./components/ProtectedRoute.jsx";
 import AllEvents from "./pages/AllEventsPage.jsx";
 import AuthCallbackPage from "./pages/AuthCallbackPage.jsx";
@@ -66,7 +65,7 @@ function HomePage() {
   return canManageEvents ? (
     <ManageEvents />
   ) : (
-    <Navigate to={`/events/${DEFAULT_EVENT_ID}`} replace />
+    <Navigate to="/explore" replace />
   );
 }
 
@@ -76,7 +75,7 @@ function EventsIndexPage() {
   return canManageEvents ? (
     <Navigate to="/organizer" replace />
   ) : (
-    <Navigate to={`/events/${DEFAULT_EVENT_ID}`} replace />
+    <Navigate to="/explore" replace />
   );
 }
 
