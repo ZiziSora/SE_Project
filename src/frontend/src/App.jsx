@@ -27,14 +27,20 @@ import ViewEvent from "./pages/ViewEventPage.jsx";
 import AdminEventReviewsPage from "./pages/admin/AdminEventReviewsPage.jsx";
 import AdminEventReviewDetailPage from "./pages/admin/AdminEventReviewDetailPage.jsx";
 import ExploreEventsPage from "./pages/ExploreEventsPage.jsx";
-function PlaceholderPage({ title, description }) {
+import OrganizerHomePage from "./pages/OrganizerHomePage.jsx";
+import OrganizerHeader from "./components/common/OrganizerHeader.jsx";
+import StudentHeader from "./components/common/StudentHeader.jsx";
+function PlaceholderPage({ title, description, role = "student" }) {
   return (
-    <main className="min-h-screen bg-[#f8f9fa] px-6 py-16 text-center text-gray-900">
-      <div className="mx-auto max-w-md rounded-3xl border border-gray-100 bg-white p-10 shadow-sm">
-        <h1 className="text-2xl font-bold text-gray-800">{title}</h1>
-        <p className="mt-2 text-sm text-gray-500">{description}</p>
-      </div>
-    </main>
+    <div className="min-h-screen bg-[#f8f9fa] text-gray-900">
+      {role === "organizer" ? <OrganizerHeader /> : <StudentHeader />}
+      <main className="px-6 py-16 text-center">
+        <div className="mx-auto max-w-md rounded-3xl border border-gray-100 bg-white p-10 shadow-sm">
+          <h1 className="text-2xl font-bold text-gray-800">{title}</h1>
+          <p className="mt-2 text-sm text-gray-500">{description}</p>
+        </div>
+      </main>
+    </div>
   );
 }
 
@@ -93,6 +99,14 @@ export default function App() {
           }
         />
         <Route
+          path="/organizer/home"
+          element={
+            <ProtectedRoute>
+              <OrganizerHomePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/create-event"
           element={
             <ProtectedRoute>
@@ -105,6 +119,18 @@ export default function App() {
           element={
             <ProtectedRoute>
               <AllEvents />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/participants"
+          element={
+            <ProtectedRoute>
+              <PlaceholderPage
+                role="organizer"
+                title="Quản lý người tham gia"
+                description="Khu vực quản lý danh sách đăng ký và trạng thái check-in đang được hoàn thiện."
+              />
             </ProtectedRoute>
           }
         />

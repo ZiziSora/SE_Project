@@ -21,7 +21,7 @@ import {
   FilePlus,
   AlertTriangle,
 } from 'lucide-react';
-import { TopNav } from './TopNav.jsx';
+import OrganizerHeader from './common/OrganizerHeader.jsx';
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -369,7 +369,7 @@ export function EventForm({ mode, eventId }) {
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col">
-        <TopNav />
+        <OrganizerHeader />
         <p className="mt-16 text-center text-xs text-slate-400">Đang tải thông tin sự kiện...</p>
       </div>
     );
@@ -378,7 +378,7 @@ export function EventForm({ mode, eventId }) {
   if (loadError) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col">
-        <TopNav />
+        <OrganizerHeader />
         <div className="mt-16 text-center">
           <p className="text-xs text-red-500">{loadError}</p>
           <Link to="/" className="mt-3 inline-block text-xs font-semibold text-primary">
@@ -393,7 +393,7 @@ export function EventForm({ mode, eventId }) {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
-      <TopNav />
+      <OrganizerHeader />
 
       <main className="flex-1 w-full max-w-3xl mx-auto px-4 sm:px-6 py-6 space-y-4">
         {/* ── Header ── */}

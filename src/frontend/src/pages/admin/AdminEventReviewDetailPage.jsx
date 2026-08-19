@@ -22,7 +22,7 @@ import AdminReviewStatusBadge from "../../components/AdminEventReview/AdminRevie
 import EventReviewInfoItem from "../../components/AdminEventReview/EventReviewInfoItem.jsx";
 import EventReviewPoster from "../../components/AdminEventReview/EventReviewPoster.jsx";
 import ReviewQueueNavigator from "../../components/AdminEventReview/ReviewQueueNavigator.jsx";
-import AdminHeader from "../../components/ReviewOrganizerRequest/AdminHeader.jsx";
+import AdminHeader from "../../components/common/AdminHeader.jsx";
 import {
   approveEventReview,
   getPendingEventReviews,
