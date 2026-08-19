@@ -101,7 +101,11 @@ def register_for_event(
             detail="Sự kiện đã đủ số lượng đăng ký.",
         )
 
-    already_registered = registration_service.register_user(event_id, current_user.id)
+    already_registered = registration_service.register_user(
+        event_id,
+        current_user.id,
+        event.title,
+    )
     if not already_registered:
         count += 1
 

@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react"
 import {
-  Bell,
   ChevronDown,
   LoaderCircle,
   LogOut,
@@ -13,6 +12,7 @@ import { toast } from "react-toastify"
 
 import { getMyProfile } from "../api/profileApi.js"
 import { logoutCurrentSession } from "../utils/logoutSession.js"
+import NotificationMenu from "./NotificationMenu.jsx"
 
 /**
  * Mỗi mục menu quản một NHÓM route, không chỉ một đường dẫn duy nhất.
@@ -177,13 +177,7 @@ export function TopNav({ avatarUrl: providedAvatarUrl }) {
           </Link>
         )}
 
-        <button
-          type="button"
-          aria-label="Thông báo"
-          className="text-muted-foreground transition-colors hover:text-foreground cursor-pointer"
-        >
-          <Bell className="size-5" aria-hidden="true" />
-        </button>
+        <NotificationMenu tone="neutral" />
         <div ref={accountMenuRef} className="relative">
           <button
             ref={accountMenuTriggerRef}

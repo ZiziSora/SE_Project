@@ -1,6 +1,8 @@
 import uuid
 
 from app.core.supabase_client import get_supabase
+from app.models.enum import NotificationType
+from app.services import notification_service
 
 TABLE = "event_registrations"
 
@@ -34,7 +36,11 @@ def is_user_registered(event_id: str, user_id: str) -> bool:
     return find_registration(event_id, user_id) is not None
 
 
-def register_user(event_id: str, user_id: str) -> bool:
+def register_user(
+    event_id: str,
+    user_id: str,
+    event_title: str | None = None,
+) -> bool:
     """Register the user for the event.
 
     Returns True if the user was already registered (no-op), False if a new
@@ -53,4 +59,12 @@ def register_user(event_id: str, user_id: str) -> bool:
             "registration_status": "REGISTERED",
         }
     ).execute()
+    display_title = event_title or "Sự kiện"
+    notification_service.create_notification(
+        user_id=user_id,
+        event_id=event_id,
+        notification_type=NotificationType.REGISTRATION_CONFIRMED,
+        title="Đăng ký sự kiện thành công",
+        content=f'Bạn đã đăng ký thành công sự kiện "{display_title}".',
+    )
     return False

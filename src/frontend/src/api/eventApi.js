@@ -54,6 +54,14 @@ export const eventsApi = {
     return response.data;
   },
 
+  async sendReminder(eventId, payload) {
+    const response = await api.post(
+      `/api/organizer/events/${eventId}/reminders`,
+      payload,
+    );
+    return response.data;
+  },
+
   async remove(eventId) {
     const response = await api.delete(`/api/organizer/events/${eventId}`);
     return response.data;

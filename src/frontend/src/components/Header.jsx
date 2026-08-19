@@ -1,7 +1,6 @@
 // src/components/header.jsx
 import { useEffect, useRef, useState } from 'react';
 import {
-  Bell,
   ChevronDown,
   LoaderCircle,
   LogOut,
@@ -14,6 +13,7 @@ import { toast } from 'react-toastify';
 
 import { getMyProfile } from '../api/profileApi';
 import { logoutCurrentSession } from '../utils/logoutSession';
+import NotificationMenu from './NotificationMenu.jsx';
 
 export default function Header({ role = 'student' }) {
   const navigate = useNavigate();
@@ -149,14 +149,7 @@ export default function Header({ role = 'student' }) {
 
       {/* Khối bên phải: Thông báo & Avatar */}
       <div className="flex items-center space-x-5">
-        {/* Nút chuông thông báo */}
-        <button
-          type="button"
-          aria-label="Thông báo"
-          className="text-[#6c38cc] hover:opacity-80 transition-opacity p-1"
-        >
-          <Bell className="w-6 h-6" />
-        </button>
+        <NotificationMenu />
 
         {/* Avatar người dùng */}
         <div ref={accountMenuRef} className="relative">

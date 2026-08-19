@@ -12,6 +12,7 @@ from postgrest.exceptions import APIError
 
 from app.core.config import TABLE_CATEGORIES, TABLE_EVENTS, TABLE_REGISTRATIONS
 from app.core.supabase_client import get_supabase
+from app.models.enum import NotificationType
 from app.schemas.category import CategoryOut
 from app.schemas.event import EventOut as PublicEventOut
 from app.schemas.organizer_event import (
@@ -23,6 +24,7 @@ from app.schemas.organizer_event import (
     StatsOut,
     missing_required_fields,
 )
+from app.services import notification_service
 
 # Trạng thái Organizer được phép mở form sửa
 EDITABLE_STATUSES = {
@@ -391,6 +393,17 @@ def update_event(
     target_status = (
         payload.event_status.value if payload.event_status is not None else None
     )
+    location_changed = (
+        "location" in data and data["location"] != current.get("location")
+    )
+    time_changed = any(
+        field in data and data[field] != current.get(field)
+        for field in ("start_time", "end_time")
+    )
+    is_newly_cancelled = (
+        target_status == EventStatus.CANCELLED.value
+        and current_status != EventStatus.CANCELLED.value
+    )
 
     if not data and target_status is None:
         return _to_organizer_event_out(current, _category_map(), {})
@@ -451,6 +464,38 @@ def update_event(
     )
     res = _run(query)
     row = res.data[0] if res.data else merged
+
+    event_title = row.get("title") or current.get("title") or "Sự kiện"
+    if is_newly_cancelled:
+        notification_service.notify_event_participants(
+            event_id=event_id,
+            notification_type=NotificationType.EVENT_CANCELLED,
+            title="Sự kiện đã bị huỷ",
+            content=f'Sự kiện "{event_title}" đã bị huỷ.',
+        )
+    else:
+        if location_changed:
+            new_location = row.get("location") or data.get("location")
+            notification_service.notify_event_participants(
+                event_id=event_id,
+                notification_type=NotificationType.EVENT_LOCATION_CHANGED,
+                title="Thay đổi địa điểm sự kiện",
+                content=(
+                    f'Sự kiện "{event_title}" đã chuyển địa điểm '
+                    f'tới "{new_location}".'
+                ),
+            )
+        if time_changed:
+            notification_service.notify_event_participants(
+                event_id=event_id,
+                notification_type=NotificationType.EVENT_TIME_CHANGED,
+                title="Thay đổi thời gian sự kiện",
+                content=(
+                    f'Thời gian của sự kiện "{event_title}" đã được '
+                    "cập nhật. Vui lòng xem lại chi tiết sự kiện."
+                ),
+            )
+
     return _to_organizer_event_out(
         row, _category_map(), _registration_counts([event_id])
     )
