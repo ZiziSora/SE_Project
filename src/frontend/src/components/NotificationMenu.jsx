@@ -9,6 +9,10 @@ import {
 import { Link, useNavigate } from "react-router-dom";
 
 import { notificationApi } from "../api/notificationApi.js";
+import {
+  getNotificationSampleDetail,
+  getNotificationSampleList,
+} from "../data/notificationSampleData.js";
 
 
 const TYPE_LABELS = {
@@ -41,6 +45,7 @@ export default function NotificationMenu({ tone = "purple" }) {
   const navigate = useNavigate();
   const menuRef = useRef(null);
   const triggerRef = useRef(null);
+  const sampleReadIdsRef = useRef(new Set());
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
@@ -48,7 +53,20 @@ export default function NotificationMenu({ tone = "purple" }) {
   const [unreadCount, setUnreadCount] = useState(0);
   const [selectedNotification, setSelectedNotification] = useState(null);
   const [error, setError] = useState("");
+  const [isUsingSampleData, setIsUsingSampleData] = useState(false);
   const isNeutral = tone === "neutral";
+
+  const showSampleNotifications = () => {
+    const items = getNotificationSampleList().map((item) =>
+      sampleReadIdsRef.current.has(item.notification_id)
+        ? { ...item, is_read: true }
+        : item,
+    );
+
+    setNotifications(items);
+    setUnreadCount(items.filter((item) => !item.is_read).length);
+    setIsUsingSampleData(true);
+  };
 
   useEffect(() => {
     if (!localStorage.getItem("access_token")) return undefined;
@@ -110,9 +128,20 @@ export default function NotificationMenu({ tone = "purple" }) {
 
     try {
       const data = await notificationApi.list({ page: 1, pageSize: 20 });
-      setNotifications(data.items || []);
+      const items = data.items || [];
+
+      if (items.length === 0 && import.meta.env.DEV) {
+        showSampleNotifications();
+      } else {
+        setNotifications(items);
+        setIsUsingSampleData(false);
+      }
     } catch {
-      setError("Không thể tải thông báo. Vui lòng thử lại.");
+      if (import.meta.env.DEV) {
+        showSampleNotifications();
+      } else {
+        setError("Không thể tải thông báo. Vui lòng thử lại.");
+      }
     } finally {
       setIsLoading(false);
     }
@@ -138,6 +167,36 @@ export default function NotificationMenu({ tone = "purple" }) {
     setError("");
 
     try {
+      if (notification.is_sample) {
+        const sampleDetail = getNotificationSampleDetail(
+          notification.notification_id,
+        );
+
+        if (!sampleDetail) {
+          throw new Error("Không tìm thấy dữ liệu mẫu.");
+        }
+
+        const displayedNotification = {
+          ...sampleDetail,
+          is_read: true,
+        };
+
+        if (!notification.is_read) {
+          sampleReadIdsRef.current.add(notification.notification_id);
+          setUnreadCount((count) => Math.max(0, count - 1));
+          setNotifications((items) =>
+            items.map((item) =>
+              item.notification_id === notification.notification_id
+                ? { ...item, is_read: true }
+                : item,
+            ),
+          );
+        }
+
+        setSelectedNotification(displayedNotification);
+        return;
+      }
+
       const detail = await notificationApi.get(notification.notification_id);
       let displayedNotification = detail;
 
@@ -216,10 +275,19 @@ export default function NotificationMenu({ tone = "purple" }) {
                 {selectedNotification ? "Chi tiết thông báo" : "Thông báo"}
               </h2>
             </div>
-            {!selectedNotification && unreadCount > 0 && (
-              <span className="rounded-full bg-purple-50 px-2.5 py-1 text-xs font-semibold text-purple-700">
-                {unreadCount} chưa đọc
-              </span>
+            {!selectedNotification && (
+              <div className="flex items-center gap-2">
+                {isUsingSampleData && (
+                  <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700">
+                    Dữ liệu mẫu
+                  </span>
+                )}
+                {unreadCount > 0 && (
+                  <span className="rounded-full bg-purple-50 px-2.5 py-1 text-xs font-semibold text-purple-700">
+                    {unreadCount} chưa đọc
+                  </span>
+                )}
+              </div>
             )}
           </div>
 
