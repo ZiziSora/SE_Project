@@ -15,7 +15,7 @@ import { toast } from "react-toastify";
 import AdminEventDecisionDialog from "../../components/AdminEventReview/AdminEventDecisionDialog.jsx";
 import AdminReviewStatCard from "../../components/AdminEventReview/AdminReviewStatCard.jsx";
 import EventReviewQueue from "../../components/AdminEventReview/EventReviewQueue.jsx";
-import AdminHeader from "../../components/ReviewOrganizerRequest/AdminHeader.jsx";
+import AdminHeader from "../../components/common/AdminHeader.jsx";
 import {
   approveEventReview,
   getPendingEventReviews,

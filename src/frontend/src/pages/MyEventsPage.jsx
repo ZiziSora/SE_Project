@@ -4,6 +4,7 @@ import Toast from "../components/Toast";
 import TabNavigation from "../components/TabNavigation";
 import RegistrationEventCard from "../components/RegistrationEventCard";
 import CancelModal from "../components/CancelModal";
+import StudentHeader from "../components/common/StudentHeader.jsx";
 import {
   cancelRegistration,
   getMyEvents,
@@ -159,70 +160,73 @@ export default function MyEventsPage() {
   });
 
   return (
-    <main className="min-h-[calc(100vh-64px)] bg-[#f8f9fa] text-gray-900 px-6 py-10 font-sans relative">
-      <Toast toast={toast} />
+    <div className="min-h-screen bg-[#f8f9fa] font-sans text-gray-900">
+      <StudentHeader />
+      <main className="relative min-h-[calc(100vh-72px)] px-6 py-10">
+        <Toast toast={toast} />
 
-      <div className="max-w-6xl mx-auto">
-        <h1 className="text-3xl font-bold text-gray-900">Sự kiện của tôi</h1>
-        <p className="text-gray-500 text-sm mt-1">
-          Quản lý lịch trình nghiên cứu và các buổi hội thảo học thuật của bạn.
-        </p>
+        <div className="max-w-6xl mx-auto">
+          <h1 className="text-3xl font-bold text-gray-900">Sự kiện của tôi</h1>
+          <p className="text-gray-500 text-sm mt-1">
+            Quản lý lịch trình nghiên cứu và các buổi hội thảo học thuật của bạn.
+          </p>
 
-        <TabNavigation
-          activeTab={activeTab}
-          setActiveTab={setActiveTab}
-          registrations={registrations}
-          getEffectiveStatus={getEffectiveStatus}
+          <TabNavigation
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            registrations={registrations}
+            getEffectiveStatus={getEffectiveStatus}
+          />
+
+          {loading ? (
+            <div className="flex flex-col items-center justify-center py-20 text-gray-400">
+              <Loader2 className="w-8 h-8 animate-spin text-purple-600 mb-3" />
+              <p className="text-sm font-medium">Đang tải danh sách sự kiện...</p>
+            </div>
+          ) : error ? (
+            <div className="bg-red-50 border border-red-100 rounded-2xl p-6 mt-8 text-center text-red-600">
+              <AlertTriangle className="w-8 h-8 mx-auto mb-2 text-red-500" />
+              <p className="text-sm font-medium">{error}</p>
+              <button
+                onClick={fetchMyEvents}
+                className="mt-4 px-4 py-2 bg-red-600 text-white text-xs font-semibold rounded-xl hover:bg-red-700 transition"
+              >
+                Thử lại
+              </button>
+            </div>
+          ) : filteredRegistrations.length === 0 ? (
+            <div className="bg-white border border-gray-100 rounded-2xl p-12 mt-8 text-center text-gray-400 shadow-sm">
+              <Calendar className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+              <h3 className="text-base font-bold text-gray-700">Chưa có sự kiện nào</h3>
+              <p className="text-xs text-gray-500 mt-1">
+                Bạn chưa có sự kiện nào ở mục "{activeTab}".
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
+              {filteredRegistrations.map((item) => (
+                <RegistrationEventCard
+                  key={item.registration_id}
+                  item={item}
+                  getEffectiveStatus={getEffectiveStatus}
+                  canCancelRegistration={canCancelRegistration}
+                  formatEventDate={formatEventDate}
+                  onSelectCancel={setSelectedRegistration}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+
+        <CancelModal
+          selectedRegistration={selectedRegistration}
+          onClose={() => setSelectedRegistration(null)}
+          onConfirm={handleConfirmCancel}
+          isCanceling={isCanceling}
+          canCancelRegistration={canCancelRegistration}
+          formatEventDate={formatEventDate}
         />
-
-        {loading ? (
-          <div className="flex flex-col items-center justify-center py-20 text-gray-400">
-            <Loader2 className="w-8 h-8 animate-spin text-purple-600 mb-3" />
-            <p className="text-sm font-medium">Đang tải danh sách sự kiện...</p>
-          </div>
-        ) : error ? (
-          <div className="bg-red-50 border border-red-100 rounded-2xl p-6 mt-8 text-center text-red-600">
-            <AlertTriangle className="w-8 h-8 mx-auto mb-2 text-red-500" />
-            <p className="text-sm font-medium">{error}</p>
-            <button
-              onClick={fetchMyEvents}
-              className="mt-4 px-4 py-2 bg-red-600 text-white text-xs font-semibold rounded-xl hover:bg-red-700 transition"
-            >
-              Thử lại
-            </button>
-          </div>
-        ) : filteredRegistrations.length === 0 ? (
-          <div className="bg-white border border-gray-100 rounded-2xl p-12 mt-8 text-center text-gray-400 shadow-sm">
-            <Calendar className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-            <h3 className="text-base font-bold text-gray-700">Chưa có sự kiện nào</h3>
-            <p className="text-xs text-gray-500 mt-1">
-              Bạn chưa có sự kiện nào ở mục "{activeTab}".
-            </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
-            {filteredRegistrations.map((item) => (
-              <RegistrationEventCard
-                key={item.registration_id}
-                item={item}
-                getEffectiveStatus={getEffectiveStatus}
-                canCancelRegistration={canCancelRegistration}
-                formatEventDate={formatEventDate}
-                onSelectCancel={setSelectedRegistration}
-              />
-            ))}
-          </div>
-        )}
-      </div>
-
-      <CancelModal
-        selectedRegistration={selectedRegistration}
-        onClose={() => setSelectedRegistration(null)}
-        onConfirm={handleConfirmCancel}
-        isCanceling={isCanceling}
-        canCancelRegistration={canCancelRegistration}
-        formatEventDate={formatEventDate}
-      />
-    </main>
+      </main>
+    </div>
   );
 }

@@ -5,7 +5,7 @@ import {
   UsersRound,
 } from "lucide-react";
 
-import AdminHeader from "../../components/ReviewOrganizerRequest/AdminHeader";
+import AdminHeader from "../../components/common/AdminHeader.jsx";
 
 export default function AdminStatisticsPage() {
   return (

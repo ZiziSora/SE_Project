@@ -1,4 +1,4 @@
-import Header from '../components/Header';
+import OrganizerHeader from '../components/common/OrganizerHeader.jsx';
 import FilterBar from '../components/FilterBar';
 import EventCard from '../components/EventCard';
 import { useEventFilter } from '../utils/useEventFilter';
@@ -9,7 +9,7 @@ export default function OrganizerHomePage() {
 
     return (
         <div className="min-h-screen bg-white font-sans">
-            <Header role="organizer" />
+            <OrganizerHeader />
 
             <main className="mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6 sm:space-y-7 max-w-5xl">
                 <section id="hero-title" className="space-y-2 pt-1">

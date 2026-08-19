@@ -1,10 +1,10 @@
-import { TopNav } from "../components/TopNav"
+import OrganizerHeader from "../components/common/OrganizerHeader.jsx"
 import { FullEventsTable } from "../components/FullEventTable"
 
 export default function AllEvents() {
   return (
     <div className="min-h-screen w-full bg-background">
-      <TopNav />
+      <OrganizerHeader />
 
       <div className="mx-auto max-w-5xl px-6 py-4.5 md:px-10">
         <header className="mb-5">
