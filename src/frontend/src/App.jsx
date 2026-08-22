@@ -107,7 +107,7 @@ export default function App() {
           }
         />
         <Route
-          path="/create-event"
+          path="/organizer/create-event"
           element={
             <ProtectedRoute>
               <CreateEvent />
@@ -115,7 +115,7 @@ export default function App() {
           }
         />
         <Route
-          path="/all-events"
+          path="/organizer/all-events"
           element={
             <ProtectedRoute>
               <AllEvents />
@@ -123,7 +123,7 @@ export default function App() {
           }
         />
         <Route
-          path="/participants"
+          path="/organizer/participants"
           element={
             <ProtectedRoute>
               <PlaceholderPage
@@ -135,7 +135,7 @@ export default function App() {
           }
         />
         <Route
-          path="/edit-event/:eventId"
+          path="/organizer/edit-event/:eventId"
           element={
             <ProtectedRoute>
               <EditEvent />

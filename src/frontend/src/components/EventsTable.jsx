@@ -145,7 +145,7 @@ export function EventsTable() {
                       <div className="flex items-center justify-end gap-3 text-muted-foreground">
                         {row.can_edit && (
                           <Link
-                            to={`/edit-event/${row.event_id}`}
+                            to={`/organizer/edit-event/${row.event_id}`}
                             aria-label={`Chỉnh sửa ${row.title}`}
                             className="hover:text-primary"
                           >
@@ -180,7 +180,7 @@ export function EventsTable() {
       {/* Footer luôn dính đáy bảng, không bị đẩy khỏi màn hình */}
       <div className="flex shrink-0 justify-end border-t border-border px-6 py-2.5">
         <Link
-          to="/all-events"
+          to="/organizer/all-events"
           className="inline-flex items-center gap-1.5 font-mono text-sm font-medium text-primary transition-colors hover:text-primary/80"
         >
           Xem tất cả sự kiện

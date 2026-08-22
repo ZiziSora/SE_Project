@@ -356,7 +356,7 @@ export function EventForm({ mode, eventId }) {
             : 'Đã gửi yêu cầu xét duyệt sự kiện thành công',
         );
       }
-      navigate('/');
+      navigate('/organizer');
     } catch (err) {
       console.error('Lỗi khi lưu sự kiện:', err);
       toast.error(err instanceof Error ? err.message : 'Không lưu được sự kiện.');
@@ -381,7 +381,7 @@ export function EventForm({ mode, eventId }) {
         <OrganizerHeader />
         <div className="mt-16 text-center">
           <p className="text-xs text-red-500">{loadError}</p>
-          <Link to="/" className="mt-3 inline-block text-xs font-semibold text-primary">
+          <Link to="/organizer" className="mt-3 inline-block text-xs font-semibold text-primary">
             Quay lại Dashboard
           </Link>
         </div>
@@ -398,7 +398,7 @@ export function EventForm({ mode, eventId }) {
       <main className="flex-1 w-full max-w-3xl mx-auto px-4 sm:px-6 py-6 space-y-4">
         {/* ── Header ── */}
         <div>
-          <Link to="/">
+          <Link to="/organizer">
             <button className="flex items-center gap-1.5 text-[11px] font-semibold tracking-wider text-slate-400 cursor-pointer hover:text-primary transition-colors mb-3 uppercase">
               <ArrowLeft size={13} />
               Quay lại Dashboard
@@ -682,14 +682,14 @@ export function EventForm({ mode, eventId }) {
         {/* ── Footer Actions ── */}
         {isView ? (
           <div className="flex items-center justify-end gap-3 pt-1 pb-4">
-            <Link to="/">
+            <Link to="/organizer">
               <button type="button" className="text-xs cursor-pointer font-medium text-slate-500 hover:text-slate-700 transition-colors px-2 py-1.5">
                 Quay lại
               </button>
             </Link>
             {/* Chỉ mời sửa khi backend cho phép (can_edit) */}
             {canEdit && (
-              <Link to={`/edit-event/${eventId}`}>
+              <Link to={`/organizer/edit-event/${eventId}`}>
                 <button
                   type="button"
                   className="bg-primary cursor-pointer hover:bg-primary-700 text-white font-semibold text-xs rounded-lg px-5 py-2 transition-colors shadow-sm"
@@ -701,7 +701,7 @@ export function EventForm({ mode, eventId }) {
           </div>
         ) : (
           <div className="flex items-center justify-end gap-3 pt-1 pb-4">
-            <Link to="/">
+            <Link to="/organizer">
               <button type="button" className="text-xs cursor-pointer font-medium text-slate-500 hover:text-slate-700 transition-colors px-2 py-1.5">
                 Hủy bỏ
               </button>

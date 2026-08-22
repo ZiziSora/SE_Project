@@ -237,7 +237,7 @@ export function FullEventsTable() {
                         <div className="flex items-center justify-end gap-3 text-muted-foreground">
                           {row.can_edit && (
                             <Link
-                              to={`/edit-event/${row.event_id}`}
+                              to={`/organizer/edit-event/${row.event_id}`}
                               aria-label={`Chỉnh sửa ${row.title}`}
                               className="hover:text-primary"
                             >
