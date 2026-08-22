@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { toast } from "react-toastify";
 import { useParams } from "react-router-dom";
 import StudentHeader from "../components/common/StudentHeader.jsx";
+import OrganizerHeader from "../components/common/OrganizerHeader.jsx";
 import { supabase } from "../lib/supabase";
 import { publicEventApi } from "../api/eventApi.js";
 import {
@@ -51,6 +52,12 @@ export function EventDetailPage() {
     Boolean(user) &&
     (user?.user_metadata?.role === "student" ||
       localStorage.getItem("role") === "student");
+
+  // Ban tổ chức chỉ được xem chi tiết sự kiện, không thể đăng ký tham gia.
+  const isOrganizer =
+    Boolean(user) &&
+    (user?.user_metadata?.role === "organizer" ||
+      localStorage.getItem("role") === "organizer");
 
   /**
    * 1. Lấy chi tiết sự kiện từ Backend API (GET /events/:eventId)
@@ -321,8 +328,8 @@ export function EventDetailPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header Navigation */}
-      <StudentHeader />
+      {/* Header Navigation - hiển thị theo đúng role đang đăng nhập */}
+      {isOrganizer ? <OrganizerHeader /> : <StudentHeader />}
 
       <main className="max-w-5xl mx-auto px-6 md:px-10 py-10 pb-20">
         {/* State 1: Fallback UI khi đang Loading dữ liệu từ Backend API */}
@@ -389,17 +396,27 @@ export function EventDetailPage() {
               }
             />
 
-            {/* Thanh đăng ký tham gia */}
-            <RegisterActionBar
-              maxCapacity={maxCapacity}
-              count={count}
-              registered={registered}
-              registerLoading={registerLoading}
-              dataLoading={dataLoading}
-              onRegister={handleRegister}
-              feedback={feedback}
-              user={user}
-            />
+            {/* Thanh đăng ký tham gia - Ban tổ chức chỉ xem, không đăng ký được */}
+            {isOrganizer ? (
+              <div className="flex items-center gap-2 text-sm font-medium text-gray-500 bg-gray-100 rounded-xl px-4 py-3">
+                <Users size={18} className="text-purple-700" />
+                <span>
+                  {count}/{maxCapacity} sinh viên đã đăng ký · Ban tổ chức chỉ có
+                  thể xem chi tiết sự kiện.
+                </span>
+              </div>
+            ) : (
+              <RegisterActionBar
+                maxCapacity={maxCapacity}
+                count={count}
+                registered={registered}
+                registerLoading={registerLoading}
+                dataLoading={dataLoading}
+                onRegister={handleRegister}
+                feedback={feedback}
+                user={user}
+              />
+            )}
           </>
         )}
       </main>
