@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import {
-  Bell,
   Building2,
   ChevronDown,
   GraduationCap,
@@ -182,7 +181,7 @@ export default function RoleHeader({ role, avatarUrl: providedAvatarUrl }) {
   };
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border/90 bg-card/90 font-['Geist',ui-sans-serif,system-ui] backdrop-blur-xl">
+    <header className="sticky top-0 z-50 w-full border-b border-border/90 bg-card/90 font-inter backdrop-blur-xl">
       <div className="mx-auto flex h-16 w-full max-w-[1440px] items-center justify-between gap-4 px-4 sm:h-[72px] sm:px-8 lg:grid lg:grid-cols-[1fr_auto_1fr] lg:px-12 xl:px-16">
         <Link
           to={config.logoTo}

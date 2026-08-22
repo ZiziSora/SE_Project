@@ -60,6 +60,24 @@ def _fake_event():
     )
 
 
+@patch("app.services.saved_event_service.list_saved_events")
+def test_list_saved_events(mock_list_saved, logged_in_client):
+    mock_list_saved.return_value = [
+        {
+            "event_id": EVENT_ID,
+            "student_id": STUDENT_ID,
+            "saved_at": "2026-08-02T10:00:00+00:00",
+            "events": _fake_event().model_dump(mode="json"),
+        }
+    ]
+
+    response = logged_in_client.get("/api/events/saved")
+
+    assert response.status_code == 200
+    assert response.json()[0]["event_id"] == EVENT_ID
+    mock_list_saved.assert_called_once_with(STUDENT_ID)
+
+
 # --- TC08: unauthenticated save request must be rejected --------------------
 def test_save_event_requires_authentication(client):
     response = client.post(f"/api/events/{EVENT_ID}/save")
