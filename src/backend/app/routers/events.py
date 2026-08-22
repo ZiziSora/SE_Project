@@ -8,6 +8,7 @@ from app.schemas.event import EventOut
 from app.schemas.registration import RegisterResponseOut, RegistrationStatusOut
 from app.schemas.saved_event import (
     RemoveSavedEventResponseOut,
+    SavedEventOut,
     SavedEventStatusOut,
     SaveEventResponseOut,
 )
@@ -45,6 +46,13 @@ def get_events(
 @router.get("/ongoing", response_model=list[EventOut])
 def read_ongoing_events() -> list[EventOut]:
     return event_service.list_ongoing_events()
+
+
+@router.get("/saved", response_model=list[SavedEventOut])
+def read_saved_events(
+    current_user: User = Depends(require_current_user),
+) -> list[SavedEventOut]:
+    return saved_event_service.list_saved_events(current_user.id)
 
 
 @router.get("/{event_id}", response_model=EventOut)

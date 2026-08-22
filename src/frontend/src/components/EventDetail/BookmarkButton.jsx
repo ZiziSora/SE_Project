@@ -12,17 +12,26 @@ export function BookmarkButton({ saved = false, loading = false, onClick }) {
       aria-pressed={saved}
       aria-label={saved ? "Bỏ lưu sự kiện" : "Lưu sự kiện"}
       title={saved ? "Bỏ lưu sự kiện" : "Lưu sự kiện"}
-      className="shrink-0 p-2 rounded-full hover:bg-purple-100 transition-colors disabled:opacity-60 disabled:cursor-wait"
+      className={`group inline-flex min-h-12 shrink-0 items-center justify-center gap-2 rounded-full border px-4 text-sm font-semibold shadow-sm transition-all duration-300 hover:-translate-y-0.5 disabled:cursor-wait disabled:opacity-60 disabled:hover:translate-y-0 ${
+        saved
+          ? "border-violet-700 bg-violet-700 text-white hover:bg-violet-800"
+          : "border-slate-200 bg-white text-slate-700 hover:border-violet-300 hover:text-violet-700"
+      }`}
     >
       {loading ? (
-        <Loader2 className="w-6 h-6 animate-spin text-purple-600" />
+        <>
+          <Loader2 className="size-4 animate-spin" />
+          <span>Đang cập nhật</span>
+        </>
       ) : (
-        <Bookmark
-          className={`w-6 h-6 transition-colors ${saved ? "text-yellow-400" : "text-gray-500 hover:text-purple-700"
-            }`}
-          fill={saved ? "#facc15" : "none"}
-          strokeWidth={2}
-        />
+        <>
+          <Bookmark
+            className="size-4 transition-transform duration-300 group-hover:scale-105"
+            fill={saved ? "currentColor" : "none"}
+            strokeWidth={2}
+          />
+          <span>{saved ? "Đã lưu" : "Lưu sự kiện"}</span>
+        </>
       )}
     </button>
   );

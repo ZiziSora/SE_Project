@@ -116,6 +116,11 @@ export const publicEventApi = {
     return response.data;
   },
 
+  async listSavedEvents() {
+    const response = await api.get("/api/events/saved");
+    return response.data;
+  },
+
   async getEvent(eventId) {
     const response = await api.get(`/api/events/${eventId}`);
     return response.data;
