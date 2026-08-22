@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { ChevronDown, ImagePlus, LoaderCircle } from "lucide-react";
 import { toast } from "react-toastify";
 import SideTabProfile from "../../components/SideTabProfile";
-import { TopNav } from "../../components/TopNav.jsx";
+import OrganizerHeader from "../../components/common/OrganizerHeader.jsx";
+import StudentHeader from "../../components/common/StudentHeader.jsx";
 import {
   changePassword,
   getMyProfile,
@@ -548,7 +549,11 @@ const AccountProfilePage = ({ role, initialTab }) => {
 
   return (
     <div className="flex min-h-screen flex-col bg-[#f8f9ff] font-inter text-[#102238]">
-      {isOrganizer && <TopNav avatarUrl={avatarUrl} />}
+      {isOrganizer ? (
+        <OrganizerHeader avatarUrl={avatarUrl} />
+      ) : (
+        <StudentHeader avatarUrl={avatarUrl} />
+      )}
       <main className={contentClass}>
         <div className={isOrganizer ? "mb-6" : "mb-12 max-sm:mb-7"}>
           <h1 className="mb-1 font-manrope text-[clamp(34px,3.1vw,42px)] leading-tight font-bold tracking-[-1.4px] max-sm:text-[32px]">

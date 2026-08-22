@@ -15,7 +15,7 @@ import {
   getOrganizerRequests,
   reviewOrganizerRequest,
 } from "../../api/organizerRequestApi.js";
-import AdminHeader from "../../components/ReviewOrganizerRequest/AdminHeader.jsx";
+import AdminHeader from "../../components/common/AdminHeader.jsx";
 import ConfirmActionDialog from "../../components/ReviewOrganizerRequest/ConfirmActionDialog.jsx";
 import EvidenceDialog from "../../components/ReviewOrganizerRequest/EvidenceDialog.jsx";
 import StatStrip from "../../components/ReviewOrganizerRequest/StatStrip.jsx";

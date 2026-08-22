@@ -1,13 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { toast } from "react-toastify";
-import {
-  BrowserRouter,
-  Routes,
-  Route,
-  Navigate,
-  useParams,
-} from "react-router-dom";
-import Header from "../components/Header";
+import { useParams } from "react-router-dom";
+import StudentHeader from "../components/common/StudentHeader.jsx";
 import { supabase } from "../lib/supabase";
 import { publicEventApi } from "../api/eventApi.js";
 import {
@@ -328,7 +322,7 @@ export function EventDetailPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header Navigation */}
-      <Header />
+      <StudentHeader />
 
       <main className="max-w-5xl mx-auto px-6 md:px-10 py-10 pb-20">
         {/* State 1: Fallback UI khi đang Loading dữ liệu từ Backend API */}

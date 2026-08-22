@@ -40,7 +40,8 @@ export default function EventReviewPoster({ event, compact = false }) {
             {event.title}
           </p>
           <p className="mt-4 text-xs font-medium text-white/65">
-            {event.category} · {event.id}
+            {/* Hồ sơ bản sửa có id riêng, nhưng ở đây luôn hiện id của SỰ KIỆN */}
+            {event.category} · {event.eventId ?? event.id}
           </p>
         </div>
       )}

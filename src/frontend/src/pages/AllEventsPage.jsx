@@ -1,16 +1,23 @@
-import { TopNav } from "../components/TopNav"
+import OrganizerHeader from "../components/common/OrganizerHeader.jsx"
 import { FullEventsTable } from "../components/FullEventTable"
 
 export default function AllEvents() {
   return (
-    <div className="min-h-screen w-full bg-background">
-      <TopNav />
+    // h-screen + overflow-hidden: khoá trang đúng bằng chiều cao màn hình để
+    // không phải cuộn trang; phần dư (nếu có) do thân bảng tự cuộn bên trong.
+    <div className="flex h-screen w-full flex-col overflow-hidden bg-background">
+      <OrganizerHeader />
 
-      <div className="mx-auto max-w-5xl px-6 py-4.5 md:px-10">
-        <header className="mb-5">
-          <h1 className="text-balance text-3xl font-extrabold tracking-tight text-foreground">Tất cả sự kiện</h1>
+      {/* min-h-0 bắt buộc phải có, nếu không flex item sẽ không chịu co lại.
+          max-w-6xl: bảng rộng hơn nhưng vẫn nằm gọn trong khung trang. */}
+      <div className="mx-auto flex w-full min-h-0 max-w-6xl flex-1 flex-col px-2 py-4 md:px-8">
+        <header className="mb-3 shrink-0">
+          <h1 className="text-balance text-2xl font-extrabold tracking-tight text-foreground">Tất cả sự kiện</h1>
         </header>
 
+        {/* min-h-0 + flex-1 để bảng CÓ THỂ co lại và tự cuộn khi danh sách dài,
+            nhưng bản thân bảng cao theo nội dung nên ít sự kiện thì không bị
+            chừa khoảng trống — giống bảng ở trang Dashboard. */}
         <FullEventsTable />
       </div>
     </div>

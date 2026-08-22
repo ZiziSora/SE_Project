@@ -25,6 +25,19 @@ export function getStatusDisplay(status) {
 }
 
 
+/**
+ * Nhãn phụ đứng cạnh trạng thái chính khi sự kiện ĐANG CÔNG KHAI nhưng có một
+ * yêu cầu chỉnh sửa nằm chờ Admin duyệt (bảng `event_revisions`).
+ *
+ * Cố tình KHÔNG gộp vào `STATUS_LABELS`: trạng thái thật của sự kiện vẫn là
+ * "Đang mở đăng ký" — sinh viên vẫn đăng ký được bản cũ trong lúc chờ duyệt.
+ */
+export const PENDING_REVISION_BADGE = {
+  label: "Chờ duyệt thay đổi",
+  className: "bg-amber-100 text-amber-700",
+};
+
+
 export const FILTER_TO_STATUS = {
   "Tất cả": undefined,
   "Đang mở đăng ký": "PUBLISHED",
@@ -47,4 +60,29 @@ export function formatDateTime(value) {
 
 export function formatRegistered(event) {
   return `${event.registered_count}/${event.capacity ?? "∞"}`;
+}
+/**
+ * Lấy thông báo lỗi dễ đọc từ lỗi axios.
+ *
+ * FastAPI trả lỗi nghiệp vụ ở `detail` (chuỗi), còn lỗi validate của Pydantic là
+ * mảng `[{ msg: "Value error, ..." }]`. Nếu chỉ dùng `err.message` thì người dùng
+ * chỉ thấy "Request failed with status code 422" — không biết sai ở đâu.
+ */
+export function extractApiErrorMessage(error, fallback = "Đã xảy ra lỗi. Vui lòng thử lại.") {
+  const detail = error?.response?.data?.detail;
+
+  if (typeof detail === "string" && detail.trim()) return detail;
+
+  if (Array.isArray(detail)) {
+    const messages = detail
+      .map((item) => String(item?.msg ?? "").replace(/^Value error,\s*/, "").trim())
+      .filter(Boolean);
+    if (messages.length) return messages.join(" ");
+  }
+
+  // Không có phản hồi từ server (mất mạng, backend chưa chạy...) thì message gốc
+  // của axios vẫn có ích hơn câu mặc định.
+  if (!error?.response && error instanceof Error && error.message) return error.message;
+
+  return fallback;
 }
