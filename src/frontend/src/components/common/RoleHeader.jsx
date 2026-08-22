@@ -17,6 +17,7 @@ import { toast } from "react-toastify";
 
 import { getMyProfile } from "../../api/profileApi.js";
 import { logoutCurrentSession } from "../../utils/logoutSession.js";
+import NotificationMenu from "../../components/NotificationMenu.jsx"
 
 const ROLE_CONFIG = {
   student: {
@@ -230,14 +231,7 @@ export default function RoleHeader({ role, avatarUrl: providedAvatarUrl }) {
             </Link>
           )}
 
-          <button
-            type="button"
-            aria-label="Thông báo"
-            className="relative grid size-10 cursor-pointer place-items-center rounded-full border border-border bg-card text-muted-foreground shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-          >
-            <Bell className="size-[18px]" strokeWidth={2} aria-hidden="true" />
-            <span className="absolute right-[9px] top-[8px] size-1.5 rounded-full bg-primary ring-2 ring-card" />
-          </button>
+          <NotificationMenu tone="neutral" />
 
           <div ref={accountMenuRef} className="relative">
             <button
