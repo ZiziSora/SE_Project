@@ -266,11 +266,21 @@ def get_event(event_id: str, organizer_id: str) -> OrganizerEventOut:
 
 
 def get_event_by_id(event_id: str) -> Optional[PublicEventOut]:
-    """Return the public event representation using the shared event lookup."""
-    row = _find_raw(event_id)
-    if row is None:
+    """Return an event only when it is approved and publicly published."""
+    query = (
+        get_supabase()
+        .table(TABLE_EVENTS)
+        .select("*")
+        .eq("event_id", event_id)
+        .eq("event_status", DB_PUBLISHED)
+        .eq("approval_status", DB_APPROVAL_APPROVED)
+        .limit(1)
+    )
+    rows: list[dict[str, Any]] = _run(query).data or []
+    if not rows:
         return None
 
+    row = rows[0]
     data = dict(row)
     data["category_name"] = _category_map().get(row.get("category_id"))
     return PublicEventOut(**data)

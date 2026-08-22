@@ -3,6 +3,7 @@ import StudentHeader from "../components/common/StudentHeader.jsx";
 import FilterBar from "../components/FilterBar";
 import EventCard from "../components/EventCard";
 import FloatingChatbox from "../components/FloatingChatbox";
+import { publicEventApi } from "../api/eventApi.js";
 
 export default function ExploreEventsPage() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -22,31 +23,24 @@ export default function ExploreEventsPage() {
 
     async function fetchEvents() {
       try {
-        const params = new URLSearchParams();
-        if (searchTerm) params.append("search_term", searchTerm);
-        if (selectedFaculty) params.append("faculty", selectedFaculty);
-        if (selectedCategory) params.append("category", selectedCategory);
-        if (sortOption) params.append("sort_by", sortOption);
-
-        params.append("page", currentPage);
-        params.append("limit", 12);
-
-        const res = await fetch(
-          `http://127.0.0.1:8000/api/events?${params.toString()}`,
+        const data = await publicEventApi.list(
           {
-            signal: controller.signal,
+            search_term: searchTerm,
+            faculty: selectedFaculty,
+            category: selectedCategory,
+            sort_by: sortOption,
+            page: currentPage,
+            limit: 12,
           },
+          { signal: controller.signal },
         );
-
-        if (!res.ok) return;
-        const data = await res.json();
 
         if (data && data.events) {
           setEvents(data.events);
           setTotalPages(data.total_pages || 1);
         }
       } catch (err) {
-        if (err.name === "AbortError") return;
+        if (controller.signal.aborted) return;
         console.error("Không thể kết nối đến Backend API:", err);
       }
     }
