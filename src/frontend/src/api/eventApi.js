@@ -100,6 +100,13 @@ export const publicEventApi = {
     return response.data;
   },
 
+  async getRecommendations(limit = 6) {
+    const response = await api.get("/api/events/recommendations", {
+      params: { limit },
+    });
+    return response.data;
+  },
+
   async getEvent(eventId) {
     const response = await api.get(`/api/events/${eventId}`);
     return response.data;

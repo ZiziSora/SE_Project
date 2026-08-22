@@ -5,13 +5,19 @@ from supabase_auth.types import User
 
 from app.core.security import get_current_user, require_current_user
 from app.schemas.event import EventOut
+from app.schemas.recommendation import RecommendationsOut
 from app.schemas.registration import RegisterResponseOut, RegistrationStatusOut
 from app.schemas.saved_event import (
     RemoveSavedEventResponseOut,
     SavedEventStatusOut,
     SaveEventResponseOut,
 )
-from app.services import event_service, registration_service, saved_event_service
+from app.services import (
+    event_service,
+    recommendation_service,
+    registration_service,
+    saved_event_service,
+)
 from app.services.event_services import get_filtered_events_service
 
 router = APIRouter(prefix="/api/events", tags=["events"])
@@ -45,6 +51,18 @@ def get_events(
 @router.get("/ongoing", response_model=list[EventOut])
 def read_ongoing_events() -> list[EventOut]:
     return event_service.list_ongoing_events()
+
+
+@router.get("/recommendations", response_model=RecommendationsOut)
+def read_recommendations(
+    limit: int = Query(6, ge=1, le=12),
+    current_user: Optional[User] = Depends(get_current_user),
+) -> RecommendationsOut:
+    student_id = current_user.id if current_user else None
+    return recommendation_service.get_recommendations_service(
+        student_id=student_id,
+        limit=limit,
+    )
 
 
 @router.get("/{event_id}", response_model=EventOut)
