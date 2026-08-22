@@ -267,8 +267,9 @@ def get_event(event_id: str, organizer_id: str) -> OrganizerEventOut:
 
 def get_event_by_id(event_id: str) -> Optional[PublicEventOut]:
     """Return an event only when it is approved and publicly published."""
+    sb = get_supabase()
     query = (
-        get_supabase()
+        sb
         .table(TABLE_EVENTS)
         .select("*")
         .eq("event_id", event_id)
@@ -283,7 +284,53 @@ def get_event_by_id(event_id: str) -> Optional[PublicEventOut]:
     row = rows[0]
     data = dict(row)
     data["category_name"] = _category_map().get(row.get("category_id"))
+    data["organizer"] = _public_organizer_profile(sb, row.get("organizer_id"))
     return PublicEventOut(**data)
+
+
+def _public_organizer_profile(sb: Any, organizer_id: Any) -> Optional[dict[str, Any]]:
+    """Build the safe, public portion of an organizer profile."""
+    if not organizer_id:
+        return None
+
+    user_query = (
+        sb.table("users")
+        .select(
+            "user_id, full_name, avatar_url, department_name, "
+            "organization_type_id, organization_description, "
+            "contact_phone, office_address"
+        )
+        .eq("user_id", str(organizer_id))
+        .limit(1)
+    )
+    users: list[dict[str, Any]] = _run(user_query).data or []
+    if not users:
+        return None
+
+    user = users[0]
+    organization_type = None
+    organization_type_id = user.get("organization_type_id")
+    if organization_type_id:
+        type_query = (
+            sb.table("organization_types")
+            .select("name")
+            .eq("organization_type_id", str(organization_type_id))
+            .limit(1)
+        )
+        organization_types: list[dict[str, Any]] = _run(type_query).data or []
+        if organization_types:
+            organization_type = organization_types[0].get("name")
+
+    return {
+        "organizer_id": str(organizer_id),
+        "name": user.get("full_name"),
+        "avatar_url": user.get("avatar_url"),
+        "department_name": user.get("department_name"),
+        "organization_type": organization_type,
+        "description": user.get("organization_description"),
+        "contact_phone": user.get("contact_phone"),
+        "office_address": user.get("office_address"),
+    }
 
 
 def list_ongoing_events() -> list[PublicEventOut]:
