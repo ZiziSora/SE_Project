@@ -12,6 +12,7 @@ from app.routers import (
     categories,
     event_review,
     events,
+    notifications,
     organizer_events,
     organizer_requests,
     uploads,
@@ -41,6 +42,7 @@ app.include_router(auth_router)
 app.include_router(user_router)
 app.include_router(history_router)
 app.include_router(events.router)
+app.include_router(notifications.router)
 app.include_router(organizer_events.router)
 app.include_router(organizer_requests.router)
 app.include_router(event_review.router)

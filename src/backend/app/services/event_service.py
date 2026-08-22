@@ -12,6 +12,7 @@ from postgrest.exceptions import APIError
 
 from app.core.config import TABLE_CATEGORIES, TABLE_EVENTS, TABLE_REGISTRATIONS
 from app.core.supabase_client import get_supabase
+from app.models.enum import NotificationType
 from app.schemas.category import CategoryOut
 from app.schemas.event_revision import EventRevisionOut
 from app.schemas.event import EventOut as PublicEventOut
@@ -25,6 +26,7 @@ from app.schemas.organizer_event import (
     StatsOut,
     missing_required_fields,
 )
+from app.services import notification_service
 
 # Trạng thái Organizer được phép mở form sửa.
 # ONGOING không nằm ở đây: sự kiện đã bắt đầu thì mọi thay đổi (giờ, địa điểm,
@@ -404,6 +406,17 @@ def update_event(
     data.pop("event_status", None)
     target_status = (
         payload.event_status.value if payload.event_status is not None else None
+    )
+    location_changed = (
+        "location" in data and data["location"] != current.get("location")
+    )
+    time_changed = any(
+        field in data and data[field] != current.get(field)
+        for field in ("start_time", "end_time")
+    )
+    is_newly_cancelled = (
+        target_status == EventStatus.CANCELLED.value
+        and current_status != EventStatus.CANCELLED.value
     )
 
     if not data and target_status is None:

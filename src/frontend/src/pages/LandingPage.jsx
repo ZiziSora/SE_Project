@@ -313,15 +313,6 @@ export default function LandingPage() {
         <div className="max-w-5xl">
           <h2 className="font-manrope text-[clamp(2.5rem,5vw,5.2rem)] font-bold leading-[1.02] tracking-[-0.045em] text-[#0b1c30]">
             Mọi hoạt động trong trường, cùng chuyển động trong
-            <span
-              className="mx-3 inline-block h-[0.72em] w-[1.7em] rounded-full bg-cover bg-center align-middle shadow-lg shadow-violet-200"
-              style={{
-                backgroundImage:
-                  "url(https://picsum.photos/seed/student-community/500/240)",
-              }}
-              role="img"
-              aria-label="Cộng đồng sinh viên"
-            />
             một hệ sinh thái.
           </h2>
           <p className="mt-7 max-w-2xl text-base leading-7 text-[#4a4455] sm:text-lg sm:leading-8">
