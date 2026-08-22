@@ -2,6 +2,7 @@ from .user import User
 from .checkin_qr import EventCheckinQR
 from .event import Event
 from .event_category import EventCategory
+from .event_revision import EventRevision
 from .notfication import Notification
 from .organizer_request import OrganizerRequest
 from .organizer_request_attachment import OrganizerRequestAttachment

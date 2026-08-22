@@ -10,7 +10,8 @@ export default function ManageEvents() {
       <OrganizerHeader />
 
       {/* min-h-0 bắt buộc phải có, nếu không flex item sẽ không chịu co lại */}
-      <main className="mx-auto flex w-full min-h-0 max-w-5xl flex-1 flex-col px-2 py-4 md:px-10">
+      {/* max-w-6xl: bảng rộng hơn nhưng vẫn nằm gọn trong khung trang */}
+      <main className="mx-auto flex w-full min-h-0 max-w-6xl flex-1 flex-col px-2 py-4 md:px-8">
 
         {/* Tiêu đề và thẻ thống kê giữ nguyên chiều cao, không co giãn */}
         <header className="mb-3 shrink-0">

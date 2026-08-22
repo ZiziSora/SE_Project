@@ -21,3 +21,4 @@ CORS_ORIGINS = [
 TABLE_EVENTS = "events"
 TABLE_CATEGORIES = "event_categories"
 TABLE_REGISTRATIONS = "registrations"
+TABLE_EVENT_REVISIONS = "event_revisions"

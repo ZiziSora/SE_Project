@@ -108,6 +108,20 @@ def change_status(
 
 
 @router.delete(
+    "/{event_id}/revision",
+    response_model=OrganizerEventOut,
+    summary="Rút lại yêu cầu chỉnh sửa đang chờ duyệt",
+)
+def cancel_pending_revision(
+    event_id: str,
+    current_user: User = Depends(require_approved_organizer),
+):
+    return event_service.cancel_pending_revision(
+        event_id, str(current_user.user_id)
+    )
+
+
+@router.delete(
     "/{event_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     summary="Xoá sự kiện",
