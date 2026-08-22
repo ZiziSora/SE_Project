@@ -31,6 +31,7 @@ import AdminEventReviewDetailPage from "./pages/admin/AdminEventReviewDetailPage
 import ExploreEventsPage from "./pages/ExploreEventsPage.jsx";
 import OrganizerHomePage from "./pages/OrganizerHomePage.jsx";
 import AdminEventChangeDetailPage from "./pages/admin/AdminEventChangeDetailPage.jsx";
+import OrganizerCheckinPage from "./pages/organizer/OrganizerCheckinPage.jsx";
 import OrganizerHeader from "./components/common/OrganizerHeader.jsx";
 import StudentHeader from "./components/common/StudentHeader.jsx";
 function PlaceholderPage({ title, description, role = "student" }) {
@@ -127,6 +128,23 @@ export default function App() {
         />
         <Route
           path="/organizer/edit-event/:eventId"
+          path="/participants"
+          element={
+            <ProtectedRoute>
+              <ManageEvents />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/organizer/events/:eventId/checkin"
+          element={
+            <ProtectedRoute>
+              <OrganizerCheckinPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/edit-event/:eventId"
           element={
             <ProtectedRoute>
               <EditEvent />
