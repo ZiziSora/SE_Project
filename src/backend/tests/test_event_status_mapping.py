@@ -179,14 +179,20 @@ def test_luu_ban_nhap_xoa_dau_vet_duyet_cu(mock_get_supabase, _cats):
     assert sent["approval_status"] is None
 
 
+@patch("app.services.event_revision_service.submit_revision")
 @patch("app.services.event_service._validate_capacity_against_registrations")
 @patch("app.services.event_service._registration_counts", return_value={})
 @patch("app.services.event_service._category_map", return_value={})
 @patch("app.services.event_service._get_raw")
 @patch("app.services.event_service.get_supabase")
-def test_sua_su_kien_cong_khai_thi_quay_lai_cho_duyet(
-    mock_get_supabase, mock_get_raw, _cats, _counts, _cap
+def test_sua_su_kien_cong_khai_thi_tao_ban_cho_duyet_khong_ghi_de(
+    mock_get_supabase, mock_get_raw, _cats, _counts, _cap, mock_submit
 ):
+    """Sự kiện ĐÃ DUYỆT: dữ liệu mới sang bảng `event_revisions`.
+
+    Bảng `events` phải giữ nguyên bản đang công khai — nếu ghi đè thì Admin mất
+    dữ liệu cũ để đối chiếu, còn sinh viên thì mất sự kiện trong lúc chờ duyệt.
+    """
     payload = _full_payload()
     current = {
         "event_id": EVENT_ID,
@@ -195,18 +201,64 @@ def test_sua_su_kien_cong_khai_thi_quay_lai_cho_duyet(
         **payload,
     }
     mock_get_raw.return_value = current
-    client, chain = _fake_supabase(
-        {**current, "event_status": "DRAFT", "approval_status": "PENDING"}
-    )
+    client, chain = _fake_supabase(current)
     mock_get_supabase.return_value = client
+    # Dòng `event_revisions` chỉ chứa nội dung MỚI; giá trị cũ để bảng `events`
+    # giữ, backend tự đối chiếu khi dựng bảng so sánh.
+    mock_submit.return_value = {
+        "revision_id": "33333333-3333-3333-3333-333333333333",
+        "event_id": EVENT_ID,
+        "status": "PENDING",
+        **payload,
+        "title": "Tên mới",
+    }
 
-    event_service.update_event(
+    result = event_service.update_event(
         EVENT_ID, EventUpdate(title="Tên mới"), ORGANIZER_ID
     )
 
-    sent = chain.update.call_args.args[0]
-    assert sent["event_status"] == "DRAFT"
-    assert sent["approval_status"] == "PENDING"
+    # 1. Không đụng vào bảng events
+    chain.update.assert_not_called()
+    # 2. Bản sửa nhận đúng dữ liệu mới + dòng hiện tại để chụp giá trị cũ
+    assert mock_submit.call_args.kwargs["new_data"]["title"] == "Tên mới"
+    assert mock_submit.call_args.kwargs["current"] is current
+    # 3. Sự kiện vẫn công khai, kèm cờ và bảng so sánh cho giao diện
+    assert result.event_status == "PUBLISHED"
+    assert result.has_pending_revision is True
+    change = result.pending_revision.changes[0]
+    assert (change.label, change.old_text, change.new_text) == (
+        "Tên sự kiện",
+        payload["title"],
+        "Tên mới",
+    )
+
+
+@patch("app.services.event_revision_service.submit_revision")
+@patch("app.services.event_service._validate_capacity_against_registrations")
+@patch("app.services.event_service._registration_counts", return_value={})
+@patch("app.services.event_service._category_map", return_value={})
+@patch("app.services.event_service._get_raw")
+@patch("app.services.event_service.get_supabase")
+def test_huy_su_kien_cong_khai_van_ghi_thang_khong_cho_duyet(
+    mock_get_supabase, mock_get_raw, _cats, _counts, _cap, mock_submit
+):
+    """Huỷ sự kiện là quyết định của Ban tổ chức, không phải nội dung cần duyệt."""
+    current = {
+        "event_id": EVENT_ID,
+        "event_status": "PUBLISHED",
+        "approval_status": "APPROVED",
+        **_full_payload(),
+    }
+    mock_get_raw.return_value = current
+    client, chain = _fake_supabase({**current, "event_status": "CANCELLED"})
+    mock_get_supabase.return_value = client
+
+    event_service.update_event(
+        EVENT_ID, EventUpdate(event_status=EventStatus.CANCELLED), ORGANIZER_ID
+    )
+
+    mock_submit.assert_not_called()
+    assert chain.update.call_args.args[0]["event_status"] == "CANCELLED"
 
 
 @patch("app.services.event_service._get_raw")

@@ -13,6 +13,8 @@ import LoginPage from "./pages/auth/LoginPage.jsx";
 import LandingPage from "./pages/LandingPage.jsx";
 import ManageEvents from "./pages/ManageEventsPage.jsx";
 import MyEventsPage from "./pages/MyEventsPage.jsx";
+import ParticipantDetailPage from "./pages/ParticipantDetailPage.jsx";
+import ParticipantEventsPage from "./pages/ParticipantEventsPage.jsx";
 import OrganizerProfile from "./pages/profile/OrganizerProfile.jsx";
 import StudentProfile from "./pages/profile/StudentProfile.jsx";
 import ResetPasswordPage from "./pages/ResetPasswordPage.jsx";
@@ -28,6 +30,7 @@ import AdminEventReviewsPage from "./pages/admin/AdminEventReviewsPage.jsx";
 import AdminEventReviewDetailPage from "./pages/admin/AdminEventReviewDetailPage.jsx";
 import ExploreEventsPage from "./pages/ExploreEventsPage.jsx";
 import OrganizerHomePage from "./pages/OrganizerHomePage.jsx";
+import AdminEventChangeDetailPage from "./pages/admin/AdminEventChangeDetailPage.jsx";
 import OrganizerHeader from "./components/common/OrganizerHeader.jsx";
 import StudentHeader from "./components/common/StudentHeader.jsx";
 function PlaceholderPage({ title, description, role = "student" }) {
@@ -107,7 +110,7 @@ export default function App() {
           }
         />
         <Route
-          path="/create-event"
+          path="/organizer/create-event"
           element={
             <ProtectedRoute>
               <CreateEvent />
@@ -115,7 +118,7 @@ export default function App() {
           }
         />
         <Route
-          path="/all-events"
+          path="/organizer/all-events"
           element={
             <ProtectedRoute>
               <AllEvents />
@@ -123,19 +126,7 @@ export default function App() {
           }
         />
         <Route
-          path="/participants"
-          element={
-            <ProtectedRoute>
-              <PlaceholderPage
-                role="organizer"
-                title="Quản lý người tham gia"
-                description="Khu vực quản lý danh sách đăng ký và trạng thái check-in đang được hoàn thiện."
-              />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/edit-event/:eventId"
+          path="/organizer/edit-event/:eventId"
           element={
             <ProtectedRoute>
               <EditEvent />
@@ -201,6 +192,24 @@ export default function App() {
           }
         />
 
+        {/* Quản lý người tham gia: chọn sự kiện rồi vào danh sách chi tiết */}
+        <Route
+          path="/organizer/participants"
+          element={
+            <ProtectedRoute>
+              <ParticipantEventsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/organizer/participants/:eventId"
+          element={
+            <ProtectedRoute>
+              <ParticipantDetailPage />
+            </ProtectedRoute>
+          }
+        />
+
         <Route path="/admin">
           <Route
             path="organizer-requests"
@@ -231,6 +240,15 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <AdminEventReviewDetailPage />
+              </ProtectedRoute>
+            }
+          />
+          {/* Duyệt YÊU CẦU CHỈNH SỬA một sự kiện đã công khai */}
+          <Route
+            path="event-changes/:revisionId"
+            element={
+              <ProtectedRoute>
+                <AdminEventChangeDetailPage />
               </ProtectedRoute>
             }
           />

@@ -48,15 +48,15 @@ const ROLE_CONFIG = {
         match: [
           "/organizer/events",
           "/manage-events",
-          "/all-events",
-          "/create-event",
-          "/edit-event",
+          "/organizer/all-events",
+          "/organizer/create-event",
+          "/organizer/edit-event",
         ],
       },
       {
         label: "Quản lý người tham gia",
-        to: "/participants",
-        match: ["/participants", "/check-in"],
+        to: "/organizer/participants",
+        match: ["/organizer/participants", "/organizer/check-in"],
       },
     ],
   },
@@ -108,7 +108,7 @@ export default function RoleHeader({ role, avatarUrl: providedAvatarUrl }) {
   const displayedAvatarUrl = avatarUrl === failedAvatarUrl ? "" : avatarUrl;
   const isAdmin = role === "admin";
   const isOrganizer = role === "organizer";
-  const showCreateAction = isOrganizer && location.pathname !== "/create-event";
+  const showCreateAction = isOrganizer && location.pathname !== "/organizer/create-event";
   const RoleIcon = isAdmin
     ? ShieldCheck
     : isOrganizer
@@ -222,7 +222,7 @@ export default function RoleHeader({ role, avatarUrl: providedAvatarUrl }) {
         <div className="flex items-center justify-self-end gap-2 sm:gap-2.5">
           {showCreateAction && (
             <Link
-              to="/create-event"
+              to="/organizer/create-event"
               className="hidden h-10 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-[0_8px_20px_color-mix(in_oklab,var(--primary)_20%,transparent)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:inline-flex"
             >
               <Plus className="size-4" strokeWidth={2.2} aria-hidden="true" />
@@ -371,7 +371,7 @@ export default function RoleHeader({ role, avatarUrl: providedAvatarUrl }) {
 
             {showCreateAction && (
               <Link
-                to="/create-event"
+                to="/organizer/create-event"
                 onClick={handleNavigation}
                 className="mt-2 inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground sm:hidden"
               >

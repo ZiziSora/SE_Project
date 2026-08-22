@@ -17,9 +17,8 @@ import AdminReviewStatCard from "../../components/AdminEventReview/AdminReviewSt
 import EventReviewQueue from "../../components/AdminEventReview/EventReviewQueue.jsx";
 import AdminHeader from "../../components/common/AdminHeader.jsx";
 import {
-  approveEventReview,
-  getPendingEventReviews,
-  rejectEventReview,
+  decideReviewItem,
+  getReviewQueue,
 } from "../../api/adminEventReviewApi.js";
 
 const PAGE_SIZE = 4;
@@ -27,6 +26,9 @@ const PAGE_SIZE = 4;
 export default function AdminEventReviewsPage() {
   const [events, setEvents] = useState([]);
   const [totalPending, setTotalPending] = useState(0);
+  // Tách riêng để thẻ thống kê nói rõ trong hàng chờ có bao nhiêu sự kiện mới
+  // và bao nhiêu yêu cầu chỉnh sửa.
+  const [pendingChanges, setPendingChanges] = useState(0);
   const [processed, setProcessed] = useState({ approved: 0, rejected: 0 });
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -39,9 +41,10 @@ export default function AdminEventReviewsPage() {
     setIsLoading(true);
     setLoadError("");
     try {
-      const result = await getPendingEventReviews();
+      const result = await getReviewQueue();
       setEvents(result.items);
       setTotalPending(result.total);
+      setPendingChanges(result.changeTotal);
     } catch (error) {
       setLoadError(
         error.response?.data?.detail ||
@@ -61,11 +64,12 @@ export default function AdminEventReviewsPage() {
   const summary = useMemo(
     () => ({
       pending: totalPending,
+      changes: pendingChanges,
       processed: processed.approved + processed.rejected,
       approved: processed.approved,
       rejected: processed.rejected,
     }),
-    [processed, totalPending],
+    [pendingChanges, processed, totalPending],
   );
   const filteredEvents = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLocaleLowerCase("vi");
@@ -73,7 +77,7 @@ export default function AdminEventReviewsPage() {
     return events.filter((event) => {
       const searchableText = [
         event.title,
-        event.id,
+        event.eventId,
         event.organizerName,
         event.organization,
         event.category,
@@ -104,14 +108,16 @@ export default function AdminEventReviewsPage() {
     setIsSubmitting(true);
     try {
       const isApproving = decision.action === "approve";
-      const result = isApproving
-        ? await approveEventReview(decision.event.id)
-        : await rejectEventReview(decision.event.id);
+      // Sự kiện mới và yêu cầu chỉnh sửa đi qua hai API khác nhau
+      const result = await decideReviewItem(decision.event, decision.action);
 
       setEvents((currentEvents) =>
         currentEvents.filter((event) => event.id !== decision.event.id),
       );
       setTotalPending((total) => Math.max(total - 1, 0));
+      if (decision.event.kind === "REVISION") {
+        setPendingChanges((total) => Math.max(total - 1, 0));
+      }
       setProcessed((current) => ({
         ...current,
         [isApproving ? "approved" : "rejected"]:
@@ -163,8 +169,9 @@ export default function AdminEventReviewsPage() {
           </div>
           <aside className="border-l-2 border-[#7c3aed] pl-5 lg:mb-1 lg:justify-self-end lg:max-w-[340px]">
             <p className="text-sm leading-6 text-[#6b6275]">
-              Hàng chờ được đồng bộ trực tiếp từ hệ thống. Mỗi quyết định sẽ
-              cập nhật trạng thái sự kiện ngay sau khi xác nhận.
+              Hàng chờ được đồng bộ trực tiếp từ hệ thống. Sự kiện đang công
+              khai vẫn giữ nguyên nội dung cũ cho tới khi bạn duyệt phần thay
+              đổi.
             </p>
           </aside>
         </section>
@@ -177,7 +184,7 @@ export default function AdminEventReviewsPage() {
           <AdminReviewStatCard
             label="Hàng chờ hiện tại"
             value={summary.pending}
-            helper="Dữ liệu trực tiếp từ hệ thống"
+            helper={`${summary.pending - summary.changes} sự kiện mới · ${summary.changes} yêu cầu sửa`}
             icon={ClipboardList}
             tone="blue"
           />
@@ -220,7 +227,8 @@ export default function AdminEventReviewsPage() {
                 </span>
               </div>
               <p className="mt-1 text-sm text-[#7a7183]">
-                Danh sách sự kiện đang chờ quản trị viên xử lý.
+                Gồm sự kiện mới gửi duyệt và yêu cầu chỉnh sửa sự kiện đang
+                công khai.
               </p>
             </div>
 

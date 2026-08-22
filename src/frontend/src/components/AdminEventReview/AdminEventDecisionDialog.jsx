@@ -9,6 +9,9 @@ export default function AdminEventDecisionDialog({
   onConfirm,
 }) {
   const isRejecting = action === "reject";
+  // Hồ sơ có thể là sự kiện mới, hoặc yêu cầu chỉnh sửa sự kiện đang công khai
+  // — hệ quả của mỗi quyết định khác hẳn nhau nên câu chữ phải khác theo.
+  const isRevision = event?.kind === "REVISION";
 
   useEffect(() => {
     if (!event) return undefined;
@@ -69,19 +72,32 @@ export default function AdminEventDecisionDialog({
           id="admin-review-dialog-title"
           className="mt-5 font-['Cabinet_Grotesk','Manrope',sans-serif] text-2xl font-bold tracking-[-0.035em] text-[#172235]"
         >
-          {isRejecting ? "Từ chối sự kiện?" : "Phê duyệt sự kiện?"}
+          {isRevision
+            ? isRejecting
+              ? "Từ chối thay đổi?"
+              : "Áp dụng thay đổi?"
+            : isRejecting
+              ? "Từ chối sự kiện?"
+              : "Phê duyệt sự kiện?"}
         </h2>
         <p className="mt-2 text-sm leading-6 text-[#6f6678]">
-          {isRejecting
-            ? "Sự kiện sẽ được chuyển về bản nháp để Ban tổ chức chỉnh sửa và gửi duyệt lại."
-            : "Sự kiện sẽ được phép chuyển sang trạng thái công khai cho sinh viên đăng ký."}
+          {isRevision
+            ? isRejecting
+              ? "Sự kiện giữ nguyên nội dung đang công khai. Yêu cầu chỉnh sửa bị huỷ, Ban tổ chức có thể gửi lại yêu cầu khác."
+              : "Nội dung mới sẽ được ghi đè lên sự kiện đang công khai và sinh viên thấy ngay sau đó."
+            : isRejecting
+              ? "Sự kiện sẽ được chuyển về bản nháp để Ban tổ chức chỉnh sửa và gửi duyệt lại."
+              : "Sự kiện sẽ được phép chuyển sang trạng thái công khai cho sinh viên đăng ký."}
         </p>
 
         <div className="mt-5 rounded-xl border border-[#e6e0eb] bg-[#faf9fc] p-4">
           <p className="line-clamp-2 text-sm font-semibold leading-5 text-[#2a2431]">
             {event.title}
           </p>
-          <p className="mt-1 text-xs text-[#857c8d]">{event.id}</p>
+          <p className="mt-1 text-xs text-[#857c8d]">
+            {event.eventId ?? event.id}
+            {isRevision && ` · ${event.changes.length} thay đổi`}
+          </p>
         </div>
 
         <div className="mt-6 flex flex-col-reverse gap-2.5 sm:flex-row sm:justify-end">
@@ -110,7 +126,11 @@ export default function AdminEventDecisionDialog({
             ) : (
               <Check className="size-4" strokeWidth={2.2} aria-hidden="true" />
             )}
-            {isRejecting ? "Xác nhận từ chối" : "Phê duyệt sự kiện"}
+            {isRejecting
+              ? "Xác nhận từ chối"
+              : isRevision
+                ? "Áp dụng thay đổi"
+                : "Phê duyệt sự kiện"}
           </button>
         </div>
       </section>

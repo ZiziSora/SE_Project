@@ -40,3 +40,15 @@ class NotificationType(str, enum.Enum):
     EVENT_CANCELLED = "event_cancelled"
     NEW_EVENT = "new_event"
     WAITLIST_PROMOTED = "waitlist_promoted"
+
+class RevisionStatus(str, enum.Enum):
+    """Trạng thái của một yêu cầu chỉnh sửa sự kiện (bảng `event_revisions`).
+
+    SUPERSEDED: Ban tổ chức gửi bản sửa mới trong khi bản cũ còn đang chờ duyệt,
+    bản cũ được đánh dấu là đã bị thay thế thay vì xoá đi (giữ lịch sử).
+    """
+
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
+    SUPERSEDED = "superseded"
