@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react"
-import { ArrowRight, Eye, Pencil, Trash2 } from "lucide-react"
+import { ArrowRight, Eye, Pencil, QrCode, Trash2 } from "lucide-react"
 import { Link } from "react-router-dom"
 import { toast } from "react-toastify"
 import { cn } from "../lib/utils"
@@ -143,6 +143,14 @@ export function EventsTable() {
 
                     <td className={cn(cellCls, "whitespace-nowrap")}>
                       <div className="flex items-center justify-end gap-3 text-muted-foreground">
+                        <Link
+                          to={`/organizer/events/${row.event_id}/checkin`}
+                          aria-label={`Điểm danh check-in ${row.title}`}
+                          title="Điểm danh Check-in"
+                          className="hover:text-purple-600 text-purple-700 font-bold flex items-center gap-1"
+                        >
+                          <QrCode className="size-4" aria-hidden="true" />
+                        </Link>
                         {row.can_edit && (
                           <Link
                             to={`/edit-event/${row.event_id}`}

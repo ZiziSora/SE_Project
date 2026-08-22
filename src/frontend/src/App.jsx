@@ -28,6 +28,7 @@ import AdminEventReviewsPage from "./pages/admin/AdminEventReviewsPage.jsx";
 import AdminEventReviewDetailPage from "./pages/admin/AdminEventReviewDetailPage.jsx";
 import ExploreEventsPage from "./pages/ExploreEventsPage.jsx";
 import OrganizerHomePage from "./pages/OrganizerHomePage.jsx";
+import OrganizerCheckinPage from "./pages/organizer/OrganizerCheckinPage.jsx";
 import OrganizerHeader from "./components/common/OrganizerHeader.jsx";
 import StudentHeader from "./components/common/StudentHeader.jsx";
 function PlaceholderPage({ title, description, role = "student" }) {
@@ -126,11 +127,15 @@ export default function App() {
           path="/participants"
           element={
             <ProtectedRoute>
-              <PlaceholderPage
-                role="organizer"
-                title="Quản lý người tham gia"
-                description="Khu vực quản lý danh sách đăng ký và trạng thái check-in đang được hoàn thiện."
-              />
+              <ManageEvents />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/organizer/events/:eventId/checkin"
+          element={
+            <ProtectedRoute>
+              <OrganizerCheckinPage />
             </ProtectedRoute>
           }
         />
