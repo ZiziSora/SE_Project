@@ -103,6 +103,14 @@ export const uploadsApi = {
 
 
 export const publicEventApi = {
+  async list(params = {}, options = {}) {
+    const response = await api.get("/api/events", {
+      params: compactParams(params),
+      signal: options.signal,
+    });
+    return response.data;
+  },
+
   async listOngoingEvents() {
     const response = await api.get("/api/events/ongoing");
     return response.data;

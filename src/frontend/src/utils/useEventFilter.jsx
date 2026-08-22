@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { publicEventApi } from '../api/eventApi.js';
 
 export function useEventFilter() {
     const [searchTerm, setSearchTerm] = useState('');
@@ -17,27 +18,24 @@ export function useEventFilter() {
         async function fetchFilteredEvents() {
             try {
                 setLoading(true);
-                const params = new URLSearchParams();
-                if (searchTerm) params.append('search_term', searchTerm);
-                if (selectedFaculty && selectedFaculty !== 'Tất cả') params.append('faculty', selectedFaculty);
-                if (selectedCategory && selectedCategory !== 'Tất cả') params.append('category', selectedCategory);
-                if (sortOption) params.append('sort_by', sortOption);
-                params.append('page', currentPage);
-                params.append('limit', 12);
-
-                const res = await fetch(`http://127.0.0.1:8000/api/events?${params.toString()}`, {
-                    signal: controller.signal,
-                });
-
-                if (!res.ok) return;
-                const data = await res.json();
+                const data = await publicEventApi.list(
+                    {
+                        search_term: searchTerm,
+                        faculty: selectedFaculty === 'Tất cả' ? undefined : selectedFaculty,
+                        category: selectedCategory === 'Tất cả' ? undefined : selectedCategory,
+                        sort_by: sortOption,
+                        page: currentPage,
+                        limit: 12,
+                    },
+                    { signal: controller.signal },
+                );
 
                 if (data && data.events) {
                     setEvents(data.events);
                     setTotalPages(data.total_pages || 1);
                 }
             } catch (err) {
-                if (err.name === 'AbortError') return;
+                if (controller.signal.aborted) return;
                 console.error('Lỗi lọc sự kiện:', err);
             } finally {
                 setLoading(false);
