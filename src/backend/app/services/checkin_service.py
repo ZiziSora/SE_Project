@@ -188,16 +188,53 @@ def process_checkin(
         .first()
     )
 
-    # 1. Verification: Record existence
-    if not qr_record or not qr_record.registration:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Mã QR hoặc mã thủ công không tồn tại trong hệ thống.",
+    registration = None
+    event = None
+    user = None
+
+    if qr_record and qr_record.registration:
+        registration = qr_record.registration
+        event = registration.event
+        user = registration.user
+
+        # Verification: Expiration check for QR/manual token
+        now = datetime.now(timezone.utc)
+        if qr_record.expired_at:
+            exp_dt = _ensure_utc(qr_record.expired_at)
+            if exp_dt and now > exp_dt:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Mã check-in đã hết hạn sử dụng.",
+                )
+    else:
+        # Fallback: Look up registration directly by student_code (MSSV) or email
+        reg_query = (
+            db.query(EventRegistration)
+            .options(
+                joinedload(EventRegistration.user),
+                joinedload(EventRegistration.event),
+            )
+            .join(User, EventRegistration.user_id == User.user_id)
         )
 
-    registration = qr_record.registration
-    event = registration.event
-    user = registration.user
+        if event_id is not None:
+            reg_query = reg_query.filter(EventRegistration.event_id == event_id)
+
+        registration = (
+            reg_query.filter(
+                (func.upper(User.student_code) == clean_code.upper())
+                | (func.upper(User.email) == clean_code.upper())
+            ).first()
+        )
+
+        if not registration or not registration.user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Không tìm thấy đăng ký của sinh viên có mã '{clean_code}' trong hệ thống.",
+            )
+
+        event = registration.event
+        user = registration.user
 
     # Permission check: Caller must be ORGANIZER or ADMIN
     if current_user.role not in (UserRole.ORGANIZER, UserRole.ADMIN):
@@ -207,25 +244,15 @@ def process_checkin(
                 detail="Bạn không có quyền thực hiện check-in cho sự kiện này.",
             )
 
-    # 2. Verification: Expiration check
-    now = datetime.now(timezone.utc)
-    if qr_record.expired_at:
-        exp_dt = _ensure_utc(qr_record.expired_at)
-        if exp_dt and now > exp_dt:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Mã check-in đã hết hạn sử dụng.",
-            )
-
-    # 3. Verification: Event matching check
-    if event_id is not None:
+    # Verification: Event matching check
+    if event_id is not None and registration.event_id is not None:
         if str(registration.event_id) != str(event_id):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Mã vé QR không thuộc về sự kiện đang check-in này.",
             )
 
-    # 4. Verification: Registration status check (Cancelled)
+    # Verification: Registration status check (Cancelled)
     reg_status_str = _format_registration_status(registration.registration_status)
     if reg_status_str == "CANCELLED":
         raise HTTPException(
@@ -233,7 +260,7 @@ def process_checkin(
             detail="Đăng ký tham gia sự kiện này của người dùng đã bị hủy.",
         )
 
-    # 5. Verification: Idempotency check (Already checked in)
+    # Verification: Idempotency check (Already checked in)
     if reg_status_str == "CHECKED_IN":
         checked_time_str = (
             registration.checked_in_at.strftime("%H:%M:%S %d/%m/%Y")
@@ -243,7 +270,7 @@ def process_checkin(
         user_name = user.full_name or user.email if user else "Người dùng"
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"Vé đã được sử dụng check-in trước đó vào lúc {checked_time_str} ({user_name}).",
+            detail=f"Sinh viên {user_name} ({user.student_code or user.email}) đã được check-in trước đó vào lúc {checked_time_str}.",
         )
 
     # Execution: Lock & update registration status atomically
@@ -337,7 +364,7 @@ def get_event_checkin_stats(
             student_code=r.user.student_code if r.user else None,
             registration_status=_format_registration_status(r.registration_status),
             checked_in_at=r.checked_in_at,
-            created_at=r.created_at,
+            created_at=r.created_at or datetime.now(timezone.utc),  # <-- Fallback ở đây
         )
         for r in registrations
     ]

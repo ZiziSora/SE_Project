@@ -140,10 +140,47 @@ def test_process_checkin_manual_code_success(
     assert response.participant.email == "student@university.edu.vn"
 
 
-def test_process_checkin_not_found(mock_db, sample_organizer):
-    mock_db.query.return_value.options.return_value.filter.return_value.first.return_value = (
-        None
+def test_process_checkin_by_student_code_success(
+    mock_db, sample_organizer, sample_registration
+):
+    # First query (EventCheckinQR lookup) returns None
+    # Second query (EventRegistration lookup by MSSV) returns sample_registration
+    mock_query = MagicMock()
+    mock_db.query.return_value = mock_query
+
+    # Configure query chain for QR lookup returning None, then reg lookup returning sample_registration
+    qr_lookup = MagicMock()
+    qr_lookup.options.return_value.filter.return_value.first.return_value = None
+
+    reg_lookup = MagicMock()
+    reg_lookup.options.return_value.join.return_value.filter.return_value.filter.return_value.first.return_value = (
+        sample_registration
     )
+
+    mock_db.query.side_effect = [qr_lookup, reg_lookup, mock_query]
+    mock_query.filter.return_value.with_for_update.return_value.first.return_value = (
+        sample_registration
+    )
+
+    response = process_checkin(
+        db=mock_db,
+        code="20120001",
+        current_user=sample_organizer,
+        event_id=sample_registration.event_id,
+    )
+
+    assert response.success is True
+    assert response.participant.student_code == "20120001"
+    assert response.registration_status == "CHECKED_IN"
+    assert sample_registration.registration_status == RegistrationStatus.CHECKED_IN
+    assert sample_registration.checked_in_at is not None
+
+
+def test_process_checkin_not_found(mock_db, sample_organizer):
+    mock_query = MagicMock()
+    mock_db.query.return_value = mock_query
+    mock_query.options.return_value.filter.return_value.first.return_value = None
+    mock_query.options.return_value.join.return_value.filter.return_value.first.return_value = None
 
     with pytest.raises(HTTPException) as exc_info:
         process_checkin(
@@ -153,7 +190,7 @@ def test_process_checkin_not_found(mock_db, sample_organizer):
         )
 
     assert exc_info.value.status_code == 404
-    assert "Mã QR hoặc mã thủ công không tồn tại" in exc_info.value.detail
+    assert "Không tìm thấy" in exc_info.value.detail
 
 
 def test_process_checkin_expired(
@@ -178,6 +215,7 @@ def test_process_checkin_expired(
 def test_process_checkin_wrong_event(
     mock_db, sample_organizer, sample_registration, sample_qr
 ):
+    sample_qr.registration.event_id = sample_registration.event_id
     mock_db.query.return_value.options.return_value.filter.return_value.first.return_value = (
         sample_qr
     )
@@ -214,4 +252,5 @@ def test_process_checkin_already_checked_in(
         )
 
     assert exc_info.value.status_code == 409
-    assert "Vé đã được sử dụng check-in trước đó" in exc_info.value.detail
+    assert "đã được check-in trước đó" in exc_info.value.detail
+

@@ -462,7 +462,7 @@ export default function QRScannerModal({
             className="space-y-3 pt-2 border-t border-gray-100"
           >
             <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider">
-              Hoặc nhập mã Token / Manual Code
+              Hoặc nhập MSSV / Mã QR Token / Code
             </label>
             <div className="relative flex items-center gap-2">
               <div className="relative flex-1">
@@ -471,7 +471,7 @@ export default function QRScannerModal({
                   type="text"
                   value={qrCodeInput}
                   onChange={(e) => setQrCodeInput(e.target.value)}
-                  placeholder="Nhập mã QR token hoặc mã số..."
+                  placeholder="Nhập MSSV (ví dụ 21110001), mã QR token hoặc mã số..."
                   className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 focus:border-purple-600 focus:bg-white rounded-2xl text-xs font-mono font-bold text-gray-900 transition outline-none"
                   disabled={submitting}
                 />

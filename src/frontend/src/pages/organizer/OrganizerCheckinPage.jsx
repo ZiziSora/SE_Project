@@ -9,6 +9,7 @@ import {
   CheckCircle2,
   AlertTriangle,
   RefreshCw,
+  UserCheck,
 } from "lucide-react";
 import OrganizerHeader from "../../components/common/OrganizerHeader.jsx";
 import QRScannerModal from "../../components/checkin/QRScannerModal.jsx";
@@ -27,6 +28,11 @@ export default function OrganizerCheckinPage() {
   const [statusFilter, setStatusFilter] = useState("ALL"); // 'ALL' | 'CHECKED_IN' | 'REGISTERED'
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [actionLoadingId, setActionLoadingId] = useState(null);
+
+  // Manual Check-in by MSSV states
+  const [mssvInput, setMssvInput] = useState("");
+  const [mssvSubmitting, setMssvSubmitting] = useState(false);
+  const [mssvResult, setMssvResult] = useState(null);
 
   const fetchStats = useCallback(async () => {
     if (!eventId) return;
@@ -47,16 +53,75 @@ export default function OrganizerCheckinPage() {
   }, [eventId]);
 
   useEffect(() => {
-    fetchStats();
-  }, [fetchStats]);
+    let isMounted = true;
+    if (!eventId) return;
 
+    getEventCheckinStats(eventId)
+      .then((data) => {
+        if (isMounted) {
+          setStatsData(data);
+          setError(null);
+        }
+      })
+      .catch((err) => {
+        if (isMounted) {
+          console.error("Lỗi khi tải thông tin điểm danh:", err);
+          setError(
+            err.response?.data?.detail ||
+              "Không thể tải danh sách điểm danh. Vui lòng kiểm tra quyền truy cập."
+          );
+        }
+      })
+      .finally(() => {
+        if (isMounted) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [eventId]);
+
+  const handleDirectMssvCheckin = async (e) => {
+    if (e) e.preventDefault();
+    const cleanMssv = mssvInput.trim();
+    if (!cleanMssv) return;
+
+    try {
+      setMssvSubmitting(true);
+      setMssvResult(null);
+      const res = await processCheckin({
+        eventId,
+        code: cleanMssv,
+      });
+
+      setMssvResult({
+        type: "success",
+        participant: res.participant,
+        checked_in_at: res.checked_in_at,
+      });
+      toast.success(`Đã điểm danh thành công cho ${res.participant?.full_name || cleanMssv}!`);
+      setMssvInput("");
+      fetchStats();
+    } catch (err) {
+      const errMsg = err.response?.data?.detail || "Không thể điểm danh cho sinh viên này.";
+      setMssvResult({
+        type: "error",
+        message: errMsg,
+      });
+      toast.error(errMsg);
+    } finally {
+      setMssvSubmitting(false);
+    }
+  };
 
   const handleManualRowCheckin = async (participant) => {
     try {
       setActionLoadingId(participant.registration_id);
       await processCheckin({
         eventId,
-        code: participant.email || participant.student_code,
+        code: participant.student_code || participant.email,
       });
 
       toast.success(`Đã điểm danh thành công cho ${participant.full_name || participant.email}!`);
@@ -149,7 +214,7 @@ export default function OrganizerCheckinPage() {
                     {statsData?.title || "Sự kiện UniEvent"}
                   </h1>
                   <p className="text-xs text-purple-200/80 mt-1 max-w-xl">
-                    Quét mã QR qua camera thiết bị để xác nhận sinh viên tham dự sự kiện nhanh chóng và chính xác.
+                    Nhập mã số sinh viên (MSSV) để check-in thủ công nhanh chóng hoặc dùng máy quét mã QR từ camera.
                   </p>
                 </div>
 
@@ -161,7 +226,6 @@ export default function OrganizerCheckinPage() {
                   Mở Trình Quét mã QR Check-in
                 </button>
               </div>
-
 
               {/* Stats Counters */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-8 pt-6 border-t border-white/10 relative z-10">
@@ -205,6 +269,81 @@ export default function OrganizerCheckinPage() {
                   </div>
                 </div>
               </div>
+            </div>
+
+            {/* Manual Check-in Card (MSSV) */}
+            <div className="bg-white border border-purple-100 rounded-3xl p-6 shadow-sm mb-8">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+                <div>
+                  <h3 className="text-base font-bold text-gray-900 flex items-center gap-2">
+                    <UserCheck className="w-5 h-5 text-purple-700" />
+                    Điểm danh thủ công bằng Mã số sinh viên (MSSV)
+                  </h3>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Nhập MSSV của sinh viên đến tham dự. Hệ thống sẽ ghi nhận thời gian check-in ngay tại mốc thời điểm này.
+                  </p>
+                </div>
+              </div>
+
+              <form onSubmit={handleDirectMssvCheckin} className="flex flex-col sm:flex-row items-stretch gap-3">
+                <div className="relative flex-1">
+                  <input
+                    type="text"
+                    value={mssvInput}
+                    onChange={(e) => setMssvInput(e.target.value)}
+                    placeholder="Nhập Mã số sinh viên (ví dụ: 21110001)..."
+                    className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 focus:border-purple-600 focus:bg-white rounded-2xl text-xs font-mono font-bold text-gray-900 transition outline-none"
+                    disabled={mssvSubmitting}
+                  />
+                  <UserCheck className="w-4 h-4 text-gray-400 absolute left-3.5 top-3.5" />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={mssvSubmitting || !mssvInput.trim()}
+                  className="px-6 py-3 bg-purple-700 hover:bg-purple-800 disabled:bg-gray-200 disabled:text-gray-400 text-white font-bold text-xs rounded-2xl shadow-md transition flex items-center justify-center gap-2 shrink-0 cursor-pointer"
+                >
+                  {mssvSubmitting ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    "Điểm danh ngay"
+                  )}
+                </button>
+              </form>
+
+              {mssvResult && (
+                <div className="mt-4 animate-in fade-in duration-200">
+                  {mssvResult.type === "success" && (
+                    <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 flex items-center justify-between text-xs text-emerald-900">
+                      <div className="flex items-center gap-3">
+                        <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
+                        <div>
+                          <p className="font-bold text-emerald-950">
+                            {mssvResult.participant?.full_name || mssvResult.participant?.email} (MSSV: {mssvResult.participant?.student_code || "N/A"})
+                          </p>
+                          <p className="text-[11px] text-emerald-700 mt-0.5">
+                            Check-in thành công lúc {new Date(mssvResult.checked_in_at).toLocaleTimeString("vi-VN")} ngày {new Date(mssvResult.checked_in_at).toLocaleDateString("vi-VN")}
+                          </p>
+                        </div>
+                      </div>
+                      <button onClick={() => setMssvResult(null)} className="text-emerald-700 hover:text-emerald-900 text-xs font-bold px-2 py-1 cursor-pointer">
+                        Đóng
+                      </button>
+                    </div>
+                  )}
+                  {mssvResult.type === "error" && (
+                    <div className="bg-red-50 border border-red-200 rounded-2xl p-4 flex items-center justify-between text-xs text-red-900">
+                      <div className="flex items-center gap-3">
+                        <AlertTriangle className="w-5 h-5 text-red-600 shrink-0" />
+                        <p className="font-medium text-red-900">{mssvResult.message}</p>
+                      </div>
+                      <button onClick={() => setMssvResult(null)} className="text-red-700 hover:text-red-900 text-xs font-bold px-2 py-1 cursor-pointer">
+                        Đóng
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* Filter & Search Toolbar */}

@@ -128,10 +128,9 @@ export default function App() {
         />
         <Route
           path="/organizer/edit-event/:eventId"
-          path="/participants"
           element={
             <ProtectedRoute>
-              <ManageEvents />
+              <EditEvent />
             </ProtectedRoute>
           }
         />
