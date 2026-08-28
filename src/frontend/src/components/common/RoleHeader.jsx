@@ -16,7 +16,7 @@ import { toast } from "react-toastify";
 
 import { getMyProfile } from "../../api/profileApi.js";
 import { logoutCurrentSession } from "../../utils/logoutSession.js";
-import NotificationMenu from "../../components/NotificationMenu.jsx"
+import NotificationMenu from "../../components/NotificationMenu.jsx";
 
 const ROLE_CONFIG = {
   student: {
@@ -27,7 +27,6 @@ const ROLE_CONFIG = {
     navItems: [
       { label: "Khám phá", to: "/explore", match: ["/explore", "/events"] },
       { label: "Sự kiện của tôi", to: "/my-events", match: ["/my-events"] },
-      { label: "Lịch sử", to: "/history", match: ["/history"] },
     ],
   },
   organizer: {
@@ -207,11 +206,10 @@ export default function RoleHeader({ role, avatarUrl: providedAvatarUrl }) {
                 to={item.to}
                 onClick={handleNavigation}
                 aria-current={active ? "page" : undefined}
-                className={`rounded-full px-4 py-2 text-[13px] font-semibold transition-all duration-200 xl:px-5 ${
-                  active
+                className={`rounded-full px-4 py-2 text-[13px] font-semibold transition-all duration-200 xl:px-5 ${active
                     ? "bg-accent text-accent-foreground shadow-[inset_0_0_0_1px_color-mix(in_oklab,var(--primary)_8%,transparent)]"
                     : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                }`}
+                  }`}
               >
                 {item.label}
               </Link>
@@ -351,11 +349,10 @@ export default function RoleHeader({ role, avatarUrl: providedAvatarUrl }) {
                   to={item.to}
                   onClick={handleNavigation}
                   aria-current={active ? "page" : undefined}
-                  className={`rounded-xl px-4 py-3 text-sm font-semibold transition-colors ${
-                    active
+                  className={`rounded-xl px-4 py-3 text-sm font-semibold transition-colors ${active
                       ? "bg-accent text-accent-foreground"
                       : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                  }`}
+                    }`}
                 >
                   {item.label}
                 </Link>
