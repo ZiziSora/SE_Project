@@ -16,20 +16,47 @@ export const ATTENDANCE_STATUS = {
   },
   not_checked_in: {
     label: "Chưa điểm danh",
-    className: "border-red-200 bg-red-50 text-red-600",
-    dotClass: "bg-red-500",
+    className: "border-amber-200 bg-amber-50 text-amber-700",
+    dotClass: "bg-amber-500",
+  },
+  waitlisted: {
+    label: "Danh sách chờ",
+    className: "border-yellow-200 bg-yellow-50 text-yellow-700",
+    dotClass: "bg-yellow-500",
+  },
+  cancelled: {
+    label: "Đã hủy",
+    className: "border-rose-200 bg-rose-50 text-rose-700",
+    dotClass: "bg-rose-500",
   },
 };
 
-/** Một người tham gia được coi là đã điểm danh khi backend trả về mốc thời gian check-in. */
+/** 
+ * Kiểm tra trạng thái điểm danh:
+ * Ưu tiên kiểm tra registration_status === 'CHECKED_IN'.
+ */
 export function isCheckedIn(participant) {
-  return Boolean(participant?.checked_in_at);
+  if (!participant) return false;
+  const status = String(participant.registration_status || participant.status || "").toUpperCase();
+  return status === "CHECKED_IN";
 }
 
 export function getAttendanceDisplay(participant) {
-  return isCheckedIn(participant)
-    ? ATTENDANCE_STATUS.checked_in
-    : ATTENDANCE_STATUS.not_checked_in;
+  if (!participant) return ATTENDANCE_STATUS.not_checked_in;
+
+  const status = String(participant.registration_status || participant.status || "").toUpperCase();
+
+  if (status === "CHECKED_IN") {
+    return ATTENDANCE_STATUS.checked_in;
+  }
+  if (status === "WAITLISTED") {
+    return ATTENDANCE_STATUS.waitlisted;
+  }
+  if (status === "CANCELLED") {
+    return ATTENDANCE_STATUS.cancelled;
+  }
+
+  return ATTENDANCE_STATUS.not_checked_in;
 }
 
 /** Lấy chữ cái đầu của họ và tên để làm avatar chữ khi sinh viên chưa có ảnh. */
@@ -46,7 +73,10 @@ function toDate(value) {
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-/** "12/10/2024 14:30" — dùng cho cột Thời gian đăng ký. */
+/** 
+ * "12/10/2024 14:30" — dùng cho cột Thời gian đăng ký.
+ * Hỗ trợ fallback cả registered_at lẫn created_at.
+ */
 export function formatRegisteredAt(value) {
   const date = toDate(value);
   if (!date) return "--";
@@ -99,16 +129,19 @@ export function formatNumber(value) {
   return Number(value ?? 0).toLocaleString("vi-VN");
 }
 
-/** "300 / 300 Người đăng ký" — sự kiện không giới hạn thì bỏ phần mẫu số. */
+/** "300 / 300 Người đăng ký" — hỗ trợ nhiều định dạng field từ backend. */
 export function formatRegisteredCount(event) {
-  const registered = formatNumber(event?.registered_count);
+  const count = event?.registered_count ?? event?.total_registered ?? event?.participant_count ?? 0;
+  const registered = formatNumber(count);
   if (!event?.capacity) return `${registered} Người đăng ký`;
   return `${registered} / ${formatNumber(event.capacity)} Người đăng ký`;
 }
 
 /** Phần trăm lấp đầy cho thanh tiến trình trên thẻ sự kiện (0 - 100). */
 export function getProgressPercent(event) {
-  const registered = Number(event?.registered_count ?? 0);
+  const registered = Number(
+    event?.registered_count ?? event?.total_registered ?? event?.participant_count ?? 0
+  );
   const capacity = Number(event?.capacity ?? 0);
   if (!capacity) return registered > 0 ? 100 : 0;
   return Math.min(100, Math.round((registered / capacity) * 100));
