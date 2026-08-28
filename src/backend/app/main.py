@@ -18,6 +18,7 @@ from app.routers import (
     uploads,
 )
 from app.routers.auth_router import router as auth_router
+from app.routers.checkin_router import router as checkin_router
 from app.routers.my_event import router as history_router
 from app.routers.profile_router import router as user_router
 from app.routers.events import router as events_router
@@ -49,6 +50,7 @@ app.include_router(event_review.router)
 app.include_router(admin_event_revisions.router)
 app.include_router(categories.router)
 app.include_router(uploads.router)
+app.include_router(checkin_router)
 
 
 @app.exception_handler(RequestValidationError)

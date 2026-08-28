@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { CalendarClock, CircleCheck, QrCode, UsersRound } from "lucide-react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import { toast } from "react-toastify";
 
 import ParticipantFilterBar from "../components/Participants/ParticipantFilterBar.jsx";
@@ -16,6 +16,7 @@ const EMPTY_SUMMARY = { total: 0, checked_in: 0, not_checked_in: 0 };
 /** Trang danh sách người tham gia của một sự kiện. */
 export default function ParticipantDetailPage() {
   const { eventId } = useParams();
+  const navigate = useNavigate();
 
   const [event, setEvent] = useState(null);
   const [summary, setSummary] = useState(EMPTY_SUMMARY);
@@ -30,7 +31,6 @@ export default function ParticipantDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [checkingId, setCheckingId] = useState(null);
-  const [isMock, setIsMock] = useState(false);
 
   // Thông tin sự kiện + số liệu tổng quan: chỉ tải lại khi đổi sự kiện
   const loadHeader = useCallback(async () => {
@@ -41,7 +41,6 @@ export default function ParticipantDetailPage() {
       ]);
       setEvent(eventResult);
       setSummary(summaryResult);
-      setIsMock(Boolean(eventResult.is_mock || summaryResult.is_mock));
     } catch (err) {
       console.error("Lỗi tải thông tin sự kiện:", err);
       toast.error("Không tải được thông tin sự kiện.");
@@ -49,9 +48,25 @@ export default function ParticipantDetailPage() {
   }, [eventId]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    loadHeader();
-  }, [loadHeader]);
+    let isSubscribed = true;
+    Promise.all([
+      participantsApi.getEvent(eventId),
+      participantsApi.summary(eventId),
+    ])
+      .then(([eventResult, summaryResult]) => {
+        if (isSubscribed) {
+          setEvent(eventResult);
+          setSummary(summaryResult);
+        }
+      })
+      .catch((err) => {
+        console.error("Lỗi tải thông tin sự kiện:", err);
+      });
+
+    return () => {
+      isSubscribed = false;
+    };
+  }, [eventId]);
 
   // Danh sách người tham gia: tải lại khi đổi bộ lọc / từ khoá / trang
   useEffect(() => {
@@ -88,13 +103,14 @@ export default function ParticipantDetailPage() {
   const handleCheckIn = async (participant) => {
     setCheckingId(participant.registration_id);
     try {
-      const result = await participantsApi.checkIn(eventId, participant.registration_id);
+      const targetCode = participant.student_code || participant.email || participant.registration_id;
+      const result = await participantsApi.checkIn(eventId, targetCode);
 
       // Cập nhật ngay trên giao diện để tránh phải chờ tải lại toàn bộ bảng
       setParticipants((previous) =>
         previous.map((item) =>
           item.registration_id === participant.registration_id
-            ? { ...item, checked_in_at: result.checked_in_at ?? new Date().toISOString() }
+            ? { ...item, checked_in_at: result.checked_in_at ?? new Date().toISOString(), registration_status: "CHECKED_IN" }
             : item,
         ),
       );
@@ -103,10 +119,11 @@ export default function ParticipantDetailPage() {
         checked_in: previous.checked_in + 1,
         not_checked_in: Math.max(0, previous.not_checked_in - 1),
       }));
-      toast.success(`Đã điểm danh cho ${participant.full_name}`);
+      loadHeader();
+      toast.success(`Đã điểm danh cho ${participant.full_name || participant.email}`);
     } catch (err) {
       console.error("Lỗi điểm danh:", err);
-      toast.error("Không điểm danh được. Vui lòng thử lại.");
+      toast.error(err.response?.data?.detail || "Không điểm danh được. Vui lòng thử lại.");
     } finally {
       setCheckingId(null);
     }
@@ -133,21 +150,15 @@ export default function ParticipantDetailPage() {
               {event?.title ?? "Đang tải sự kiện..."}
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">Quản lý người tham gia</p>
-            {isMock && (
-              <p className="mt-2 inline-flex rounded-md bg-yellow-100 px-2.5 py-1 font-mono text-xs font-medium text-yellow-700">
-                Đang hiển thị dữ liệu mẫu — API chưa sẵn sàng
-              </p>
-            )}
           </header>
 
-          {/* Quét QR sẽ được nối sau khi backend hoàn thiện endpoint check-in */}
           <button
             type="button"
-            onClick={() => toast.info("Tính năng quét QR điểm danh đang được phát triển.")}
-            className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-primary px-5 py-3 font-mono text-sm font-semibold uppercase tracking-wide text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
+            onClick={() => navigate(`/organizer/events/${eventId}/checkin`)}
+            className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-purple-700 hover:bg-purple-800 px-5 py-3 font-mono text-sm font-semibold uppercase tracking-wide text-white shadow-sm transition-colors"
           >
             <QrCode className="size-4" aria-hidden="true" />
-            Quét QR điểm danh
+            Trang Điểm danh & Quét QR
           </button>
         </div>
 
