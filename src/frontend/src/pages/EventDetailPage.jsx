@@ -165,7 +165,10 @@ export function EventDetailPage() {
           await publicEventApi.getRegistrationStatus(currentEventId);
         if (isMounted) {
           setCount(status.count);
-          setRegistered(status.registered);
+          setRegistered(
+            Boolean(status.registered) &&
+              String(status.status || "").toUpperCase() !== "CANCELLED",
+          );
         }
       } catch (err) {
         console.error("Lỗi khi tải trạng thái đăng ký:", err);
@@ -297,11 +300,17 @@ export function EventDetailPage() {
       setFeedback(
         result.already_registered
           ? { type: "info", message: "Bạn đã đăng ký sự kiện này từ trước!" }
-          : {
-              type: "success",
-              message:
-                "Đăng ký thành công! Bạn đã giữ được chỗ tham gia sự kiện.",
-            },
+          : result.is_waitlisted
+            ? {
+                type: "warning",
+                message:
+                  "Sự kiện đã hết chỗ chính thức. Bạn đã được thêm vào Danh sách chờ (WAITLISTED)!",
+              }
+            : {
+                type: "success",
+                message:
+                  "Đăng ký thành công! Bạn đã giữ được chỗ tham gia sự kiện.",
+              },
       );
     } catch (err) {
       if (err.response?.status === 401) {

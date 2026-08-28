@@ -21,6 +21,7 @@ export default function RegistrationEventCard({
   const effectiveStatus = getEffectiveStatus(item);
 
   const isCancelled = effectiveStatus === "CANCELLED";
+  const isWaitlisted = effectiveStatus === "WAITLISTED";
   const isAttended = effectiveStatus === "ATTENDED";
   const isAbsent = effectiveStatus === "ABSENT";
   const isUpcoming = effectiveStatus === "REGISTERED";
@@ -59,6 +60,11 @@ export default function RegistrationEventCard({
               {isCancelled && (
                 <span className="bg-red-100 text-red-700 text-[10px] font-bold px-2 py-0.5 rounded-md">
                   Đã hủy đăng ký
+                </span>
+              )}
+              {isWaitlisted && (
+                <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1">
+                  <Clock className="w-3 h-3 text-amber-600" /> Danh sách chờ
                 </span>
               )}
               {isAttended && (
@@ -106,6 +112,34 @@ export default function RegistrationEventCard({
               <CheckCircle2 className="w-4 h-4 text-emerald-600" />
               Xem Vé QR (Đã điểm danh)
             </button>
+          ) : isWaitlisted ? (
+            <>
+              <button
+                onClick={() => setIsQrModalOpen(true)}
+                className="w-full text-xs font-semibold py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 transition bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 cursor-pointer"
+              >
+                <Clock className="w-4 h-4 text-amber-600" />
+                Danh sách chờ (Xem vé)
+              </button>
+
+              {canCancel ? (
+                <button
+                  onClick={() => onSelectCancel(item)}
+                  title="Hủy đăng ký"
+                  className="px-3 py-2.5 border border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 rounded-xl transition text-xs font-semibold flex items-center gap-1 shrink-0 active:scale-[0.98]"
+                >
+                  Hủy
+                </button>
+              ) : (
+                <button
+                  disabled
+                  title="Thời hạn hủy đăng ký đã hết (phải trước 5 ngày khi sự kiện diễn ra)"
+                  className="px-3 py-2.5 border border-gray-200 text-gray-400 bg-gray-100 rounded-xl transition text-xs font-semibold flex items-center gap-1 shrink-0 cursor-not-allowed whitespace-nowrap"
+                >
+                  Hết hạn hủy
+                </button>
+              )}
+            </>
           ) : isAbsent ? (
             <button
               disabled

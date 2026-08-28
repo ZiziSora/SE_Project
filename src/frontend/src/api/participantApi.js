@@ -95,12 +95,23 @@ export const participantsApi = {
   },
 
   /** Điểm danh thủ công cho một lượt đăng ký. */
-  async checkIn(eventId, codeOrStudentCode) {
-    const response = await api.post("/api/checkin", {
-      event_id: eventId,
-      code: codeOrStudentCode,
-    });
-    return { ...response.data, is_mock: false };
+  async checkIn(eventId, codeOrStudentCode, registrationId = null) {
+    try {
+      const response = await api.post(`/api/checkin/events/${eventId}/manual`, {
+        registration_id: registrationId || undefined,
+        code: codeOrStudentCode,
+      });
+      return { ...response.data, is_mock: false };
+    } catch (err) {
+      if (err.response?.status === 404 || err.response?.status === 405) {
+        const response = await api.post("/api/checkin", {
+          event_id: eventId,
+          code: codeOrStudentCode,
+        });
+        return { ...response.data, is_mock: false };
+      }
+      throw err;
+    }
   },
 };
 

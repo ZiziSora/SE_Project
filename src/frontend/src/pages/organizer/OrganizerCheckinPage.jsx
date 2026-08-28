@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import OrganizerHeader from "../../components/common/OrganizerHeader.jsx";
 import QRScannerModal from "../../components/checkin/QRScannerModal.jsx";
-import { getEventCheckinStats, processCheckin } from "../../api/checkinApi.js";
+import { getEventCheckinStats, manualCheckin } from "../../api/checkinApi.js";
 import { toast } from "react-toastify";
 
 export default function OrganizerCheckinPage() {
@@ -91,8 +91,9 @@ export default function OrganizerCheckinPage() {
     try {
       setMssvSubmitting(true);
       setMssvResult(null);
-      const res = await processCheckin({
+      const res = await manualCheckin({
         eventId,
+        studentCode: cleanMssv,
         code: cleanMssv,
       });
 
@@ -119,9 +120,11 @@ export default function OrganizerCheckinPage() {
   const handleManualRowCheckin = async (participant) => {
     try {
       setActionLoadingId(participant.registration_id);
-      await processCheckin({
+      await manualCheckin({
         eventId,
-        code: participant.student_code || participant.email,
+        registrationId: participant.registration_id,
+        studentCode: participant.student_code,
+        code: participant.email || participant.student_code,
       });
 
       toast.success(`Đã điểm danh thành công cho ${participant.full_name || participant.email}!`);

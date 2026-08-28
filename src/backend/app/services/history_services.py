@@ -4,10 +4,12 @@ from datetime import datetime, timedelta, timezone
 from uuid import UUID
 
 from fastapi import HTTPException, status
+from sqlalchemy import String, cast
 from sqlalchemy.orm import Session, joinedload
 
+from app.core.supabase_client import get_supabase
+from app.models.enum import NotificationType, RegistrationStatus
 from app.models.event import Event
-from app.models.enum import RegistrationStatus
 from app.models.registration import EventRegistration
 from app.models.user import User
 from app.schemas.history import (
@@ -17,6 +19,107 @@ from app.schemas.history import (
     HistoryEventResponse,
     HistoryResponse,
 )
+from app.services import notification_service
+
+
+def promote_next_waitlisted_participant(
+    db: Session,
+    event_id: UUID,
+    event_title: str | None = None,
+) -> EventRegistration | None:
+    """Tự động chuyển sinh viên đầu tiên ở danh sách chờ sang danh sách chính thức khi có slot trống."""
+    next_waitlist_reg = None
+    try:
+        next_waitlist_reg = (
+            db.query(EventRegistration)
+            .options(joinedload(EventRegistration.event))
+            .filter(
+                EventRegistration.event_id == event_id,
+                cast(EventRegistration.registration_status, String).in_([
+                    "WAITLISTED",
+                    "waitlisted",
+                    "WAITLIST",
+                ]),
+            )
+            .order_by(EventRegistration.created_at.asc())
+            .first()
+        )
+    except Exception:
+        next_waitlist_reg = (
+            db.query(EventRegistration)
+            .options(joinedload(EventRegistration.event))
+            .filter(
+                EventRegistration.event_id == event_id,
+                EventRegistration.registration_status.in_([
+                    RegistrationStatus.WAITLISTED,
+                    "waitlisted",
+                    "WAITLISTED",
+                    "WAITLIST",
+                ]),
+            )
+            .order_by(EventRegistration.created_at.asc())
+            .first()
+        )
+
+    promoted_user_id = None
+    promoted_reg_id = None
+
+    if next_waitlist_reg:
+        next_waitlist_reg.registration_status = RegistrationStatus.REGISTERED
+        db.commit()
+        db.refresh(next_waitlist_reg)
+        promoted_user_id = str(next_waitlist_reg.user_id)
+        promoted_reg_id = str(next_waitlist_reg.registration_id)
+    else:
+        # Search via Supabase REST API in case registration was saved via REST
+        try:
+            sp = get_supabase()
+            res = (
+                sp.table("event_registrations")
+                .select("registration_id, user_id")
+                .eq("event_id", str(event_id))
+                .in_("registration_status", ["WAITLISTED", "waitlisted", "WAITLIST"])
+                .order("created_at", desc=False)
+                .limit(1)
+                .execute()
+            )
+            if res.data and len(res.data) > 0:
+                target_reg = res.data[0]
+                promoted_reg_id = target_reg["registration_id"]
+                promoted_user_id = target_reg["user_id"]
+                sp.table("event_registrations").update({
+                    "registration_status": "REGISTERED"
+                }).eq("registration_id", promoted_reg_id).execute()
+        except Exception:
+            pass
+
+    if not promoted_user_id:
+        return None
+
+    # Sync Supabase status as well
+    try:
+        if promoted_reg_id:
+            get_supabase().table("event_registrations").update({
+                "registration_status": "REGISTERED"
+            }).eq("registration_id", promoted_reg_id).execute()
+    except Exception:
+        pass
+
+    display_title = event_title or (
+        next_waitlist_reg.event.title if (next_waitlist_reg and next_waitlist_reg.event) else "Sự kiện"
+    )
+    try:
+        notification_service.create_notification(
+            user_id=promoted_user_id,
+            event_id=str(event_id),
+            notification_type=NotificationType.WAITLIST_PROMOTED,
+            title="Bạn đã được nhận suất tham gia chính thức!",
+            content=f'Một vị trí đã trống và bạn đã được tự động chuyển từ Danh sách chờ sang Danh sách chính thức cho sự kiện "{display_title}".',
+        )
+    except Exception:
+        pass
+
+    return next_waitlist_reg
 
 
 def _enum_name(value: object | None) -> str | None:
@@ -33,6 +136,8 @@ def _registration_status_name(value: object | None) -> str | None:
     status_name = getattr(value, "name", str(value)).upper().replace("-", "_")
     if status_name == "CHECK_IN":
         return "CHECKED_IN"
+    if status_name in ("WAITLIST", "WAITLISTED"):
+        return "WAITLISTED"
     return status_name
 
 
@@ -139,9 +244,14 @@ def cancel_registration_service(
                     ),
                 )
 
+        old_status_name = _registration_status_name(registration.registration_status)
         registration.registration_status = RegistrationStatus.CANCELLED
         db.commit()
         db.refresh(registration)
+
+        if old_status_name in ("REGISTERED", "CHECKED_IN"):
+            event_title = registration.event.title if registration.event else None
+            promote_next_waitlisted_participant(db, registration.event_id, event_title)
 
         return CancelRegistrationResponse(
             message="Registration cancelled successfully",

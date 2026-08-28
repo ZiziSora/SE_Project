@@ -139,6 +139,7 @@ export default function MyEventsPage() {
     const rawStatus = (item.registration_status || "REGISTERED").toUpperCase();
 
     if (rawStatus === "CANCELLED") return "CANCELLED";
+    if (rawStatus === "WAITLISTED" || rawStatus === "WAITLIST") return "WAITLISTED";
     if (rawStatus === "CHECKED_IN" || rawStatus === "ATTENDED" || rawStatus === "CHECK_IN") {
       return "ATTENDED";
     }
@@ -174,7 +175,7 @@ export default function MyEventsPage() {
 
   const filteredRegistrations = registrations.filter((item) => {
     const status = getEffectiveStatus(item);
-    if (activeTab === "Sắp diễn ra") return status === "REGISTERED";
+    if (activeTab === "Sắp diễn ra") return status === "REGISTERED" || status === "WAITLISTED";
     if (activeTab === "Đã tham gia") return status === "ATTENDED";
     if (activeTab === "Vắng mặt") return status === "ABSENT";
     if (activeTab === "Đã hủy") return status === "CANCELLED";
