@@ -1,4 +1,9 @@
+from datetime import datetime
+from typing import Optional
+
 from pydantic import BaseModel
+
+from app.schemas.event import EventOut
 
 
 class SavedEventStatusOut(BaseModel):
@@ -12,3 +17,10 @@ class SaveEventResponseOut(BaseModel):
 
 class RemoveSavedEventResponseOut(BaseModel):
     removed: bool
+
+
+class SavedEventOut(BaseModel):
+    event_id: str
+    student_id: str
+    saved_at: Optional[datetime] = None
+    events: Optional[EventOut] = None

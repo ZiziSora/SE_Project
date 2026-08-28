@@ -54,6 +54,14 @@ export const eventsApi = {
     return response.data;
   },
 
+  async sendReminder(eventId, payload) {
+    const response = await api.post(
+      `/api/organizer/events/${eventId}/reminders`,
+      payload,
+    );
+    return response.data
+  },
+
   /** Rút lại yêu cầu chỉnh sửa đang chờ Admin duyệt. */
   async cancelRevision(eventId) {
     const response = await api.delete(
@@ -95,6 +103,14 @@ export const uploadsApi = {
 
 
 export const publicEventApi = {
+  async list(params = {}, options = {}) {
+    const response = await api.get("/api/events", {
+      params: compactParams(params),
+      signal: options.signal,
+    });
+    return response.data;
+  },
+
   async listOngoingEvents() {
     const response = await api.get("/api/events/ongoing");
     return response.data;
@@ -104,6 +120,11 @@ export const publicEventApi = {
     const response = await api.get("/api/events/recommendations", {
       params: { limit },
     });
+    return response.data;
+  },
+
+  async listSavedEvents() {
+    const response = await api.get("/api/events/saved");
     return response.data;
   },
 

@@ -9,6 +9,7 @@ from app.schemas.recommendation import RecommendationsOut
 from app.schemas.registration import RegisterResponseOut, RegistrationStatusOut
 from app.schemas.saved_event import (
     RemoveSavedEventResponseOut,
+    SavedEventOut,
     SavedEventStatusOut,
     SaveEventResponseOut,
 )
@@ -65,6 +66,13 @@ def read_recommendations(
     )
 
 
+@router.get("/saved", response_model=list[SavedEventOut])
+def read_saved_events(
+    current_user: User = Depends(require_current_user),
+) -> list[SavedEventOut]:
+    return saved_event_service.list_saved_events(current_user.id)
+
+
 @router.get("/{event_id}", response_model=EventOut)
 def read_event(event_id: str) -> EventOut:
     event = event_service.get_event_by_id(event_id)
@@ -119,7 +127,11 @@ def register_for_event(
             detail="Sự kiện đã đủ số lượng đăng ký.",
         )
 
-    already_registered = registration_service.register_user(event_id, current_user.id)
+    already_registered = registration_service.register_user(
+        event_id,
+        current_user.id,
+        event.title,
+    )
     if not already_registered:
         count += 1
 

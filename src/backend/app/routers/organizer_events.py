@@ -13,7 +13,8 @@ from app.schemas.organizer_event import (
     OrganizerEventOut,
     StatsOut,
 )
-from app.services import event_service
+from app.schemas.notification import EventReminderIn, EventReminderOut
+from app.services import event_service, notification_service
 
 router = APIRouter(prefix="/api/organizer/events", tags=["organizer_events"])
 
@@ -47,6 +48,25 @@ def get_stats(current_user: User = Depends(require_approved_organizer)):
 @router.get("/locations", response_model=list[str], summary="Gợi ý địa điểm")
 def list_locations(_current_user: User = Depends(require_approved_organizer)):
     return event_service.list_locations()
+
+
+@router.post(
+    "/{event_id}/reminders",
+    response_model=EventReminderOut,
+    status_code=status.HTTP_201_CREATED,
+    summary="Gửi thông báo nhắc lịch cho sinh viên đã đăng ký",
+)
+def send_event_reminder(
+    event_id: str,
+    payload: EventReminderIn,
+    current_user: User = Depends(require_approved_organizer),
+):
+    return notification_service.send_event_reminder(
+        event_id=event_id,
+        organizer_id=str(current_user.user_id),
+        title=payload.title,
+        content=payload.content,
+    )
 
 
 @router.get(

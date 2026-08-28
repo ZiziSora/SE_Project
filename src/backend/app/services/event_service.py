@@ -12,6 +12,7 @@ from postgrest.exceptions import APIError
 
 from app.core.config import TABLE_CATEGORIES, TABLE_EVENTS, TABLE_REGISTRATIONS
 from app.core.supabase_client import get_supabase
+from app.models.enum import NotificationType
 from app.schemas.category import CategoryOut
 from app.schemas.event_revision import EventRevisionOut
 from app.schemas.event import EventOut as PublicEventOut
@@ -25,6 +26,7 @@ from app.schemas.organizer_event import (
     StatsOut,
     missing_required_fields,
 )
+from app.services import notification_service
 
 # Trạng thái Organizer được phép mở form sửa.
 # ONGOING không nằm ở đây: sự kiện đã bắt đầu thì mọi thay đổi (giờ, địa điểm,
@@ -264,14 +266,71 @@ def get_event(event_id: str, organizer_id: str) -> OrganizerEventOut:
 
 
 def get_event_by_id(event_id: str) -> Optional[PublicEventOut]:
-    """Return the public event representation using the shared event lookup."""
-    row = _find_raw(event_id)
-    if row is None:
+    """Return an event only when it is approved and publicly published."""
+    sb = get_supabase()
+    query = (
+        sb
+        .table(TABLE_EVENTS)
+        .select("*")
+        .eq("event_id", event_id)
+        .eq("event_status", DB_PUBLISHED)
+        .eq("approval_status", DB_APPROVAL_APPROVED)
+        .limit(1)
+    )
+    rows: list[dict[str, Any]] = _run(query).data or []
+    if not rows:
         return None
 
+    row = rows[0]
     data = dict(row)
     data["category_name"] = _category_map().get(row.get("category_id"))
+    data["organizer"] = _public_organizer_profile(sb, row.get("organizer_id"))
     return PublicEventOut(**data)
+
+
+def _public_organizer_profile(sb: Any, organizer_id: Any) -> Optional[dict[str, Any]]:
+    """Build the safe, public portion of an organizer profile."""
+    if not organizer_id:
+        return None
+
+    user_query = (
+        sb.table("users")
+        .select(
+            "user_id, full_name, avatar_url, department_name, "
+            "organization_type_id, organization_description, "
+            "contact_phone, office_address"
+        )
+        .eq("user_id", str(organizer_id))
+        .limit(1)
+    )
+    users: list[dict[str, Any]] = _run(user_query).data or []
+    if not users:
+        return None
+
+    user = users[0]
+    organization_type = None
+    organization_type_id = user.get("organization_type_id")
+    if organization_type_id:
+        type_query = (
+            sb.table("organization_types")
+            .select("name")
+            .eq("organization_type_id", str(organization_type_id))
+            .limit(1)
+        )
+        organization_types: list[dict[str, Any]] = _run(type_query).data or []
+        if organization_types:
+            organization_type = organization_types[0].get("name")
+
+    return {
+        "organizer_id": str(organizer_id),
+        "name": user.get("full_name"),
+        "avatar_url": user.get("avatar_url"),
+        "department_name": user.get("department_name"),
+        "organization_type": organization_type,
+        "description": user.get("organization_description"),
+        "contact_phone": user.get("contact_phone"),
+        "office_address": user.get("office_address"),
+    }
 
 
 def list_ongoing_events() -> list[PublicEventOut]:
@@ -404,6 +463,17 @@ def update_event(
     data.pop("event_status", None)
     target_status = (
         payload.event_status.value if payload.event_status is not None else None
+    )
+    location_changed = (
+        "location" in data and data["location"] != current.get("location")
+    )
+    time_changed = any(
+        field in data and data[field] != current.get(field)
+        for field in ("start_time", "end_time")
+    )
+    is_newly_cancelled = (
+        target_status == EventStatus.CANCELLED.value
+        and current_status != EventStatus.CANCELLED.value
     )
 
     if not data and target_status is None:
@@ -630,8 +700,9 @@ def _registration_counts(event_ids: list[str]) -> dict[str, int]:
         res = (
             get_supabase()
             .table(TABLE_REGISTRATIONS)
-            .select("event_id")
+            .select("event_id, registration_status")
             .in_("event_id", ids)
+            .neq("registration_status", "CANCELLED")
             .execute()
         )
     except Exception:  # noqa: BLE001

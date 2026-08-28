@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import {
-  Bell,
   Building2,
   ChevronDown,
   GraduationCap,
@@ -17,6 +16,7 @@ import { toast } from "react-toastify";
 
 import { getMyProfile } from "../../api/profileApi.js";
 import { logoutCurrentSession } from "../../utils/logoutSession.js";
+import NotificationMenu from "../../components/NotificationMenu.jsx"
 
 const ROLE_CONFIG = {
   student: {
@@ -181,7 +181,7 @@ export default function RoleHeader({ role, avatarUrl: providedAvatarUrl }) {
   };
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border/90 bg-card/90 font-['Geist',ui-sans-serif,system-ui] backdrop-blur-xl">
+    <header className="sticky top-0 z-50 w-full border-b border-border/90 bg-card/90 font-inter backdrop-blur-xl">
       <div className="mx-auto flex h-16 w-full max-w-[1440px] items-center justify-between gap-4 px-4 sm:h-[72px] sm:px-8 lg:grid lg:grid-cols-[1fr_auto_1fr] lg:px-12 xl:px-16">
         <Link
           to={config.logoTo}
@@ -230,14 +230,7 @@ export default function RoleHeader({ role, avatarUrl: providedAvatarUrl }) {
             </Link>
           )}
 
-          <button
-            type="button"
-            aria-label="Thông báo"
-            className="relative grid size-10 cursor-pointer place-items-center rounded-full border border-border bg-card text-muted-foreground shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-          >
-            <Bell className="size-[18px]" strokeWidth={2} aria-hidden="true" />
-            <span className="absolute right-[9px] top-[8px] size-1.5 rounded-full bg-primary ring-2 ring-card" />
-          </button>
+          <NotificationMenu tone="neutral" />
 
           <div ref={accountMenuRef} className="relative">
             <button

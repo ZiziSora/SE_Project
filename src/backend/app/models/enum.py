@@ -36,9 +36,15 @@ class ApprovalStatus(str, enum.Enum):
 
 
 class NotificationType(str, enum.Enum):
+    REGISTRATION_CONFIRMED = "registration_confirmed"
+    REGISTRATION_CANCELLED = "registration_cancelled"
     EVENT_UPDATED = "event_updated"
     EVENT_CANCELLED = "event_cancelled"
+    EVENT_REMINDER = "event_reminder"
+    EVENT_LOCATION_CHANGED = "event_location_changed"
+    EVENT_TIME_CHANGED = "event_time_changed"
     NEW_EVENT = "new_event"
+    WAITLIST_JOINED = "waitlist_joined"
     WAITLIST_PROMOTED = "waitlist_promoted"
 
 class RevisionStatus(str, enum.Enum):

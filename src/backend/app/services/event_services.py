@@ -10,8 +10,14 @@ def get_filtered_events_service(
     limit: int = 10
 ) -> Dict[str, Any]:
     
-    # Step 1: base query for events
-    builder = supabase.table('events').select('*')
+    # Explore is public: only events approved by an Admin and published by the
+    # platform may continue through the search/filter/pagination pipeline.
+    builder = (
+        supabase.table('events')
+        .select('*')
+        .eq('event_status', 'PUBLISHED')
+        .eq('approval_status', 'APPROVED')
+    )
 
     # Step 2: search by title using ILIKE
     if search_term:
