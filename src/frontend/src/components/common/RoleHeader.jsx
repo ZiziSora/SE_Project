@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import {
-  Bell,
   Building2,
   ChevronDown,
   GraduationCap,
@@ -17,6 +16,7 @@ import { toast } from "react-toastify";
 
 import { getMyProfile } from "../../api/profileApi.js";
 import { logoutCurrentSession } from "../../utils/logoutSession.js";
+import NotificationMenu from "../../components/NotificationMenu.jsx"
 
 const ROLE_CONFIG = {
   student: {
@@ -48,15 +48,15 @@ const ROLE_CONFIG = {
         match: [
           "/organizer/events",
           "/manage-events",
-          "/all-events",
-          "/create-event",
-          "/edit-event",
+          "/organizer/all-events",
+          "/organizer/create-event",
+          "/organizer/edit-event",
         ],
       },
       {
         label: "Quản lý người tham gia",
-        to: "/participants",
-        match: ["/participants", "/check-in"],
+        to: "/organizer/participants",
+        match: ["/organizer/participants", "/organizer/check-in"],
       },
     ],
   },
@@ -108,7 +108,7 @@ export default function RoleHeader({ role, avatarUrl: providedAvatarUrl }) {
   const displayedAvatarUrl = avatarUrl === failedAvatarUrl ? "" : avatarUrl;
   const isAdmin = role === "admin";
   const isOrganizer = role === "organizer";
-  const showCreateAction = isOrganizer && location.pathname !== "/create-event";
+  const showCreateAction = isOrganizer && location.pathname !== "/organizer/create-event";
   const RoleIcon = isAdmin
     ? ShieldCheck
     : isOrganizer
@@ -181,7 +181,7 @@ export default function RoleHeader({ role, avatarUrl: providedAvatarUrl }) {
   };
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border/90 bg-card/90 font-['Geist',ui-sans-serif,system-ui] backdrop-blur-xl">
+    <header className="sticky top-0 z-50 w-full border-b border-border/90 bg-card/90 font-inter backdrop-blur-xl">
       <div className="mx-auto flex h-16 w-full max-w-[1440px] items-center justify-between gap-4 px-4 sm:h-[72px] sm:px-8 lg:grid lg:grid-cols-[1fr_auto_1fr] lg:px-12 xl:px-16">
         <Link
           to={config.logoTo}
@@ -222,7 +222,7 @@ export default function RoleHeader({ role, avatarUrl: providedAvatarUrl }) {
         <div className="flex items-center justify-self-end gap-2 sm:gap-2.5">
           {showCreateAction && (
             <Link
-              to="/create-event"
+              to="/organizer/create-event"
               className="hidden h-10 items-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-[0_8px_20px_color-mix(in_oklab,var(--primary)_20%,transparent)] transition-all duration-200 hover:-translate-y-0.5 hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary sm:inline-flex"
             >
               <Plus className="size-4" strokeWidth={2.2} aria-hidden="true" />
@@ -230,14 +230,7 @@ export default function RoleHeader({ role, avatarUrl: providedAvatarUrl }) {
             </Link>
           )}
 
-          <button
-            type="button"
-            aria-label="Thông báo"
-            className="relative grid size-10 cursor-pointer place-items-center rounded-full border border-border bg-card text-muted-foreground shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-          >
-            <Bell className="size-[18px]" strokeWidth={2} aria-hidden="true" />
-            <span className="absolute right-[9px] top-[8px] size-1.5 rounded-full bg-primary ring-2 ring-card" />
-          </button>
+          <NotificationMenu tone="neutral" />
 
           <div ref={accountMenuRef} className="relative">
             <button
@@ -371,7 +364,7 @@ export default function RoleHeader({ role, avatarUrl: providedAvatarUrl }) {
 
             {showCreateAction && (
               <Link
-                to="/create-event"
+                to="/organizer/create-event"
                 onClick={handleNavigation}
                 className="mt-2 inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-primary-foreground sm:hidden"
               >

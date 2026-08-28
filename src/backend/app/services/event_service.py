@@ -4,7 +4,7 @@
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
 from fastapi import HTTPException, status
@@ -12,8 +12,11 @@ from postgrest.exceptions import APIError
 
 from app.core.config import TABLE_CATEGORIES, TABLE_EVENTS, TABLE_REGISTRATIONS
 from app.core.supabase_client import get_supabase
+from app.models.enum import NotificationType
 from app.schemas.category import CategoryOut
+from app.schemas.event_revision import EventRevisionOut
 from app.schemas.event import EventOut as PublicEventOut
+from app.services import event_revision_service
 from app.schemas.organizer_event import (
     EventCreate,
     EventListOut,
@@ -23,35 +26,33 @@ from app.schemas.organizer_event import (
     StatsOut,
     missing_required_fields,
 )
+from app.services import notification_service
 
-# Trạng thái Organizer được phép mở form sửa
+# Trạng thái Organizer được phép mở form sửa.
+# ONGOING không nằm ở đây: sự kiện đã bắt đầu thì mọi thay đổi (giờ, địa điểm,
+# sức chứa...) đều gây rối cho người đang tham dự.
 EDITABLE_STATUSES = {
     EventStatus.DRAFT.value,
     EventStatus.PENDING.value,
     EventStatus.PUBLISHED.value,
+}
+
+# Sự kiện đã công khai nhưng CHƯA bắt đầu: sửa xong PHẢI quay lại chờ Admin duyệt lại
+REAPPROVAL_STATUSES = {EventStatus.PUBLISHED.value}
+
+# Sự kiện đang diễn ra / đã đóng: khoá hoàn toàn, không sửa nội dung cũng không
+# đổi trạng thái (kể cả huỷ) và không xoá được.
+LOCKED_STATUSES = {
     EventStatus.ONGOING.value,
+    EventStatus.ENDED.value,
+    EventStatus.CANCELLED.value,
 }
 
-# Sự kiện đã công khai: sửa xong PHẢI quay lại chờ Admin duyệt lại
-REAPPROVAL_STATUSES = {EventStatus.PUBLISHED.value, EventStatus.ONGOING.value}
-
-# Sự kiện đã đóng: không còn gì để duyệt lại nên khoá luôn
-LOCKED_STATUSES = {EventStatus.ENDED.value, EventStatus.CANCELLED.value}
-
-# Các cột thuộc "nội dung sự kiện". Chỉ khi một trong số này thay đổi thì mới
-# cần duyệt lại — đổi riêng event_status thì không tính.
-CONTENT_FIELDS = {
-    "title",
-    "category_id",
-    "location",
-    "start_time",
-    "end_time",
-    "registration_deadline",
-    "capacity",
-    "description",
-    "banner_url",
-    "file_url",
-}
+# Các cột thuộc "nội dung sự kiện" — chỉ khi một trong số này đổi thì mới cần
+# duyệt lại; đổi riêng event_status thì không tính. Danh sách nằm ở
+# `event_revision_service.REVISION_FIELDS` để bảng `event_revisions` và luồng
+# duyệt lại luôn hiểu "nội dung" là cùng một tập trường.
+CONTENT_FIELDS = set(event_revision_service.REVISION_FIELDS)
 
 # Cho phép sort theo whitelist để tránh SQL injection qua query param
 SORT_FIELDS = {
@@ -230,8 +231,19 @@ def list_events(
     total = res.count if res.count is not None else len(rows)
 
     categories = _category_map()
-    counts = _registration_counts([_row_id(r) for r in rows])
-    items = [_to_organizer_event_out(r, categories, counts) for r in rows]
+    ids = [_row_id(r) for r in rows]
+    counts = _registration_counts(ids)
+    # Một truy vấn cho cả trang thay vì hỏi từng dòng có bản sửa chờ duyệt không
+    pending_ids = event_revision_service.events_with_pending_revision(ids)
+    items = [
+        _to_organizer_event_out(
+            r,
+            categories,
+            counts,
+            has_pending_revision=_row_id(r) in pending_ids,
+        )
+        for r in rows
+    ]
 
     return EventListOut(
         items=items,
@@ -245,19 +257,80 @@ def list_events(
 def get_event(event_id: str, organizer_id: str) -> OrganizerEventOut:
     row = _get_raw(event_id, organizer_id)
     return _to_organizer_event_out(
-        row, _category_map(), _registration_counts([_row_id(row)])
+        row,
+        _category_map(),
+        _registration_counts([_row_id(row)]),
+        # Màn hình chi tiết / chỉnh sửa cần cả bảng so sánh cũ → mới
+        revision=event_revision_service.get_pending_revision(event_id),
     )
 
 
 def get_event_by_id(event_id: str) -> Optional[PublicEventOut]:
-    """Return the public event representation using the shared event lookup."""
-    row = _find_raw(event_id)
-    if row is None:
+    """Return an event only when it is approved and publicly published."""
+    sb = get_supabase()
+    query = (
+        sb
+        .table(TABLE_EVENTS)
+        .select("*")
+        .eq("event_id", event_id)
+        .eq("event_status", DB_PUBLISHED)
+        .eq("approval_status", DB_APPROVAL_APPROVED)
+        .limit(1)
+    )
+    rows: list[dict[str, Any]] = _run(query).data or []
+    if not rows:
         return None
 
+    row = rows[0]
     data = dict(row)
     data["category_name"] = _category_map().get(row.get("category_id"))
+    data["organizer"] = _public_organizer_profile(sb, row.get("organizer_id"))
     return PublicEventOut(**data)
+
+
+def _public_organizer_profile(sb: Any, organizer_id: Any) -> Optional[dict[str, Any]]:
+    """Build the safe, public portion of an organizer profile."""
+    if not organizer_id:
+        return None
+
+    user_query = (
+        sb.table("users")
+        .select(
+            "user_id, full_name, avatar_url, department_name, "
+            "organization_type_id, organization_description, "
+            "contact_phone, office_address"
+        )
+        .eq("user_id", str(organizer_id))
+        .limit(1)
+    )
+    users: list[dict[str, Any]] = _run(user_query).data or []
+    if not users:
+        return None
+
+    user = users[0]
+    organization_type = None
+    organization_type_id = user.get("organization_type_id")
+    if organization_type_id:
+        type_query = (
+            sb.table("organization_types")
+            .select("name")
+            .eq("organization_type_id", str(organization_type_id))
+            .limit(1)
+        )
+        organization_types: list[dict[str, Any]] = _run(type_query).data or []
+        if organization_types:
+            organization_type = organization_types[0].get("name")
+
+    return {
+        "organizer_id": str(organizer_id),
+        "name": user.get("full_name"),
+        "avatar_url": user.get("avatar_url"),
+        "department_name": user.get("department_name"),
+        "organization_type": organization_type,
+        "description": user.get("organization_description"),
+        "contact_phone": user.get("contact_phone"),
+        "office_address": user.get("office_address"),
+    }
 
 
 def list_ongoing_events() -> list[PublicEventOut]:
@@ -391,6 +464,17 @@ def update_event(
     target_status = (
         payload.event_status.value if payload.event_status is not None else None
     )
+    location_changed = (
+        "location" in data and data["location"] != current.get("location")
+    )
+    time_changed = any(
+        field in data and data[field] != current.get(field)
+        for field in ("start_time", "end_time")
+    )
+    is_newly_cancelled = (
+        target_status == EventStatus.CANCELLED.value
+        and current_status != EventStatus.CANCELLED.value
+    )
 
     if not data and target_status is None:
         return _to_organizer_event_out(current, _category_map(), {})
@@ -404,27 +488,49 @@ def update_event(
             ),
         )
 
-    # Sự kiện đã kết thúc / đã huỷ thì không cho sửa nữa
+    # Đang diễn ra / đã kết thúc / đã huỷ thì khoá mọi thay đổi, kể cả đổi trạng thái
     if current_status in LOCKED_STATUSES:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=(
-                "Sự kiện đã kết thúc hoặc đã huỷ nên không thể chỉnh sửa."
-            ),
+            detail=_locked_message(current_status),
         )
 
-    # Sự kiện đang công khai: mọi thay đổi nội dung đều phải chờ Admin duyệt lại,
-    # nên tự đưa trạng thái về PENDING (kể cả khi client không gửi event_status).
-    content_changed = any(
-        field in data and data[field] != current.get(field) for field in CONTENT_FIELDS
-    )
-    if current_status in REAPPROVAL_STATUSES and content_changed:
-        target_status = EventStatus.PENDING.value
+    # Những trường nội dung THỰC SỰ đổi (so sánh có chuẩn hoá ngày giờ và số,
+    # tránh coi "2026-08-20T07:20:00" khác "2026-08-20T07:20:00+00:00")
+    changed = event_revision_service.changed_fields(data, current)
 
     # Kiểm tra lại ràng buộc ngày tháng sau khi trộn dữ liệu cũ + mới
     merged = {**current, **data}
     _validate_merged_dates(merged)
+    _validate_changed_dates_not_past(data, current)
     _validate_capacity_against_registrations(event_id, merged.get("capacity"))
+
+    # ── Sự kiện ĐÃ ĐƯỢC DUYỆT: KHÔNG ghi đè bảng `events` ────────────────────
+    # Dữ liệu mới đi vào bảng `event_revisions` kèm ảnh chụp giá trị cũ, chờ
+    # Admin đối chiếu rồi mới áp dụng. Bản đang chạy giữ nguyên nên sinh viên
+    # vẫn xem và đăng ký bình thường trong lúc chờ duyệt.
+    # Ngoại lệ: yêu cầu HUỶ sự kiện đi thẳng xuống dưới, không phải chờ duyệt.
+    is_cancelling = target_status == EventStatus.CANCELLED.value
+    if current_status in REAPPROVAL_STATUSES and changed and not is_cancelling:
+        missing = missing_required_fields(merged)
+        if missing:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Thiếu thông tin bắt buộc: " + ", ".join(missing),
+            )
+
+        revision = event_revision_service.submit_revision(
+            event_id=event_id,
+            organizer_id=organizer_id,
+            new_data=data,
+            current=current,
+        )
+        return _to_organizer_event_out(
+            current,
+            _category_map(),
+            _registration_counts([event_id]),
+            revision=revision,
+        )
 
     # Nếu kết quả cuối cùng là PENDING (gửi duyệt / duyệt lại) thì bản ghi SAU KHI
     # trộn phải đủ thông tin bắt buộc — kể cả tệp kế hoạch sự kiện.
@@ -451,19 +557,61 @@ def update_event(
     )
     res = _run(query)
     row = res.data[0] if res.data else merged
+
+    # Sự kiện đã huỷ thì bản sửa đang chờ duyệt không còn ý nghĩa
+    if is_cancelling:
+        event_revision_service.cancel_pending_revision(event_id)
+
     return _to_organizer_event_out(
-        row, _category_map(), _registration_counts([event_id])
+        row,
+        _category_map(),
+        _registration_counts([event_id]),
+        # Lưu bản nháp / gửi duyệt mà sự kiện vẫn còn bản sửa chờ duyệt thì phản
+        # hồi phải nói rõ điều đó, tránh giao diện tưởng đã áp dụng xong.
+        revision=(
+            None
+            if is_cancelling
+            else event_revision_service.get_pending_revision(event_id)
+        ),
     )
 
 
 def delete_event(event_id: str, organizer_id: str) -> None:
-    _get_raw(event_id, organizer_id)
+    current = _get_raw(event_id, organizer_id)
+
+    # Sự kiện đang diễn ra thì không được xoá — xoá là mất luôn dữ liệu đăng ký
+    # và điểm danh của người đang tham dự.
+    if _derive_ui_status(current) == EventStatus.ONGOING.value:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Sự kiện đang diễn ra nên không thể xoá.",
+        )
+
     _run(
         get_supabase()
         .table(TABLE_EVENTS)
         .delete()
         .eq("event_id", event_id)
         .eq("organizer_id", organizer_id)
+    )
+
+
+def cancel_pending_revision(
+    event_id: str,
+    organizer_id: str,
+) -> OrganizerEventOut:
+    """Ban tổ chức rút lại yêu cầu chỉnh sửa đang chờ Admin duyệt.
+
+    Bảng `events` không đổi — bản đang công khai vốn chưa hề bị ghi đè.
+    """
+    current = _get_raw(event_id, organizer_id)
+    if not event_revision_service.cancel_pending_revision(event_id):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Sự kiện này không có yêu cầu chỉnh sửa nào đang chờ duyệt.",
+        )
+    return _to_organizer_event_out(
+        current, _category_map(), _registration_counts([event_id])
     )
 
 
@@ -552,8 +700,9 @@ def _registration_counts(event_ids: list[str]) -> dict[str, int]:
         res = (
             get_supabase()
             .table(TABLE_REGISTRATIONS)
-            .select("event_id")
+            .select("event_id, registration_status")
             .in_("event_id", ids)
+            .neq("registration_status", "CANCELLED")
             .execute()
         )
     except Exception:  # noqa: BLE001
@@ -592,6 +741,51 @@ def _validate_merged_dates(merged: dict[str, Any]) -> None:
         )
 
 
+def _locked_message(current_status: str) -> str:
+    """Câu thông báo tương ứng với lý do sự kiện bị khoá."""
+    if current_status == EventStatus.ONGOING.value:
+        return "Sự kiện đang diễn ra nên không thể chỉnh sửa hay đổi trạng thái."
+    return "Sự kiện đã kết thúc hoặc đã huỷ nên không thể chỉnh sửa."
+
+
+def _validate_changed_dates_not_past(
+    data: dict[str, Any], current: dict[str, Any]
+) -> None:
+    """Chặn Organizer ĐỔI thời gian bắt đầu / hạn đăng ký sang mốc đã trôi qua.
+
+    Chỉ xét những trường thực sự thay đổi: sự kiện đang diễn ra vốn có start_time
+    nằm trong quá khứ, nếu kiểm tra cả trường không đổi thì mọi thao tác sửa nội
+    dung khác đều bị chặn oan.
+
+    Lưu ý múi giờ: DB lưu `timestamp` không timezone và toàn bộ code coi giá trị
+    naive là giờ UTC (xem `_now_naive_utc`), trong khi form gửi lên giờ địa phương.
+    Giờ VN (UTC+7) luôn lớn hơn giờ UTC nên phép so sánh này không bao giờ báo nhầm
+    mốc tương lai thành quá khứ; phần kiểm tra sát giờ người dùng nằm ở EventForm.
+    """
+    now = _now_naive_utc()
+    labels = {
+        "start_time": "Thời gian bắt đầu sự kiện",
+        "registration_deadline": "Hạn chót đăng ký",
+    }
+
+    for field, label in labels.items():
+        if field not in data:
+            continue
+        new_value = _naive(_parse_dt(data.get(field)))
+        old_value = _naive(_parse_dt(current.get(field)))
+        if new_value is None:
+            continue
+        # Sai lệch dưới 1 giây coi như không đổi — tránh chặn oan khi client gửi
+        # lại đúng mốc cũ nhưng chuỗi ISO chênh nhau phần mili giây.
+        if old_value is not None and abs(new_value - old_value) < timedelta(seconds=1):
+            continue
+        if new_value <= now:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail=f"{label} không được ở trong quá khứ.",
+            )
+
+
 def _validate_capacity_against_registrations(
     event_id: str, capacity: Any
 ) -> None:
@@ -625,6 +819,9 @@ def _to_organizer_event_out(
     row: dict[str, Any],
     categories: dict[int, str],
     counts: dict[str, int],
+    *,
+    revision: Optional[dict[str, Any]] = None,
+    has_pending_revision: Optional[bool] = None,
 ) -> OrganizerEventOut:
     event_id = _row_id(row)
     capacity = row.get("capacity")
@@ -640,6 +837,16 @@ def _to_organizer_event_out(
         and (deadline is None or deadline >= now)
         and not is_full
     )
+
+    pending_revision: Optional[EventRevisionOut] = None
+    if revision is not None:
+        # `row` chính là dòng `events` đang giữ nội dung CŨ — nguồn để dựng bảng
+        # so sánh "cũ → mới" mà không cần lưu thêm ảnh chụp nào trong DB.
+        pending_revision = event_revision_service.to_out(
+            revision, categories, current_event=row
+        )
+    if has_pending_revision is None:
+        has_pending_revision = pending_revision is not None
 
     return OrganizerEventOut(
         event_id=event_id or None,
@@ -660,7 +867,12 @@ def _to_organizer_event_out(
         file_url=row.get("file_url"),
         event_status=event_status,
         can_edit=event_status in EDITABLE_STATUSES,
+        # Sự kiện đang diễn ra thì ẩn luôn nút xoá ở phía giao diện
+        can_delete=event_status != EventStatus.ONGOING.value,
         # Sửa sự kiện đang công khai thì phải chờ Admin duyệt lại → UI cảnh báo trước
         requires_reapproval=event_status in REAPPROVAL_STATUSES,
+        # Đang có yêu cầu chỉnh sửa nằm chờ Admin duyệt (bảng `event_revisions`)
+        has_pending_revision=bool(has_pending_revision),
+        pending_revision=pending_revision,
         created_at=_parse_dt(row.get("created_at")),
     )
