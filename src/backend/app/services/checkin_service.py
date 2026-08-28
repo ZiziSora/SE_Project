@@ -343,7 +343,10 @@ def get_event_checkin_stats(
     registrations = (
         db.query(EventRegistration)
         .options(joinedload(EventRegistration.user))
-        .filter(EventRegistration.event_id == event_id)
+        .filter(
+            EventRegistration.event_id == event_id,
+            EventRegistration.registration_status != RegistrationStatus.CANCELLED,
+        )
         .order_by(EventRegistration.created_at.desc())
         .all()
     )

@@ -27,7 +27,7 @@ class Settings:
     # --- Tên bảng ---
     TABLE_EVENTS: str = "events"
     TABLE_CATEGORIES: str = "event_categories"
-    TABLE_REGISTRATIONS: str = "registrations"
+    TABLE_REGISTRATIONS: str = "event_registrations"
 
     # --- CORS: origin của Vite dev server ---
     CORS_ORIGINS: list[str] = [

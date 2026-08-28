@@ -11,9 +11,10 @@ function compactParams(params) {
 export const participantsApi = {
   /** Danh sách sự kiện mà organizer đang quản lý. */
   async listEvents(params = {}) {
+    const queryParams = compactParams({ page_size: 100, ...params });
     try {
       const response = await api.get("/api/organizer/events", {
-        params: compactParams(params),
+        params: queryParams,
       });
       const data = response.data;
       const items = Array.isArray(data) ? data : (data?.items ?? []);
@@ -21,7 +22,7 @@ export const participantsApi = {
     } catch {
       // Fallback nếu gọi endpoint sự kiện tổng hợp
       const response = await api.get("/api/organizer/events", {
-        params: compactParams({ page: 1, page_size: 50, ...params }),
+        params: queryParams,
       });
       return { items: response.data?.items ?? [], is_mock: false };
     }

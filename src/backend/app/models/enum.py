@@ -44,6 +44,7 @@ class NotificationType(str, enum.Enum):
     EVENT_LOCATION_CHANGED = "event_location_changed"
     EVENT_TIME_CHANGED = "event_time_changed"
     NEW_EVENT = "new_event"
+    WAITLIST_JOINED = "waitlist_joined"
     WAITLIST_PROMOTED = "waitlist_promoted"
 
 class RevisionStatus(str, enum.Enum):

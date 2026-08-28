@@ -52,9 +52,9 @@ export default function QRCodeModal({ eventId, eventTitle, isOpen, onClose }) {
 
   // 1. Fallback linh hoạt để không bao giờ bị undefined chuỗi QR
   const tokenToEncode = qrData?.qr_token || qrData?.token || qrData?.data?.qr_token || "";
-  const qrImageUrl = qrData
+  const qrImageUrl = tokenToEncode
     ? `https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=10&data=${encodeURIComponent(
-      qrData.qr_token
+      tokenToEncode
     )}`
     : "";
 

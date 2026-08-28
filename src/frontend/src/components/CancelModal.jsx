@@ -1,4 +1,3 @@
-import React from "react";
 import { AlertTriangle, X, Loader2, Clock, MapPin } from "lucide-react";
 
 export default function CancelModal({
