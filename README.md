@@ -32,7 +32,15 @@ Tạo `src/backend/.env`:
 SUPABASE_URL=your_supabase_url
 SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
 CORS_ORIGINS=http://localhost:5173
+
+# Tuỳ chọn — bật gợi ý sự kiện cá nhân hoá bằng AI (Gemini) ở trang Khám phá.
+# Không có 2 dòng này thì tính năng vẫn chạy bình thường, chỉ không có lớp AI.
+# Lấy key miễn phí tại https://aistudio.google.com/apikey
+GEMINI_API_KEY=your_gemini_api_key
+GEMINI_MODEL=gemini-2.5-flash-lite
 ```
+
+Chi tiết tính năng gợi ý AI: xem `src/RECOMMENDATION_FEATURE.md`.
 
 Chạy backend:
 

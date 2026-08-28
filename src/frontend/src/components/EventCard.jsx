@@ -13,6 +13,7 @@ export default function EventCard({
     date,
     location,
     isFeatured = false,
+    reason,
     role,
 }) {
     const isOrganizer = role === "organizer";
@@ -59,6 +60,12 @@ export default function EventCard({
                 <p className="text-xs text-gray-400 font-medium">
                     {faculty || "Đơn vị tổ chức"}
                 </p>
+
+                {reason && (
+                    <p className="text-xs text-[#7C3AED] italic line-clamp-2">
+                        {reason}
+                    </p>
+                )}
 
                 <div className="flex flex-col gap-1 mt-auto pt-1">
                     <div className="flex items-center gap-1.5 text-xs text-gray-500">

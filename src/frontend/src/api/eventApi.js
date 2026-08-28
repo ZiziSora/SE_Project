@@ -116,6 +116,13 @@ export const publicEventApi = {
     return response.data;
   },
 
+  async getRecommendations(limit = 6) {
+    const response = await api.get("/api/events/recommendations", {
+      params: { limit },
+    });
+    return response.data;
+  },
+
   async listSavedEvents() {
     const response = await api.get("/api/events/saved");
     return response.data;
