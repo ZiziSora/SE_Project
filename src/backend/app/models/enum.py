@@ -15,6 +15,7 @@ class RegistrationStatus(str, enum.Enum):
     REGISTERED = "registered"
     CHECKED_IN = "check-in"
     CANCELLED = "cancelled"
+    WAITLISTED = "waitlisted"
 
 
 class EventStatus(str, enum.Enum):

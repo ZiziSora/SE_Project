@@ -10,11 +10,13 @@ from app.schemas.checkin import (
     CheckinRequest,
     CheckinSuccessResponse,
     EventCheckinStatsResponse,
+    ManualCheckinRequest,
     QRDetailResponse,
 )
 from app.services.checkin_service import (
     get_event_checkin_stats,
     get_user_event_qr,
+    manual_checkin_participant,
     process_checkin,
 )
 
@@ -41,6 +43,28 @@ def checkin_participant(
         code=payload.code,
         current_user=current_user,
         event_id=payload.event_id,
+    )
+
+
+@router.post(
+    "/events/{event_id}/manual",
+    response_model=CheckinSuccessResponse,
+    summary="Điểm danh thủ công dành cho Ban tổ chức (bằng registration_id, MSSV, email hoặc code)",
+)
+def manual_checkin_by_event(
+    event_id: UUID,
+    payload: ManualCheckinRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> CheckinSuccessResponse:
+    return manual_checkin_participant(
+        db=db,
+        event_id=event_id,
+        current_user=current_user,
+        registration_id=payload.registration_id,
+        user_id=payload.user_id,
+        student_code=payload.student_code,
+        code=payload.code,
     )
 
 

@@ -104,7 +104,7 @@ export default function ParticipantDetailPage() {
     setCheckingId(participant.registration_id);
     try {
       const targetCode = participant.student_code || participant.email || participant.registration_id;
-      const result = await participantsApi.checkIn(eventId, targetCode);
+      const result = await participantsApi.checkIn(eventId, targetCode, participant.registration_id);
 
       // Cập nhật ngay trên giao diện để tránh phải chờ tải lại toàn bộ bảng
       setParticipants((previous) =>

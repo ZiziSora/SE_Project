@@ -32,7 +32,8 @@ class HistoryResponse(BaseModel):
         "REGISTERED",
         "CHECKED_IN",
         "CANCELLED",
-    ] | None = None
+        "WAITLISTED",
+    ] | str | None = None
     created_at: datetime | None = None
     events: HistoryEventResponse | None = None
 

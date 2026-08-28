@@ -32,7 +32,7 @@ export function RegisterActionBar({
     : registered
       ? "Bạn đã đăng ký"
       : isFull
-        ? "Sự kiện đã hết chỗ"
+        ? "Tham gia danh sách chờ"
         : `Đăng ký ngay · ${capacityLabel}`;
 
   return (
@@ -58,7 +58,7 @@ export function RegisterActionBar({
       <button
         type="button"
         onClick={onRegister}
-        disabled={registered || registerLoading || dataLoading || isFull}
+        disabled={registered || registerLoading || dataLoading}
         aria-label={actionLabel}
         aria-describedby={floating ? "event-registration-tooltip" : undefined}
         className={`${
@@ -69,7 +69,7 @@ export function RegisterActionBar({
           registered
             ? "cursor-not-allowed border-emerald-200 bg-emerald-100 text-emerald-800"
             : isFull
-              ? "cursor-not-allowed border-slate-300 bg-slate-200 text-slate-600"
+              ? "border-amber-600 bg-amber-600 text-white hover:-translate-y-1 hover:scale-105 hover:bg-amber-700 active:translate-y-0 active:scale-95"
               : registerLoading
                 ? "cursor-wait border-violet-300 bg-violet-400 text-white"
                 : "border-violet-600 bg-violet-700 text-white hover:-translate-y-1 hover:scale-105 hover:bg-violet-800 active:translate-y-0 active:scale-95"
@@ -101,9 +101,12 @@ export function RegisterActionBar({
           )
         ) : isFull ? (
           floating ? (
-            <Users className="size-5" />
+            <UserPlus className="size-5" />
           ) : (
-            "Hết chỗ"
+            <>
+              <UserPlus className="size-4" />
+              Đăng ký danh sách chờ
+            </>
           )
         ) : floating ? (
           <UserPlus className="size-5" />

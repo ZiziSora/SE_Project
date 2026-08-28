@@ -252,12 +252,17 @@ def process_checkin(
                 detail="Mã vé QR không thuộc về sự kiện đang check-in này.",
             )
 
-    # Verification: Registration status check (Cancelled)
+    # Verification: Registration status check (Cancelled / Waitlisted)
     reg_status_str = _format_registration_status(registration.registration_status)
     if reg_status_str == "CANCELLED":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Đăng ký tham gia sự kiện này của người dùng đã bị hủy.",
+        )
+    if reg_status_str in ("WAITLISTED", "WAITLIST"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Sinh viên đang ở trong danh sách chờ, chưa được chuyển sang danh sách chính thức.",
         )
 
     # Verification: Idempotency check (Already checked in)
@@ -379,4 +384,153 @@ def get_event_checkin_stats(
         total_registered=total_registered,
         total_checked_in=total_checked_in,
         participants=participants,
+    )
+
+
+def manual_checkin_participant(
+    db: Session,
+    event_id: UUID,
+    current_user: User,
+    registration_id: Optional[UUID] = None,
+    user_id: Optional[UUID] = None,
+    student_code: Optional[str] = None,
+    code: Optional[str] = None,
+) -> CheckinSuccessResponse:
+    """Thực hiện điểm danh thủ công cho sinh viên / người tham dự sự kiện."""
+    event = db.query(Event).filter(Event.event_id == event_id).first()
+    if not event:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Không tìm thấy sự kiện.",
+        )
+
+    # Permission check: Caller must be ORGANIZER or ADMIN
+    if current_user.role not in (UserRole.ORGANIZER, UserRole.ADMIN):
+        if event.organizer_id != current_user.user_id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Bạn không có quyền thực hiện điểm danh cho sự kiện này.",
+            )
+
+    reg_query = (
+        db.query(EventRegistration)
+        .options(
+            joinedload(EventRegistration.user),
+            joinedload(EventRegistration.event),
+        )
+        .filter(EventRegistration.event_id == event_id)
+    )
+
+    registration = None
+    if registration_id:
+        registration = reg_query.filter(EventRegistration.registration_id == registration_id).first()
+    elif user_id:
+        registration = reg_query.filter(EventRegistration.user_id == user_id).first()
+    
+    if not registration and (student_code or code):
+        lookup_code = (student_code or code or "").strip()
+        if lookup_code:
+            registration = (
+                reg_query.join(User, EventRegistration.user_id == User.user_id)
+                .filter(
+                    (func.upper(User.student_code) == lookup_code.upper())
+                    | (func.upper(User.email) == lookup_code.upper())
+                )
+                .first()
+            )
+            if not registration:
+                # Direct match by QR token or manual code
+                qr_record = (
+                    db.query(EventCheckinQR)
+                    .options(joinedload(EventCheckinQR.registration))
+                    .filter(
+                        (EventCheckinQR.qr_token == lookup_code)
+                        | (func.upper(EventCheckinQR.manual_code) == lookup_code.upper())
+                    )
+                    .first()
+                )
+                if (
+                    qr_record
+                    and qr_record.registration
+                    and str(qr_record.registration.event_id) == str(event_id)
+                ):
+                    registration = qr_record.registration
+
+    if not registration or not registration.user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Không tìm thấy thông tin đăng ký của người tham dự trong sự kiện này.",
+        )
+
+    user = registration.user
+    reg_status_str = _format_registration_status(registration.registration_status)
+
+    if reg_status_str == "CANCELLED":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Đăng ký tham gia sự kiện này của người dùng đã bị hủy.",
+        )
+
+    if reg_status_str in ("WAITLISTED", "WAITLIST"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Sinh viên đang ở trong danh sách chờ, chưa được chuyển sang danh sách chính thức.",
+        )
+
+    if reg_status_str == "CHECKED_IN" or registration.checked_in_at is not None:
+        checked_time_str = (
+            registration.checked_in_at.strftime("%H:%M:%S %d/%m/%Y")
+            if registration.checked_in_at
+            else "trước đó"
+        )
+        user_name = user.full_name or user.email
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Sinh viên {user_name} ({user.student_code or user.email}) đã được check-in trước đó vào lúc {checked_time_str}.",
+        )
+
+    # Lock & update registration
+    locked_reg = (
+        db.query(EventRegistration)
+        .filter(EventRegistration.registration_id == registration.registration_id)
+        .with_for_update()
+        .first()
+    )
+
+    if not locked_reg:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Không thể khóa bản ghi đăng ký để điểm danh.",
+        )
+
+    checkin_time = datetime.now(timezone.utc)
+    locked_reg.registration_status = RegistrationStatus.CHECKED_IN
+    locked_reg.checked_in_at = checkin_time
+    db.commit()
+    db.refresh(locked_reg)
+
+    participant_info = ParticipantInfo(
+        user_id=user.user_id,
+        full_name=user.full_name,
+        email=user.email,
+        student_code=user.student_code,
+        contact_phone=user.contact_phone,
+        avatar_url=user.avatar_url,
+    )
+
+    event_info = CheckinEventInfo(
+        event_id=event.event_id,
+        title=event.title or "Sự kiện",
+        start_time=event.start_time,
+        end_time=event.end_time,
+        location=event.location,
+    )
+
+    return CheckinSuccessResponse(
+        success=True,
+        message=f"Điểm danh thủ công thành công cho {user.full_name or user.email}!",
+        participant=participant_info,
+        event=event_info,
+        checked_in_at=checkin_time,
+        registration_status="CHECKED_IN",
     )

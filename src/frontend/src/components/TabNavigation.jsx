@@ -15,7 +15,7 @@ export default function TabNavigation({
             ? savedEvents.length
             : registrations.filter((item) => {
                 const status = getEffectiveStatus(item);
-                if (tab === "Sắp diễn ra") return status === "REGISTERED";
+                if (tab === "Sắp diễn ra") return status === "REGISTERED" || status === "WAITLISTED";
                 if (tab === "Đã tham gia") return status === "ATTENDED";
                 if (tab === "Vắng mặt") return status === "ABSENT";
                 if (tab === "Đã hủy") return status === "CANCELLED";

@@ -97,13 +97,20 @@ def read_registration_status(
         )
 
     count = registration_service.get_registration_count(event_id)
-    registered = (
-        registration_service.is_user_registered(event_id, current_user.id)
+    reg_record = (
+        registration_service.find_registration(event_id, current_user.id, include_cancelled=True)
         if current_user
-        else False
+        else None
     )
+    user_status = reg_record.get("registration_status") if reg_record else None
+    registered = reg_record is not None and str(user_status).upper() != "CANCELLED"
 
-    return RegistrationStatusOut(count=count, capacity=event.capacity, registered=registered)
+    return RegistrationStatusOut(
+        count=count,
+        capacity=event.capacity,
+        registered=registered,
+        status=user_status,
+    )
 
 
 @router.post("/{event_id}/register", response_model=RegisterResponseOut)
@@ -119,23 +126,27 @@ def register_for_event(
         )
 
     count = registration_service.get_registration_count(event_id)
-    already_registered = registration_service.is_user_registered(event_id, current_user.id)
+    active_reg = registration_service.find_registration(event_id, current_user.id, include_cancelled=False)
+    already_registered = active_reg is not None
 
-    if not already_registered and event.capacity is not None and count >= event.capacity:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Sự kiện đã đủ số lượng đăng ký.",
-        )
+    is_full = event.capacity is not None and count >= event.capacity
+    target_status = "WAITLISTED" if is_full else "REGISTERED"
 
-    already_registered = registration_service.register_user(
+    was_already_registered = registration_service.register_user(
         event_id,
         current_user.id,
         event.title,
+        registration_status=target_status,
     )
-    if not already_registered:
+    if not was_already_registered and not is_full:
         count += 1
 
-    return RegisterResponseOut(already_registered=already_registered, count=count)
+    return RegisterResponseOut(
+        already_registered=was_already_registered,
+        count=count,
+        is_waitlisted=is_full,
+        registration_status=target_status if not was_already_registered else (active_reg.get("registration_status") if active_reg else target_status),
+    )
 
 
 @router.get("/{event_id}/saved-status", response_model=SavedEventStatusOut)

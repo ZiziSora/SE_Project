@@ -17,6 +17,21 @@ class CheckinRequest(BaseModel):
     )
 
 
+class ManualCheckinRequest(BaseModel):
+    registration_id: Optional[UUID] = Field(
+        None, description="ID lượt đăng ký (registration_id)"
+    )
+    user_id: Optional[UUID] = Field(
+        None, description="ID tài khoản người tham dự (user_id)"
+    )
+    student_code: Optional[str] = Field(
+        None, description="Mã số sinh viên (MSSV)"
+    )
+    code: Optional[str] = Field(
+        None, description="Chuỗi mã QR, mã thủ công, email hoặc MSSV"
+    )
+
+
 class ParticipantInfo(BaseModel):
     user_id: UUID
     full_name: Optional[str] = None
