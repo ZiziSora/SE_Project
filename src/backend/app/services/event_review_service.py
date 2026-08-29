@@ -1,11 +1,23 @@
 from uuid import UUID
 
 from fastapi import HTTPException, status
+from sqlalchemy import or_
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, joinedload
 
 from app.models.enum import ApprovalStatus, EventStatus
 from app.models.event import Event
+
+
+# Huỷ một sự kiện chỉ đổi cột `event_status` sang CANCELLED và GIỮ NGUYÊN
+# `approval_status` (để còn biết trước đó đã được duyệt hay chưa — xem
+# `event_service._ui_status_to_db`). Vì vậy nếu hàng đợi duyệt chỉ lọc theo
+# approval_status thì sự kiện Ban tổ chức đã huỷ vẫn nằm chờ Admin xét duyệt.
+# Hai trạng thái dưới đây là "sự kiện không còn gì để duyệt nữa".
+CLOSED_EVENT_STATUSES = (
+    EventStatus.CANCELLED,
+    EventStatus.COMPLETED,
+)
 
 
 def _serialize_event(event: Event) -> dict:
@@ -43,7 +55,14 @@ def list_pending_events(db: Session) -> dict:
             joinedload(Event.organizer),
             joinedload(Event.category),
         )
-        .filter(Event.approval_status == ApprovalStatus.PENDING)
+        .filter(
+            Event.approval_status == ApprovalStatus.PENDING,
+            # event_status có thể NULL với dữ liệu cũ → coi như DRAFT
+            or_(
+                Event.event_status.is_(None),
+                Event.event_status.notin_(CLOSED_EVENT_STATUSES),
+            ),
+        )
         .order_by(Event.start_time.asc(), Event.event_id.asc())
         .all()
     )
@@ -70,6 +89,16 @@ def _get_pending_event_for_update(db: Session, event_id: UUID) -> Event:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail="Sự kiện này đã được xét duyệt trước đó.",
+        )
+    # Chặn trường hợp Admin đang mở danh sách cũ thì Ban tổ chức huỷ sự kiện:
+    # bấm "Chấp nhận" lúc đó sẽ xuất bản lại một sự kiện đã huỷ.
+    if event.event_status in CLOSED_EVENT_STATUSES:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Sự kiện này đã bị Ban tổ chức huỷ hoặc đã kết thúc "
+                "nên không còn cần xét duyệt."
+            ),
         )
     return event
 

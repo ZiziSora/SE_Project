@@ -26,6 +26,7 @@ import binascii
 import hashlib
 import hmac
 import json
+import logging
 import math
 import threading
 import time
@@ -33,6 +34,9 @@ import uuid
 import re
 import os
 from urllib.parse import quote
+
+
+logger = logging.getLogger(__name__)
 
 
 STUDENT_EMAIL_DOMAIN = "student.hcmus.edu.vn"
@@ -597,6 +601,14 @@ def login_service(body: LoginRequest, db: Session):
             detail="Email hoặc mật khẩu không chính xác.",
         ) from error
     except Exception as error:
+        # 503 ở đây KHÔNG phải "sai mật khẩu" — nghĩa là không gọi được
+        # Supabase Auth (mất mạng, project bị pause, sai SUPABASE_URL/khoá...).
+        # Không log thì thông báo cho người dùng che mất nguyên nhân thật.
+        logger.exception(
+            "Không gọi được Supabase Auth khi đăng nhập (%s): %s",
+            type(error).__name__,
+            error,
+        )
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Dịch vụ xác thực đang tạm thời không khả dụng.",
@@ -698,6 +710,11 @@ def verify_email(
             detail="Liên kết xác minh email không hợp lệ hoặc đã hết hạn.",
         ) from error
     except Exception as error:
+        logger.exception(
+            "Không gọi được Supabase Auth khi xác minh email (%s): %s",
+            type(error).__name__,
+            error,
+        )
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Dịch vụ xác thực đang tạm thời không khả dụng.",

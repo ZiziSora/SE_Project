@@ -4,6 +4,7 @@
 """
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
@@ -48,11 +49,21 @@ LOCKED_STATUSES = {
     EventStatus.CANCELLED.value,
 }
 
+# Trạng thái mà Ban tổ chức được phép HUỶ sự kiện (khác với xoá hẳn).
+# DRAFT không nằm ở đây: bản nháp chưa từng ra khỏi tài khoản Ban tổ chức, huỷ
+# nó chỉ tạo thêm một bản ghi "Đã huỷ" vô nghĩa — xoá là đúng hơn.
+CANCELLABLE_STATUSES = {
+    EventStatus.PENDING.value,
+    EventStatus.PUBLISHED.value,
+}
+
 # Các cột thuộc "nội dung sự kiện" — chỉ khi một trong số này đổi thì mới cần
 # duyệt lại; đổi riêng event_status thì không tính. Danh sách nằm ở
 # `event_revision_service.REVISION_FIELDS` để bảng `event_revisions` và luồng
 # duyệt lại luôn hiểu "nội dung" là cùng một tập trường.
 CONTENT_FIELDS = set(event_revision_service.REVISION_FIELDS)
+
+logger = logging.getLogger(__name__)
 
 # Cho phép sort theo whitelist để tránh SQL injection qua query param
 SORT_FIELDS = {
@@ -79,6 +90,15 @@ DB_DRAFT = "DRAFT"
 DB_PUBLISHED = "PUBLISHED"
 DB_CANCELLED = "CANCELLED"
 DB_COMPLETED = "COMPLETED"
+
+# Sự kiện ĐÃ TỪNG công khai thì trang chi tiết vẫn phải mở được, kể cả khi đã
+# huỷ hoặc đã đóng: sinh viên nhận thông báo huỷ luôn kèm link về sự kiện, và
+# lịch sử tham gia cũng trỏ về đây. Điều kiện "đã từng công khai" nằm ở
+# `approval_status = APPROVED` — DRAFT / PENDING không bao giờ lọt ra ngoài.
+PUBLICLY_VISIBLE_EVENT_STATUSES = [DB_PUBLISHED, DB_CANCELLED, DB_COMPLETED]
+
+# Nhãn enum `registration_status` trong DB (xem alembic a3b6e1576a9f)
+DB_REGISTRATION_CANCELLED = "CANCELLED"
 
 DB_APPROVAL_PENDING = "PENDING"
 DB_APPROVAL_APPROVED = "APPROVED"
@@ -266,14 +286,19 @@ def get_event(event_id: str, organizer_id: str) -> OrganizerEventOut:
 
 
 def get_event_by_id(event_id: str) -> Optional[PublicEventOut]:
-    """Return an event only when it is approved and publicly published."""
+    """Trả về sự kiện đã được duyệt và đã từng công khai.
+
+    Bao gồm cả sự kiện đã huỷ / đã đóng — người dùng cần mở được trang chi
+    tiết từ thông báo huỷ và từ lịch sử tham gia. Việc CHẶN đăng ký vào sự
+    kiện đã huỷ là trách nhiệm của router, không phải của hàm đọc này.
+    """
     sb = get_supabase()
     query = (
         sb
         .table(TABLE_EVENTS)
         .select("*")
         .eq("event_id", event_id)
-        .eq("event_status", DB_PUBLISHED)
+        .in_("event_status", PUBLICLY_VISIBLE_EVENT_STATUSES)
         .eq("approval_status", DB_APPROVAL_APPROVED)
         .limit(1)
     )
@@ -454,7 +479,10 @@ def update_event(
     event_id: str,
     payload: EventUpdate,
     organizer_id: str,
+    cancel_reason: Optional[str] = None,
 ) -> OrganizerEventOut:
+    """`cancel_reason` chỉ dùng khi payload đưa sự kiện sang trạng thái Đã huỷ:
+    nội dung này được ghép vào thông báo gửi cho sinh viên đã đăng ký."""
     current = _get_raw(event_id, organizer_id)
     current_status = _derive_ui_status(current)
 
@@ -562,6 +590,10 @@ def update_event(
     if is_cancelling:
         event_revision_service.cancel_pending_revision(event_id)
 
+    # Báo cho sinh viên đã đăng ký NGAY khi sự kiện chuyển sang Đã huỷ
+    if is_newly_cancelled:
+        _notify_event_cancelled(current, cancel_reason)
+
     return _to_organizer_event_out(
         row,
         _category_map(),
@@ -573,6 +605,45 @@ def update_event(
             if is_cancelling
             else event_revision_service.get_pending_revision(event_id)
         ),
+    )
+
+
+def cancel_event(
+    event_id: str,
+    organizer_id: str,
+    reason: Optional[str] = None,
+) -> OrganizerEventOut:
+    """Huỷ sự kiện: giữ lại bản ghi ở trạng thái Đã huỷ thay vì xoá.
+
+    Khác `delete_event` ở chỗ toàn bộ dữ liệu đăng ký / điểm danh vẫn còn, và
+    sinh viên đã đăng ký nhận được thông báo kèm lý do huỷ.
+    """
+    current = _get_raw(event_id, organizer_id)
+    current_status = _derive_ui_status(current)
+
+    if current_status not in CANCELLABLE_STATUSES:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=_cancel_blocked_message(current_status),
+        )
+
+    cleaned_reason = (reason or "").strip()
+    # Chỉ sự kiện đã công khai mới bắt buộc lý do — đó là lúc có sinh viên đã
+    # đăng ký và họ cần biết vì sao sự kiện không diễn ra nữa.
+    if current_status == EventStatus.PUBLISHED.value and not cleaned_reason:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "Vui lòng nhập lý do huỷ để gửi kèm thông báo cho sinh viên "
+                "đã đăng ký."
+            ),
+        )
+
+    return update_event(
+        event_id,
+        EventUpdate(event_status=EventStatus.CANCELLED),
+        organizer_id,
+        cancel_reason=cleaned_reason or None,
     )
 
 
@@ -691,7 +762,12 @@ def _category_map() -> dict[int, str]:
 def _registration_counts(event_ids: list[str]) -> dict[str, int]:
     """Đếm số người đã đăng ký cho từng sự kiện.
 
-    Bảng registrations có thể chưa tồn tại ở giai đoạn này → trả về rỗng.
+    Đăng ký đã huỷ KHÔNG được tính — nếu tính thì một sinh viên huỷ chỗ vẫn
+    chiếm sức chứa, đúng bằng cách `registration_service.get_registration_count`
+    đếm cho phía sinh viên. Hai bên phải ra cùng một con số.
+
+    Lỗi truy vấn thì trả về rỗng để trang vẫn tải được, nhưng có ghi log —
+    nuốt lỗi im lặng chính là thứ từng khiến ô "0/300" trông như đúng.
     """
     ids = [i for i in event_ids if i]
     if not ids:
@@ -706,9 +782,17 @@ def _registration_counts(event_ids: list[str]) -> dict[str, int]:
             .execute()
         )
     except Exception:  # noqa: BLE001
+        logger.warning(
+            "Không đếm được số người đăng ký (bảng %s)",
+            TABLE_REGISTRATIONS,
+            exc_info=True,
+        )
         return {}
     counts: dict[str, int] = {}
     for row in res.data or []:
+        reg_status = str(row.get("registration_status") or "").upper()
+        if reg_status == DB_REGISTRATION_CANCELLED:
+            continue
         key = str(row.get("event_id"))
         counts[key] = counts.get(key, 0) + 1
     return counts
@@ -739,6 +823,44 @@ def _validate_merged_dates(merged: dict[str, Any]) -> None:
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
             detail="Hạn chót đăng ký phải trước thời điểm sự kiện bắt đầu.",
         )
+
+
+def _cancel_blocked_message(current_status: str) -> str:
+    """Câu thông báo khi trạng thái hiện tại không cho phép huỷ."""
+    if current_status == EventStatus.DRAFT.value:
+        return (
+            "Bản nháp chưa từng công khai nên không cần huỷ — hãy xoá sự kiện "
+            "nếu không dùng nữa."
+        )
+    if current_status == EventStatus.CANCELLED.value:
+        return "Sự kiện này đã bị huỷ trước đó."
+    if current_status == EventStatus.ONGOING.value:
+        return "Sự kiện đang diễn ra nên không thể huỷ."
+    return "Sự kiện đã kết thúc nên không thể huỷ."
+
+
+def _notify_event_cancelled(
+    current: dict[str, Any], reason: Optional[str]
+) -> None:
+    """Gửi thông báo huỷ (kèm lý do) cho toàn bộ sinh viên đã đăng ký.
+
+    Sự kiện chưa được duyệt công khai thì chưa có ai đăng ký được, nên bỏ qua
+    luôn thay vì tốn thêm một truy vấn danh sách đăng ký.
+    """
+    if _derive_ui_status(current) != EventStatus.PUBLISHED.value:
+        return
+
+    event_title = current.get("title") or "Sự kiện"
+    content = f'Sự kiện "{event_title}" đã bị huỷ.'
+    if reason:
+        content += f" Lý do: {reason}"
+
+    notification_service.notify_event_participants(
+        event_id=_row_id(current),
+        notification_type=NotificationType.EVENT_CANCELLED,
+        title=f"Sự kiện đã bị huỷ: {event_title}",
+        content=content,
+    )
 
 
 def _locked_message(current_status: str) -> str:

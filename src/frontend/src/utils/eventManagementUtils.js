@@ -38,6 +38,76 @@ export const PENDING_REVISION_BADGE = {
 };
 
 
+/**
+ * Thao tác "gỡ" một sự kiện khỏi danh sách quản lý KHÔNG giống nhau ở mọi
+ * trạng thái, nên nút bấm và lời cảnh báo phải khác nhau:
+ *
+ * - Bản nháp: chưa từng công khai → xoá hẳn, và KHÔNG doạ người dùng về "dữ
+ *   liệu đăng ký, điểm danh" vì những thứ đó chưa tồn tại.
+ * - Chờ duyệt: cũng chưa công khai, nhưng đang có một yêu cầu nằm ở phía Quản
+ *   trị viên → hành động đúng nghĩa là HUỶ (sự kiện chuyển sang "Đã huỷ").
+ * - Đang mở đăng ký: đã có sinh viên đăng ký → HUỶ kèm lý do bắt buộc, hệ thống
+ *   gửi thông báo huỷ kèm lý do đó cho từng sinh viên.
+ * - Đã kết thúc / Đã huỷ: dữ liệu đăng ký và điểm danh đã tồn tại thật, nên xoá
+ *   là mất luôn — giữ nguyên lời cảnh báo nặng như cũ.
+ */
+export const REMOVAL_MODE = {
+  CANCEL: "cancel",
+  DELETE: "delete",
+};
+
+
+const REMOVAL_ACTIONS = {
+  DRAFT: {
+    mode: REMOVAL_MODE.DELETE,
+    title: "Xoá bản nháp?",
+    description:
+      "Bản nháp này sẽ bị xoá khỏi hệ thống. Sự kiện chưa từng được công khai nên không có dữ liệu đăng ký hay điểm danh nào bị ảnh hưởng. Thao tác này không thể hoàn tác.",
+    confirmLabel: "Xoá bản nháp",
+    actionLabel: "Xoá",
+    successMessage: "Đã xoá bản nháp",
+    reasonRequired: false,
+  },
+  PENDING: {
+    mode: REMOVAL_MODE.CANCEL,
+    title: "Huỷ sự kiện đang chờ duyệt?",
+    description:
+      "Yêu cầu duyệt sẽ bị rút lại và sự kiện chuyển sang trạng thái Đã huỷ. Sự kiện chưa được công khai nên chưa có dữ liệu đăng ký hay điểm danh. Sau khi huỷ, sự kiện không mở lại được.",
+    confirmLabel: "Huỷ sự kiện",
+    actionLabel: "Huỷ",
+    successMessage: "Đã huỷ sự kiện",
+    reasonRequired: false,
+  },
+  PUBLISHED: {
+    mode: REMOVAL_MODE.CANCEL,
+    title: "Huỷ sự kiện đang mở đăng ký?",
+    description:
+      "Sự kiện sẽ chuyển sang trạng thái Đã huỷ và ngừng nhận đăng ký. Toàn bộ sinh viên đã đăng ký nhận được thông báo huỷ kèm lý do bên dưới. Dữ liệu đăng ký và điểm danh vẫn được giữ lại.",
+    confirmLabel: "Huỷ sự kiện",
+    actionLabel: "Huỷ",
+    successMessage: "Đã huỷ sự kiện và gửi thông báo cho sinh viên",
+    reasonRequired: true,
+  },
+  DEFAULT: {
+    mode: REMOVAL_MODE.DELETE,
+    title: "Xoá sự kiện?",
+    description:
+      "Sự kiện sẽ bị xoá khỏi hệ thống cùng toàn bộ dữ liệu đăng ký và điểm danh đi kèm. Thao tác này không thể hoàn tác.",
+    confirmLabel: "Xoá sự kiện",
+    actionLabel: "Xoá",
+    successMessage: "Đã xoá sự kiện thành công",
+    reasonRequired: false,
+  },
+};
+
+
+/** Mô tả thao tác gỡ sự kiện ứng với trạng thái hiện tại của nó. */
+export function getRemovalAction(event) {
+  const key = (event?.event_status ?? "DRAFT").toUpperCase();
+  return REMOVAL_ACTIONS[key] ?? REMOVAL_ACTIONS.DEFAULT;
+}
+
+
 export const FILTER_TO_STATUS = {
   "Tất cả": undefined,
   "Đang mở đăng ký": "PUBLISHED",
