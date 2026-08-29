@@ -21,12 +21,13 @@ export function RegisterActionBar({
   floating = false,
 }) {
   const hasCapacityLimit = Number.isFinite(maxCapacity);
+  const displayCount = hasCapacityLimit ? Math.min(count, maxCapacity) : count;
   const isFull = hasCapacityLimit && count >= maxCapacity;
   const capacityLabel = dataLoading
     ? "Đang tải thông tin đăng ký"
     : hasCapacityLimit
-      ? `${count}/${maxCapacity} đã đăng ký`
-      : `${count} tham gia`;
+      ? `${displayCount}/${maxCapacity} đã đăng ký`
+      : `${displayCount} tham gia`;
   const actionLabel = dataLoading
     ? capacityLabel
     : registered

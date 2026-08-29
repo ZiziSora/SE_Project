@@ -83,9 +83,9 @@ def get_filtered_events_service(
         regs = regs_resp.data if hasattr(regs_resp, 'data') else (regs_resp.get('data', []) if isinstance(regs_resp, dict) else [])
         for r in (regs or []):
             eid = r.get('event_id')
-            # Đăng ký đã huỷ không chiếm chỗ — phải khớp với cách đếm ở
-            # event_service._registration_counts và registration_service.
-            if str(r.get('registration_status') or '').upper() == 'CANCELLED':
+            # Đăng ký đã huỷ hoặc ở danh sách chờ không chiếm chỗ chính thức
+            reg_st = str(r.get('registration_status') or '').upper()
+            if reg_st in ('CANCELLED', 'WAITLISTED', 'WAITLIST'):
                 continue
             if eid:
                 registered_counts[eid] = registered_counts.get(eid, 0) + 1

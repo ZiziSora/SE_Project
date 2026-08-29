@@ -15,7 +15,8 @@ export default function RegistrationEventCard({
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
 
   const event = item.events || {};
-  const { month, day, time } = formatEventDate(event.start_time, event.end_time);
+  const dateInfo = formatEventDate(event.start_time, event.end_time);
+  const displayDateTime = typeof dateInfo === "string" ? dateInfo : (dateInfo.fullDateTime || dateInfo.time);
   const categoryName = event.event_categories?.name || "Hội thảo Học thuật";
   const banner = event.banner_url || DEFAULT_IMAGE;
   const effectiveStatus = getEffectiveStatus(item);
@@ -41,14 +42,6 @@ export default function RegistrationEventCard({
                 imageEvent.currentTarget.src = DEFAULT_IMAGE;
               }}
             />
-            <div className="absolute top-3 right-3 bg-white/95 backdrop-blur-md px-2.5 py-1 rounded-lg text-center shadow-sm border border-gray-100">
-              <span className="block text-[10px] font-bold text-red-500 uppercase tracking-wider">
-                {month}
-              </span>
-              <span className="block text-base font-black text-gray-900 leading-none">
-                {day}
-              </span>
-            </div>
           </div>
 
           <div className="p-5">
@@ -64,7 +57,7 @@ export default function RegistrationEventCard({
               )}
               {isWaitlisted && (
                 <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1">
-                  <Clock className="w-3 h-3 text-amber-600" /> Danh sách chờ
+                  <Clock className="w-3 h-3 text-amber-600" /> Trong danh sách chờ
                 </span>
               )}
               {isAttended && (
@@ -91,7 +84,7 @@ export default function RegistrationEventCard({
             <div className="mt-4 space-y-1.5 text-xs text-gray-500 font-medium">
               <div className="flex items-center gap-2">
                 <Clock className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                <span className="truncate">{time}</span>
+                <span className="truncate">{displayDateTime}</span>
               </div>
               <div className="flex items-center gap-2">
                 <MapPin className="w-3.5 h-3.5 text-gray-400 shrink-0" />
@@ -115,11 +108,12 @@ export default function RegistrationEventCard({
           ) : isWaitlisted ? (
             <>
               <button
-                onClick={() => setIsQrModalOpen(true)}
-                className="w-full text-xs font-semibold py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 transition bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 cursor-pointer"
+                disabled
+                title="Bạn đang ở trong danh sách chờ. Vé và mã QR chỉ khả dụng khi bạn được xác nhận tham gia chính thức."
+                className="w-full text-xs font-semibold py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 transition bg-amber-50 text-amber-800 border border-amber-200 cursor-default opacity-90"
               >
                 <Clock className="w-4 h-4 text-amber-600" />
-                Danh sách chờ (Xem vé)
+                Trong danh sách chờ
               </button>
 
               {canCancel ? (

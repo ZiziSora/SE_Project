@@ -15,6 +15,8 @@ export default function EventCard({
     isFeatured = false,
     reason,
     role,
+    showRegisterButton = true,
+    onUnsave,
 }) {
     const isOrganizer = role === "organizer";
     const detailPath = `/events/${eventId}`;
@@ -82,20 +84,32 @@ export default function EventCard({
                     <Link
                         to={detailPath}
                         className={`flex-1 py-2 px-3 text-center text-xs font-semibold rounded-lg transition active:scale-[0.98] ${
-                            isOrganizer
+                            isOrganizer || !showRegisterButton
                                 ? "text-white bg-[#7C3AED] hover:bg-[#6D28D9] shadow-sm"
                                 : "border border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300"
                         }`}
                     >
                         Xem thông tin
                     </Link>
-                    {!isOrganizer && (
+                    {!isOrganizer && showRegisterButton && (
                         <Link
                             to={detailPath}
                             className="flex-1 py-2 px-3 text-center text-xs font-semibold rounded-lg text-white bg-[#7C3AED] hover:bg-[#6D28D9] active:scale-[0.98] transition shadow-sm"
                         >
                             Đăng ký
                         </Link>
+                    )}
+                    {onUnsave && (
+                        <button
+                            type="button"
+                            onClick={(e) => {
+                                e.preventDefault();
+                                onUnsave(eventId);
+                            }}
+                            className="py-2 px-3 text-center text-xs font-semibold rounded-lg text-red-600 border border-red-200 hover:bg-red-50 hover:border-red-300 transition active:scale-[0.98]"
+                        >
+                            Bỏ lưu
+                        </button>
                     )}
                 </div>
             </div>

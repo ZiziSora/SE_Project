@@ -14,6 +14,7 @@ def get_registration_count(event_id: str) -> int:
         .select("registration_id", count="exact", head=True)
         .eq("event_id", event_id)
         .neq("registration_status", "CANCELLED")
+        .neq("registration_status", "WAITLISTED")
         .execute()
     )
     return response.count or 0

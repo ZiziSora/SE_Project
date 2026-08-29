@@ -29,10 +29,19 @@ export default function QRCodeModal({ eventId, eventTitle, isOpen, onClose }) {
         }
       } catch (err) {
         if (isMounted) {
-          setError(
-            err.response?.data?.detail ||
-            "Không thể lấy mã QR. Vui lòng thử lại sau."
-          );
+          const detail = err.response?.data?.detail;
+          if (
+            err.response?.status === 403 ||
+            (typeof detail === "string" && detail.includes("danh sách chờ"))
+          ) {
+            setError(
+              "Bạn đang ở trong danh sách chờ. Vé và mã QR chỉ khả dụng khi bạn được xác nhận tham gia chính thức."
+            );
+          } else {
+            setError(
+              detail || "Không thể lấy mã QR. Vui lòng thử lại sau."
+            );
+          }
         }
       } finally {
         if (isMounted) {

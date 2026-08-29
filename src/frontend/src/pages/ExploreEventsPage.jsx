@@ -172,7 +172,7 @@ export default function ExploreEventsPage() {
                   location={event.location}
                   badgeText={
                     event.registered_count > 0
-                      ? `${event.registered_count} đã đăng ký`
+                      ? `${event.capacity ? Math.min(event.registered_count, event.capacity) : event.registered_count} đã đăng ký`
                       : "Mới"
                   }
                   {...event}

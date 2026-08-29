@@ -61,21 +61,27 @@ export default function ParticipantTable({
                   {error}
                 </td>
               </tr>
-            ) : participants.length === 0 ? (
+            ) : participants.filter(
+                (p) => p.registration_status !== "WAITLISTED" && p.registration_status !== "WAITLIST"
+              ).length === 0 ? (
               <tr>
                 <td colSpan={headers.length} className={cn(messageCellCls, "text-muted-foreground")}>
                   Không tìm thấy người tham gia nào.
                 </td>
               </tr>
             ) : (
-              participants.map((participant) => (
-                <ParticipantRow
-                  key={participant.registration_id}
-                  participant={participant}
-                  onCheckIn={onCheckIn}
-                  isSubmitting={checkingId === participant.registration_id}
-                />
-              ))
+              participants
+                .filter(
+                  (p) => p.registration_status !== "WAITLISTED" && p.registration_status !== "WAITLIST"
+                )
+                .map((participant) => (
+                  <ParticipantRow
+                    key={participant.registration_id}
+                    participant={participant}
+                    onCheckIn={onCheckIn}
+                    isSubmitting={checkingId === participant.registration_id}
+                  />
+                ))
             )}
           </tbody>
         </table>

@@ -23,6 +23,16 @@ export default function MyEventsPage() {
   const [isCanceling, setIsCanceling] = useState(false);
   const [toast, setToast] = useState(null);
 
+  const isEventExpired = (event) => {
+    if (!event) return true;
+    const now = new Date().getTime();
+    const deadlineStr = event.registration_deadline || event.start_time;
+    if (!deadlineStr) return false;
+    const cutoffTime = new Date(deadlineStr).getTime();
+    if (Number.isNaN(cutoffTime)) return false;
+    return cutoffTime < now;
+  };
+
   const fetchMyEvents = async () => {
     try {
       setLoading(true);
@@ -33,7 +43,10 @@ export default function MyEventsPage() {
         publicEventApi.listSavedEvents(),
       ]);
       setRegistrations(registrationData || []);
-      setSavedEvents(savedEventData || []);
+      const validSaved = (savedEventData || []).filter(
+        (item) => item.events && !isEventExpired(item.events)
+      );
+      setSavedEvents(validSaved);
     } catch (err) {
       console.error("Lỗi khi tải danh sách sự kiện:", err);
       setError("Không thể tải danh sách sự kiện. Vui lòng thử lại sau.");
@@ -42,10 +55,33 @@ export default function MyEventsPage() {
     }
   };
 
+  const handleUnsaveEvent = async (eventId) => {
+    try {
+      await publicEventApi.unsaveEvent(eventId);
+      setSavedEvents((prev) => prev.filter((item) => item.event_id !== eventId));
+      setToast({
+        type: "success",
+        message: "Đã bỏ lưu sự kiện thành công.",
+      });
+      setTimeout(() => setToast(null), 3000);
+    } catch (err) {
+      console.error("Lỗi khi bỏ lưu sự kiện:", err);
+      setToast({
+        type: "error",
+        message:
+          err.response?.data?.detail ||
+          err.message ||
+          "Không thể bỏ lưu sự kiện. Vui lòng thử lại sau.",
+      });
+      setTimeout(() => setToast(null), 4000);
+    }
+  };
+
   useEffect(() => {
     // Tải danh sách lần đầu là chủ đích của effect khi trang được mount.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchMyEvents();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const canCancelRegistration = (startTimeStr) => {
@@ -107,19 +143,19 @@ export default function MyEventsPage() {
 
   const formatEventDate = (startTimeStr, endTimeStr) => {
     if (!startTimeStr) {
-      return { month: "THG --", day: "--", time: "Chưa cập nhật" };
+      return { fullDateTime: "Thời gian chưa cập nhật", month: "THG --", day: "--", time: "Chưa cập nhật" };
     }
 
     const startDate = new Date(startTimeStr);
+    if (Number.isNaN(startDate.getTime())) {
+      return { fullDateTime: "Thời gian chưa cập nhật", month: "THG --", day: "--", time: "Chưa cập nhật" };
+    }
+
     const endDate = endTimeStr ? new Date(endTimeStr) : null;
 
-    const monthNames = [
-      "THG 1", "THG 2", "THG 3", "THG 4", "THG 5", "THG 6",
-      "THG 7", "THG 8", "THG 9", "THG 10", "THG 11", "THG 12"
-    ];
-
-    const month = monthNames[startDate.getMonth()];
     const day = String(startDate.getDate()).padStart(2, "0");
+    const month = startDate.getMonth() + 1;
+    const year = startDate.getFullYear();
 
     const formatTime = (d) =>
       d.toLocaleTimeString("en-US", {
@@ -128,11 +164,13 @@ export default function MyEventsPage() {
         hour12: true,
       });
 
-    const time = endDate
+    const timeStr = endDate && !Number.isNaN(endDate.getTime())
       ? `${formatTime(startDate)} - ${formatTime(endDate)}`
       : formatTime(startDate);
 
-    return { month, day, time };
+    const fullDateTime = `${timeStr}, ${day} Tháng ${month}, ${year}`;
+
+    return { fullDateTime, month: `THG ${month}`, day, time: timeStr };
   };
 
   const getEffectiveStatus = (item) => {
@@ -158,19 +196,10 @@ export default function MyEventsPage() {
     return "REGISTERED";
   };
 
-  const formatSavedEventDate = (startTimeStr) => {
+  const formatSavedEventDate = (startTimeStr, endTimeStr) => {
     if (!startTimeStr) return "Thời gian chưa được cập nhật";
-
-    const date = new Date(startTimeStr);
-    if (Number.isNaN(date.getTime())) return "Thời gian chưa được cập nhật";
-
-    return date.toLocaleString("vi-VN", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    const { fullDateTime } = formatEventDate(startTimeStr, endTimeStr);
+    return fullDateTime;
   };
 
   const filteredRegistrations = registrations.filter((item) => {
@@ -181,9 +210,14 @@ export default function MyEventsPage() {
     if (activeTab === "Đã hủy") return status === "CANCELLED";
     return true;
   });
+
+  const visibleSavedEvents = savedEvents.filter(
+    (item) => item.events && !isEventExpired(item.events)
+  );
+
   const isSavedTab = activeTab === "Đã lưu";
   const visibleItemCount = isSavedTab
-    ? savedEvents.length
+    ? visibleSavedEvents.length
     : filteredRegistrations.length;
 
   return (
@@ -202,7 +236,7 @@ export default function MyEventsPage() {
             activeTab={activeTab}
             setActiveTab={setActiveTab}
             registrations={registrations}
-            savedEvents={savedEvents}
+            savedEvents={visibleSavedEvents}
             getEffectiveStatus={getEffectiveStatus}
           />
 
@@ -241,7 +275,7 @@ export default function MyEventsPage() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
               {isSavedTab
-                ? savedEvents.map((item) => {
+                ? visibleSavedEvents.map((item) => {
                     const event = item.events;
                     if (!event) return null;
 
@@ -253,8 +287,10 @@ export default function MyEventsPage() {
                         badgeText="Đã lưu"
                         title={event.title}
                         faculty={event.organizer?.name || "Sự kiện đã lưu"}
-                        date={formatSavedEventDate(event.start_time)}
+                        date={formatSavedEventDate(event.start_time, event.end_time)}
                         location={event.location}
+                        showRegisterButton={false}
+                        onUnsave={handleUnsaveEvent}
                       />
                     );
                   })
