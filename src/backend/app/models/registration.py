@@ -38,6 +38,7 @@ class EventRegistration(Base):
     )
 
     created_at = Column(DateTime)
+    checked_in_at = Column(DateTime, nullable=True)
 
     user = relationship(
         "User",

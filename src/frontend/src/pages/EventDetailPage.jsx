@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { toast } from "react-toastify";
 import { Link, useParams } from "react-router-dom";
 import StudentHeader from "../components/common/StudentHeader.jsx";
+import OrganizerHeader from "../components/common/OrganizerHeader.jsx";
 import { supabase } from "../lib/supabase";
 import { publicEventApi } from "../api/eventApi.js";
 import {
@@ -55,6 +56,12 @@ export function EventDetailPage() {
     Boolean(user) &&
     (user?.user_metadata?.role === "student" ||
       localStorage.getItem("role") === "student");
+
+  // Ban tổ chức chỉ được xem chi tiết sự kiện, không thể đăng ký tham gia.
+  const isOrganizer =
+    Boolean(user) &&
+    (user?.user_metadata?.role === "organizer" ||
+      localStorage.getItem("role") === "organizer");
 
   /**
    * 1. Lấy chi tiết sự kiện từ Backend API (GET /events/:eventId)
@@ -159,7 +166,10 @@ export function EventDetailPage() {
           await publicEventApi.getRegistrationStatus(currentEventId);
         if (isMounted) {
           setCount(status.count);
-          setRegistered(status.registered);
+          setRegistered(
+            Boolean(status.registered) &&
+              String(status.status || "").toUpperCase() !== "CANCELLED",
+          );
         }
       } catch (err) {
         console.error("Lỗi khi tải trạng thái đăng ký:", err);
@@ -291,11 +301,17 @@ export function EventDetailPage() {
       setFeedback(
         result.already_registered
           ? { type: "info", message: "Bạn đã đăng ký sự kiện này từ trước!" }
-          : {
-              type: "success",
-              message:
-                "Đăng ký thành công! Bạn đã giữ được chỗ tham gia sự kiện.",
-            },
+          : result.is_waitlisted
+            ? {
+                type: "warning",
+                message:
+                  "Sự kiện đã hết chỗ chính thức. Bạn đã được thêm vào Danh sách chờ (WAITLISTED)!",
+              }
+            : {
+                type: "success",
+                message:
+                  "Đăng ký thành công! Bạn đã giữ được chỗ tham gia sự kiện.",
+              },
       );
     } catch (err) {
       if (err.response?.status === 401) {
@@ -369,7 +385,8 @@ export function EventDetailPage() {
 
   return (
     <div className="min-h-screen w-full max-w-full overflow-x-clip bg-white font-inter text-[#21182c]">
-      <StudentHeader />
+      {/* Header Navigation - hiển thị theo đúng role đang đăng nhập */}
+      {isOrganizer ? <OrganizerHeader /> : <StudentHeader />}
 
       <main className="w-full max-w-full overflow-x-clip">
         {eventLoading && (
@@ -467,17 +484,28 @@ export function EventDetailPage() {
                     : "pointer-events-none"
                 }
               >
-                <RegisterActionBar
-                  maxCapacity={maxCapacity}
-                  count={count}
-                  registered={registered}
-                  registerLoading={registerLoading}
-                  dataLoading={dataLoading}
-                  onRegister={handleRegister}
-                  feedback={feedback}
-                  user={user}
-                  floating={isRegistrationFloating}
-                />
+                {/* Ban tổ chức chỉ xem, không đăng ký được */}
+                {isOrganizer ? (
+                  <div className="pointer-events-auto flex items-center gap-2 rounded-xl bg-gray-100 px-4 py-3 text-sm font-medium text-gray-500">
+                    <Users size={18} className="text-violet-700" />
+                    <span>
+                      {count}/{maxCapacity} sinh viên đã đăng ký · Ban tổ chức
+                      chỉ có thể xem chi tiết sự kiện.
+                    </span>
+                  </div>
+                ) : (
+                  <RegisterActionBar
+                    maxCapacity={maxCapacity}
+                    count={count}
+                    registered={registered}
+                    registerLoading={registerLoading}
+                    dataLoading={dataLoading}
+                    onRegister={handleRegister}
+                    feedback={feedback}
+                    user={user}
+                    floating={isRegistrationFloating}
+                  />
+                )}
               </div>
               )}
             </div>

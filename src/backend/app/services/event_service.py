@@ -778,6 +778,7 @@ def _registration_counts(event_ids: list[str]) -> dict[str, int]:
             .table(TABLE_REGISTRATIONS)
             .select("event_id, registration_status")
             .in_("event_id", ids)
+            .neq("registration_status", "CANCELLED")
             .execute()
         )
     except Exception:  # noqa: BLE001

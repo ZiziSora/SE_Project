@@ -1,9 +1,12 @@
 # Bỏ qua thư viện Frontend
-src/frontend/node_modules/
-src/frontend/dist/
+**/node_modules/
+**/dist/
 .env
-
+.env.*
+!.env.example
 # Bỏ qua môi trường ảo Backend
-src/backend/venv/
-src/backend/__pycache__/
+**/.venv/
+**/venv/
+**/__pycache__/
 *.pyc
+*.pyo
