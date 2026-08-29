@@ -6,6 +6,8 @@ from fastapi import APIRouter, Depends, Query, Response, status
 from app.core.auth import require_approved_organizer
 from app.models.user import User
 from app.schemas.organizer_event import (
+    AIDescriptionIn,
+    AIDescriptionOut,
     EventCancelIn,
     EventCreate,
     EventListOut,
@@ -15,7 +17,7 @@ from app.schemas.organizer_event import (
     StatsOut,
 )
 from app.schemas.notification import EventReminderIn, EventReminderOut
-from app.services import event_service, notification_service
+from app.services import ai_description_service, event_service, notification_service
 
 router = APIRouter(prefix="/api/organizer/events", tags=["organizer_events"])
 
@@ -49,6 +51,20 @@ def get_stats(current_user: User = Depends(require_approved_organizer)):
 @router.get("/locations", response_model=list[str], summary="Gợi ý địa điểm")
 def list_locations(_current_user: User = Depends(require_approved_organizer)):
     return event_service.list_locations()
+
+
+@router.post(
+    "/ai/description",
+    response_model=AIDescriptionOut,
+    summary="Viết hoặc hoàn thiện mô tả sự kiện bằng AI",
+)
+def generate_ai_description(
+    payload: AIDescriptionIn,
+    _current_user: User = Depends(require_approved_organizer),
+):
+    description = ai_description_service.generate_event_description(payload)
+    mode = "refine" if (payload.current_description or "").strip() else "generate"
+    return AIDescriptionOut(description=description, mode=mode)
 
 
 @router.post(
