@@ -10,6 +10,7 @@ from app.models.user import User
 from app.routers import (
     admin_event_revisions,
     categories,
+    chatbot_router,
     event_review,
     events,
     notifications,
@@ -51,6 +52,7 @@ app.include_router(admin_event_revisions.router)
 app.include_router(categories.router)
 app.include_router(uploads.router)
 app.include_router(checkin_router)
+app.include_router(chatbot_router.router)
 
 
 @app.exception_handler(RequestValidationError)
