@@ -15,15 +15,20 @@ về một câu trả lời dự phòng lịch sự, chatbox vẫn hoạt độn
 """
 from __future__ import annotations
 
+import io
 import logging
 import os
+import re
+import xml.etree.ElementTree as ET
+import zipfile
 from datetime import datetime, timezone
 from typing import Any, Optional
 
+import httpx
 from pydantic import BaseModel
 
 from app.core.supabase_client import get_supabase
-from app.schemas.chatbot import ChatEventOut, ChatMessageIn, ChatMessageOut
+from app.schemas.chatbot import ChatEventOut, ChatMessageIn, ChatMessageOut, ChatTurn
 from app.services import recommendation_service
 
 logger = logging.getLogger(__name__)
@@ -37,6 +42,27 @@ FALLBACK_GEMINI_MODEL = "gemini-flash-latest"
 CONTEXT_EVENT_LIMIT = 25
 # Số lượt hội thoại gần nhất được giữ lại để làm ngữ cảnh.
 HISTORY_TURN_LIMIT = 10
+
+# --- Nạp nội dung TỆP KẾ HOẠCH (events.file_url) khi câu hỏi nói về 1 sự kiện cụ thể ---
+# Ban tổ chức bắt buộc đính kèm 1 tệp kế hoạch (.pdf / .docx) cho mỗi sự kiện.
+# Khi người dùng hỏi sâu về một sự kiện, ta tải tệp đó và đưa vào ngữ cảnh để trả lời
+# chi tiết (lịch trình, thể lệ, giải thưởng, yêu cầu chuẩn bị, đơn vị phối hợp...).
+PLAN_CONTEXT_MAX_CHARS = int(os.getenv("CHAT_PLAN_MAX_CHARS", "6000"))
+PLAN_MAX_EVENTS = int(os.getenv("CHAT_PLAN_MAX_EVENTS", "2"))
+PLAN_DOWNLOAD_TIMEOUT = 12
+PLAN_MAX_BYTES = 12 * 1024 * 1024
+# Tổng dung lượng PDF đính kèm 1 request (giới hạn inline-data của Gemini ~20MB).
+PLAN_PDF_TOTAL_BYTES = 14 * 1024 * 1024
+_PDF_MIME = "application/pdf"
+# Cache theo tiến trình để không tải lại tệp ở mỗi tin nhắn.
+_PLAN_CACHE: dict[str, Optional[dict[str, Any]]] = {}
+_PLAN_CACHE_MAX = 24
+_WORD_RE = re.compile(r"\w+", re.UNICODE)
+# Hư từ tiếng Việt hay xuất hiện trong tiêu đề, không mang tính định danh sự kiện.
+_TITLE_STOPWORDS = {
+    "su", "kien", "chuong", "trinh", "ngay", "hoi", "buoi", "cuoc", "thi",
+    "va", "cac", "cho", "cua", "ve", "the", "nam", "lan", "thu",
+}
 
 # Câu từ chối cố định cho câu hỏi ngoài phạm vi (test case bám vào thông điệp này).
 OUT_OF_SCOPE_REPLY = (
@@ -57,6 +83,9 @@ SYSTEM_PROMPT = (
     "- Sự kiện sắp diễn ra, đang mở đăng ký, đã kết thúc.\n"
     "- Thông tin sự kiện: thời gian, địa điểm, hạn đăng ký, chủ đề, mô tả, ban tổ chức, "
     "số người đã đăng ký, số chỗ còn lại.\n"
+    "- Chi tiết trong TỆP KẾ HOẠCH sự kiện do ban tổ chức tải lên (khi được cung cấp ở phần "
+    '"KẾ HOẠCH CHI TIẾT SỰ KIỆN" hoặc tệp PDF đính kèm): nội dung chương trình, lịch trình, '
+    "thể lệ, giải thưởng, yêu cầu chuẩn bị, đối tượng tham gia, đơn vị phối hợp...\n"
     "- Gợi ý sự kiện theo khoa/chuyên ngành / sở thích của sinh viên.\n"
     "- Hoạt động của chính sinh viên: sự kiện họ đã đăng ký, đã điểm danh, đã lưu, đang chờ "
     "danh sách (dựa trên phần HỒ SƠ NGƯỜI DÙNG).\n"
@@ -66,8 +95,10 @@ SYSTEM_PROMPT = (
     "lập trình, toán học, thời sự, tư vấn cá nhân, sản phẩm/website khác...), đặt "
     '"in_scope": false và KHÔNG cố trả lời câu hỏi đó.\n'
     '2. Nếu câu hỏi hợp lệ, đặt "in_scope": true và trả lời bằng tiếng Việt, ngắn gọn, thân thiện.\n'
-    '3. Khi nói về sự kiện cụ thể, CHỈ dùng thông tin trong phần "DỮ LIỆU SỰ KIỆN" được cung cấp. '
-    "Không bịa tên, thời gian, địa điểm. Nếu dữ liệu không có sự kiện phù hợp, nói rõ là hiện chưa có.\n"
+    '3. Khi nói về sự kiện cụ thể, CHỈ dùng thông tin trong phần "DỮ LIỆU SỰ KIỆN", phần '
+    '"KẾ HOẠCH CHI TIẾT SỰ KIỆN" và tệp PDF đính kèm (nếu có). Không bịa tên, thời gian, địa điểm, '
+    "thể lệ, giải thưởng. Nếu người dùng hỏi chi tiết mà không có kế hoạch của đúng sự kiện đó "
+    "trong ngữ cảnh, nói rõ là hiện chưa có thông tin, đừng đoán.\n"
     "4. Với câu hỏi về cách dùng UniEvent, được phép hướng dẫn theo hiểu biết chung về hệ thống.\n"
     '5. Khi người dùng nhờ gợi ý sự kiện "theo khoa của tôi" / "theo ngành của tôi" / '
     '"theo chuyên ngành" / "phù hợp với mình" mà phần "HỒ SƠ NGƯỜI DÙNG" đã có '
@@ -115,7 +146,7 @@ def _fetch_context_events(limit: int = CONTEXT_EVENT_LIMIT) -> list[dict[str, An
         .select(
             "event_id, title, description, location, start_time, end_time, "
             "registration_deadline, capacity, category_id, organizer_id, "
-            "event_status, approval_status"
+            "event_status, approval_status, file_url"
         )
         .gte("end_time", now)
         .order("start_time", desc=False)
@@ -353,12 +384,152 @@ def _to_chat_event(ev: dict[str, Any], categories: dict[int, str]) -> ChatEventO
 
 
 # --------------------------------------------------------------------------- #
+# Lớp 1b — Nạp nội dung TỆP KẾ HOẠCH của sự kiện được hỏi (events.file_url)
+# --------------------------------------------------------------------------- #
+def _events_referenced(
+    message: str,
+    history: list[ChatTurn],
+    events: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Đoán câu hỏi đang nói về (những) sự kiện nào, dựa trên khớp tiêu đề.
+
+    Chỉ khi xác định được sự kiện cụ thể ta mới tải tệp kế hoạch của nó — tránh
+    tải tệp vô ích cho câu hỏi chung ("sắp tới có sự kiện nào?").
+    """
+    recent = " ".join(
+        [message] + [t.text for t in history[-4:] if t.text]
+    ).lower()
+    if not recent.strip():
+        return []
+    recent_words = set(_WORD_RE.findall(recent))
+
+    scored: list[tuple[float, dict[str, Any]]] = []
+    for ev in events:
+        title = (ev.get("title") or "").strip().lower()
+        if not title or not ev.get("file_url"):
+            continue
+        if title in recent:
+            scored.append((1000.0 + len(title), ev))
+            continue
+        # Từ "có nghĩa" trong tiêu đề: bỏ chữ quá ngắn và vài hư từ tiếng Việt.
+        tokens = [w for w in _WORD_RE.findall(title) if len(w) >= 2 and w not in _TITLE_STOPWORDS]
+        keywords = [w for w in tokens if not w.isdigit()]
+        if not keywords:
+            continue
+        hits = sum(1 for w in keywords if w in recent_words)
+        ratio = hits / len(keywords)
+        strong = (hits >= 2 and ratio >= 0.5) or (len(keywords) <= 2 and hits == len(keywords))
+        if strong:
+            scored.append((float(hits) + ratio, ev))
+
+    scored.sort(key=lambda pair: pair[0], reverse=True)
+    return [ev for _, ev in scored[:PLAN_MAX_EVENTS]]
+
+
+def _extract_docx_text(data: bytes) -> str:
+    """Trích văn bản từ .docx bằng thư viện chuẩn (docx = zip chứa word/document.xml)."""
+    ns = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+    with zipfile.ZipFile(io.BytesIO(data)) as zf:
+        xml_bytes = zf.read("word/document.xml")
+    root = ET.fromstring(xml_bytes)
+    paragraphs: list[str] = []
+    for para in root.iter(f"{ns}p"):
+        line = "".join(node.text for node in para.iter(f"{ns}t") if node.text).strip()
+        if line:
+            paragraphs.append(line)
+    return "\n".join(paragraphs)
+
+
+def _download_plan(url: str) -> Optional[bytes]:
+    try:
+        resp = httpx.get(url, timeout=PLAN_DOWNLOAD_TIMEOUT, follow_redirects=True)
+        resp.raise_for_status()
+    except Exception:  # noqa: BLE001
+        logger.exception("Không tải được tệp kế hoạch: %s", url)
+        return None
+    data = resp.content or b""
+    if not data or len(data) > PLAN_MAX_BYTES:
+        logger.warning("Bỏ qua tệp kế hoạch rỗng/quá lớn (%s bytes): %s", len(data), url)
+        return None
+    return data
+
+
+def _load_event_plan(file_url: Optional[str]) -> Optional[dict[str, Any]]:
+    """Tải + chuẩn hoá tệp kế hoạch của một sự kiện.
+
+    - .docx -> {"kind": "text", "text": <đã cắt độ dài>}
+    - .pdf  -> {"kind": "pdf",  "pdf": <bytes>}  (gửi thẳng cho Gemini)
+    Trả None nếu không có tệp / tải lỗi / định dạng không hỗ trợ.
+    """
+    if not file_url:
+        return None
+    if file_url in _PLAN_CACHE:
+        return _PLAN_CACHE[file_url]
+
+    result: Optional[dict[str, Any]] = None
+    lowered = file_url.lower().split("?", 1)[0]
+    data = _download_plan(file_url)
+    if data is not None:
+        try:
+            if lowered.endswith(".pdf") or data[:5] == b"%PDF-":
+                result = {"kind": "pdf", "pdf": data}
+            elif lowered.endswith(".docx") or data[:2] == b"PK":
+                text = _extract_docx_text(data).strip()
+                if text:
+                    result = {"kind": "text", "text": text[:PLAN_CONTEXT_MAX_CHARS]}
+        except Exception:  # noqa: BLE001
+            logger.exception("Không đọc được nội dung tệp kế hoạch: %s", file_url)
+            result = None
+
+    if len(_PLAN_CACHE) >= _PLAN_CACHE_MAX:
+        _PLAN_CACHE.clear()
+    _PLAN_CACHE[file_url] = result
+    return result
+
+
+def _build_plan_context(
+    message: str,
+    history: list[ChatTurn],
+    events: list[dict[str, Any]],
+) -> tuple[Optional[str], list[dict[str, Any]]]:
+    """Trả (khối văn bản kế hoạch, danh sách part PDF đính kèm) cho Gemini."""
+    text_blocks: list[str] = []
+    pdf_parts: list[dict[str, Any]] = []
+    pdf_budget = PLAN_PDF_TOTAL_BYTES
+    try:
+        referenced = _events_referenced(message, history, events)
+    except Exception:  # noqa: BLE001
+        logger.exception("Lỗi khi dò sự kiện được hỏi cho chatbox.")
+        referenced = []
+
+    for ev in referenced:
+        plan = _load_event_plan(ev.get("file_url"))
+        if not plan:
+            continue
+        title = ev.get("title") or "sự kiện"
+        if plan["kind"] == "text":
+            text_blocks.append(f'### Kế hoạch sự kiện "{title}":\n{plan["text"]}')
+        elif plan["kind"] == "pdf" and len(plan["pdf"]) <= pdf_budget:
+            pdf_budget -= len(plan["pdf"])
+            text_blocks.append(
+                f'### Kế hoạch sự kiện "{title}": xem tệp PDF đính kèm bên dưới.'
+            )
+            pdf_parts.append(
+                {"inline_data": {"mime_type": _PDF_MIME, "data": plan["pdf"]}}
+            )
+
+    return ("\n\n".join(text_blocks) or None), pdf_parts
+
+
+# --------------------------------------------------------------------------- #
 # Lớp 2 — Gọi Gemini để sinh câu trả lời có cấu trúc
 # --------------------------------------------------------------------------- #
 def _build_contents(
     payload: ChatMessageIn,
     events_context: str,
     user_profile_context: Optional[str] = None,
+    plan_context: Optional[str] = None,
+    plan_pdf_parts: Optional[list[dict[str, Any]]] = None,
 ) -> list[dict[str, Any]]:
     """Ghép lịch sử hội thoại + hồ sơ người dùng + ngữ cảnh dữ liệu cho Gemini."""
     contents: list[dict[str, Any]] = []
@@ -376,14 +547,24 @@ def _build_contents(
         if user_profile_context
         else "HỒ SƠ NGƯỜI DÙNG: (chưa đăng nhập hoặc chưa có thông tin)\n\n"
     )
+    plan_block = (
+        "KẾ HOẠCH CHI TIẾT SỰ KIỆN (trích từ tệp kế hoạch do ban tổ chức tải lên — "
+        "được phép dùng để trả lời chi tiết về đúng (các) sự kiện này):\n"
+        f"{plan_context}\n\n"
+        if plan_context
+        else ""
+    )
     final_user_text = (
         f"Hôm nay là {today}.\n\n"
         f"{profile_block}"
         f"DỮ LIỆU SỰ KIỆN (chỉ được dùng thông tin dưới đây khi nói về sự kiện cụ thể):\n"
         f"{events_context}\n\n"
+        f"{plan_block}"
         f"CÂU HỎI CỦA NGƯỜI DÙNG:\n{payload.message}"
     )
-    contents.append({"role": "user", "parts": [{"text": final_user_text}]})
+    parts: list[dict[str, Any]] = [{"text": final_user_text}]
+    parts.extend(plan_pdf_parts or [])
+    contents.append({"role": "user", "parts": parts})
     return contents
 
 
@@ -460,7 +641,24 @@ def answer_chat_message(
 
     events_context = _build_events_context(events, categories, reg_counts, organizers)
     user_profile_context = _build_user_profile_context(user_id, categories)
-    contents = _build_contents(payload, events_context, user_profile_context)
+
+    # Nếu câu hỏi nói về một sự kiện cụ thể: nạp nội dung tệp kế hoạch (file_url)
+    # của sự kiện đó để trả lời chi tiết (lịch trình, thể lệ, giải thưởng...).
+    try:
+        plan_context, plan_pdf_parts = _build_plan_context(
+            payload.message, payload.history, events
+        )
+    except Exception:  # noqa: BLE001
+        logger.exception("Không nạp được kế hoạch chi tiết cho chatbox.")
+        plan_context, plan_pdf_parts = None, []
+
+    contents = _build_contents(
+        payload,
+        events_context,
+        user_profile_context,
+        plan_context,
+        plan_pdf_parts,
+    )
 
     result = _call_gemini(contents)
     if result is None:
