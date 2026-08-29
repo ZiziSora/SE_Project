@@ -27,6 +27,7 @@ import {
   AlertTriangle,
   Clock,
   Undo2,
+  Loader2,
 } from 'lucide-react';
 import OrganizerHeader from './common/OrganizerHeader.jsx';
 
@@ -192,6 +193,12 @@ export function EventForm({ mode, eventId }) {
   const [loading, setLoading] = useState(needsLoad);
   const [loadError, setLoadError] = useState(null);
 
+  // Viết mô tả bằng AI: cờ đang gọi API + bản mô tả ngay trước khi AI ghi đè,
+  // giữ trong ref để nút "Hoàn tác" khôi phục lại (null = không có gì để hoàn tác).
+  const [generatingDescription, setGeneratingDescription] = useState(false);
+  const [canUndoDescription, setCanUndoDescription] = useState(false);
+  const previousDescriptionRef = useRef(null);
+
   // Trạng thái hiện tại của sự kiện (chỉ có nghĩa ở mode edit / view)
   const [currentStatus, setCurrentStatus] = useState('DRAFT');
   const [requiresReapproval, setRequiresReapproval] = useState(false);
@@ -312,6 +319,12 @@ export function EventForm({ mode, eventId }) {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
+    // Người dùng tự sửa ô mô tả => bản "trước khi AI ghi đè" không còn ý nghĩa,
+    // ẩn nút Hoàn tác đi để tránh vô tình xoá mất phần vừa gõ thêm.
+    if (name === 'description' && canUndoDescription) {
+      setCanUndoDescription(false);
+      previousDescriptionRef.current = null;
+    }
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
@@ -383,6 +396,70 @@ export function EventForm({ mode, eventId }) {
     } finally {
       setCancellingRevision(false);
     }
+  };
+
+  /**
+   * Viết mô tả bằng AI. Chỉ chạy khi người dùng bấm nút.
+   * Ô mô tả trống  -> AI tự soạn mới từ tên / danh mục / địa điểm / thời gian.
+   * Ô đã có chữ    -> gửi kèm để AI viết lại cho mạch lạc, chuyên nghiệp hơn.
+   * Nội dung cũ được cất vào `previousDescriptionRef` để có thể Hoàn tác.
+   */
+  const handleGenerateDescription = async () => {
+    if (generatingDescription) return;
+    if (!formData.title.trim()) {
+      toast.error('Hãy nhập tên sự kiện trước khi dùng AI.');
+      return;
+    }
+
+    const refining = formData.description.trim().length > 0;
+    setGeneratingDescription(true);
+    try {
+      const categoryName = categories.find(
+        (cat) => String(cat.category_id) === String(formData.category_id),
+      )?.name;
+
+      const startDateTime =
+        formData.start_date && formData.start_time
+          ? `${formData.start_date}T${formData.start_time}:00`
+          : null;
+      const endDateTime =
+        formData.end_date && formData.end_time
+          ? `${formData.end_date}T${formData.end_time}:00`
+          : null;
+
+      const { description } = await eventsApi.generateDescription({
+        title: formData.title,
+        category_name: categoryName || null,
+        location: formData.location || null,
+        start_time: startDateTime,
+        end_time: endDateTime,
+        capacity: formData.capacity ? parseInt(formData.capacity, 10) : null,
+        current_description: refining ? formData.description : null,
+      });
+
+      previousDescriptionRef.current = formData.description;
+      setCanUndoDescription(true);
+      setFormData((prev) => ({ ...prev, description }));
+      toast.success(
+        refining
+          ? 'Đã hoàn thiện mô tả. Bạn có thể chỉnh sửa lại tuỳ ý.'
+          : 'Đã tạo mô tả bằng AI. Bạn có thể chỉnh sửa lại tuỳ ý.',
+      );
+    } catch (err) {
+      console.error('Lỗi khi tạo mô tả bằng AI:', err);
+      toast.error(extractApiErrorMessage(err, 'Không tạo được mô tả bằng AI.'));
+    } finally {
+      setGeneratingDescription(false);
+    }
+  };
+
+  /** Khôi phục đoạn mô tả ngay trước lần AI ghi đè gần nhất. */
+  const handleUndoDescription = () => {
+    if (!canUndoDescription) return;
+    setFormData((prev) => ({ ...prev, description: previousDescriptionRef.current ?? '' }));
+    previousDescriptionRef.current = null;
+    setCanUndoDescription(false);
+    toast.info('Đã hoàn tác về mô tả trước đó.');
   };
 
   /**
@@ -773,10 +850,37 @@ export function EventForm({ mode, eventId }) {
         <Card icon={<FileText size={15} />} title="Mô tả sự kiện">
           <div className="space-y-2.5">
             {!isView && (
-              <button type="button" className="flex cursor-pointer items-center gap-1.5 border border-primary text-primary rounded-full px-3.5 py-1 text-xs font-medium hover:bg-primary/5 transition-colors">
-                <Sparkles size={13} />
-                Viết mô tả bằng AI
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleGenerateDescription}
+                  disabled={generatingDescription}
+                  className="flex cursor-pointer items-center gap-1.5 border border-primary text-primary rounded-full px-3.5 py-1 text-xs font-medium hover:bg-primary/5 transition-colors disabled:opacity-50 disabled:cursor-default"
+                >
+                  {generatingDescription ? (
+                    <Loader2 size={13} className="animate-spin" />
+                  ) : (
+                    <Sparkles size={13} />
+                  )}
+                  {generatingDescription
+                    ? formData.description.trim()
+                      ? 'Đang hoàn thiện...'
+                      : 'Đang viết...'
+                    : formData.description.trim()
+                      ? 'Hoàn thiện mô tả bằng AI'
+                      : 'Viết mô tả bằng AI'}
+                </button>
+                {canUndoDescription && !generatingDescription && (
+                  <button
+                    type="button"
+                    onClick={handleUndoDescription}
+                    className="flex cursor-pointer items-center gap-1.5 border border-slate-300 text-slate-500 rounded-full px-3 py-1 text-xs font-medium hover:bg-slate-50 hover:text-slate-700 transition-colors"
+                  >
+                    <Undo2 size={13} />
+                    Hoàn tác
+                  </button>
+                )}
+              </div>
             )}
             <textarea
               rows={4}
