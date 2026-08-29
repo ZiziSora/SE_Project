@@ -142,9 +142,10 @@ export const publicEventApi = {
     return response.data;
   },
 
-  async getRecommendations(limit = 6) {
-    const response = await api.get("/api/events/recommendations", {
+  async getRecommendations(limit = 6, options = {}) {
+    const response = await api.get("/api/recommendations", {
       params: { limit },
+      signal: options.signal,
     });
     return response.data;
   },

@@ -6,6 +6,9 @@ import FloatingChatbox from "../components/FloatingChatbox";
 import { publicEventApi } from "../api/eventApi.js";
 
 export default function ExploreEventsPage() {
+  const isAuthenticatedStudent =
+    Boolean(localStorage.getItem("access_token")) &&
+    localStorage.getItem("role") === "student";
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedFaculty, setSelectedFaculty] = useState("Tất cả");
   const [selectedCategory, setSelectedCategory] = useState("Tất cả");
@@ -16,18 +19,24 @@ export default function ExploreEventsPage() {
   const [totalPages, setTotalPages] = useState(1);
 
   const [recommendedEvents, setRecommendedEvents] = useState([]);
-  const [loadingRecommendations, setLoadingRecommendations] = useState(true);
+  const [loadingRecommendations, setLoadingRecommendations] = useState(
+    isAuthenticatedStudent,
+  );
 
   // Gợi ý cá nhân hoá (lịch sử đăng ký/lưu + AI xếp hạng) — độc lập với bộ lọc bên dưới
   useEffect(() => {
+    if (!isAuthenticatedStudent) return undefined;
+
     const controller = new AbortController();
 
     async function fetchRecommendations() {
       setLoadingRecommendations(true);
       try {
-        const data = await publicEventApi.getRecommendations(3);
+        const data = await publicEventApi.getRecommendations(3, {
+          signal: controller.signal,
+        });
         if (!controller.signal.aborted) {
-          setRecommendedEvents(data?.recommendations || []);
+          setRecommendedEvents(data?.items || []);
         }
       } catch (err) {
         if (err.name !== "CanceledError") {
@@ -40,7 +49,7 @@ export default function ExploreEventsPage() {
 
     fetchRecommendations();
     return () => controller.abort();
-  }, []);
+  }, [isAuthenticatedStudent]);
 
   // Gọi API lấy dữ liệu từ FastAPI mỗi khi bộ lọc thay đổi
   useEffect(() => {
@@ -93,47 +102,49 @@ export default function ExploreEventsPage() {
         </section>
 
         {/* Khối "Gợi ý cho bạn" */}
-        <section
-          id="featured-events"
-          className="rounded-2xl p-4 sm:p-5"
-          style={{
-            background:
-              "linear-gradient(135deg, #F8F1FF 0%, #CCC3D8 20%, #7C3AED 55%, #630ED4 100%)",
-            border: "1px solid rgba(255,255,255,0.20)",
-            boxShadow: "0 4px 32px 0 rgba(99,14,212,0.18)",
-          }}
-        >
-          <div className="flex items-center gap-2 mb-4">
-            <span className="text-sm">✨</span>
-            <h2 className="text-sm font-bold text-white">Gợi ý cho bạn</h2>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-            {loadingRecommendations ? (
-              <p className="col-span-full py-6 text-center text-sm font-medium text-white/80">
-                Đang tìm sự kiện phù hợp với bạn...
-              </p>
-            ) : recommendedEvents.length > 0 ? (
-              recommendedEvents.map((event) => (
-                <EventCard
-                  key={event.event_id}
-                  eventId={event.event_id}
-                  image={event.banner_url}
-                  badgeText="Gợi ý"
-                  title={event.title}
-                  faculty={event.category_name || "Đơn vị tổ chức"}
-                  date={`${event.start_time || ""}`}
-                  location={event.location}
-                  reason={event.reason}
-                  isFeatured
-                />
-              ))
-            ) : (
-              <p className="col-span-full py-6 text-center text-sm font-medium text-white/80">
-                Chưa có sự kiện phù hợp để gợi ý.
-              </p>
-            )}
-          </div>
-        </section>
+        {isAuthenticatedStudent && (
+          <section
+            id="featured-events"
+            className="rounded-2xl p-4 sm:p-5"
+            style={{
+              background:
+                "linear-gradient(135deg, #F8F1FF 0%, #CCC3D8 20%, #7C3AED 55%, #630ED4 100%)",
+              border: "1px solid rgba(255,255,255,0.20)",
+              boxShadow: "0 4px 32px 0 rgba(99,14,212,0.18)",
+            }}
+          >
+            <div className="flex items-center gap-2 mb-4">
+              <span className="text-sm">✨</span>
+              <h2 className="text-sm font-bold text-white">Gợi ý cho bạn</h2>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+              {loadingRecommendations ? (
+                <p className="col-span-full py-6 text-center text-sm font-medium text-white/80">
+                  Đang tìm sự kiện phù hợp với bạn...
+                </p>
+              ) : recommendedEvents.length > 0 ? (
+                recommendedEvents.map((event) => (
+                  <EventCard
+                    key={event.event_id}
+                    eventId={event.event_id}
+                    image={event.banner_url}
+                    badgeText="Gợi ý"
+                    title={event.title}
+                    faculty={event.category_name || "Đơn vị tổ chức"}
+                    date={`${event.start_time || ""}`}
+                    location={event.location}
+                    reason={event.recommendation_reason}
+                    isFeatured
+                  />
+                ))
+              ) : (
+                <p className="col-span-full py-6 text-center text-sm font-medium text-white/80">
+                  Chưa có sự kiện phù hợp để gợi ý.
+                </p>
+              )}
+            </div>
+          </section>
+        )}
 
         {/* Thanh lọc */}
         <FilterBar

@@ -22,6 +22,8 @@ TABLE_EVENTS = "events"
 TABLE_CATEGORIES = "event_categories"
 TABLE_REGISTRATIONS = "event_registrations"
 TABLE_SAVED_EVENTS = "saved_events"
+TABLE_USERS = "users"
+
 
 SAVED_WEIGHT = 1.0
 REGISTERED_WEIGHT = 3.0
@@ -696,3 +698,56 @@ def _parse_datetime(value: Any) -> Optional[datetime]:
     if parsed.tzinfo is None:
         return parsed.replace(tzinfo=timezone.utc)
     return parsed.astimezone(timezone.utc)
+
+def _fetch_student_signals(student_id: str) -> dict[str, Any]:
+    """Lịch sử đăng ký + sự kiện đã lưu của sinh viên, dùng để tính độ liên quan."""
+    supabase = get_supabase()
+
+    registrations_res = (
+        supabase.table(TABLE_REGISTRATIONS)
+        .select("event_id, registration_status, events(category_id)")
+        .eq("user_id", student_id)
+        .execute()
+    )
+    saved_res = (
+        supabase.table(TABLE_SAVED_EVENTS)
+        .select("event_id, events(category_id)")
+        .eq("student_id", student_id)
+        .execute()
+    )
+    user_res = (
+        supabase.table(TABLE_USERS)
+        .select("department_name")
+        .eq("user_id", student_id)
+        .maybe_single()
+        .execute()
+    )
+
+    category_weight: dict[int, float] = {}
+    engaged_event_ids: set[str] = set()
+
+    for row in registrations_res.data or []:
+        eid = row.get("event_id")
+        if eid:
+            engaged_event_ids.add(eid)
+        if (row.get("registration_status") or "").upper() == "CANCELLED":
+            continue
+        cat_id = (row.get("events") or {}).get("category_id")
+        if cat_id is not None:
+            category_weight[cat_id] = category_weight.get(cat_id, 0) + 2
+
+    for row in saved_res.data or []:
+        eid = row.get("event_id")
+        if eid:
+            engaged_event_ids.add(eid)
+        cat_id = (row.get("events") or {}).get("category_id")
+        if cat_id is not None:
+            category_weight[cat_id] = category_weight.get(cat_id, 0) + 1
+
+    department_name = (user_res.data or {}).get("department_name") if user_res.data else None
+
+    return {
+        "category_weight": category_weight,
+        "engaged_event_ids": engaged_event_ids,
+        "department_name": department_name,
+    }
