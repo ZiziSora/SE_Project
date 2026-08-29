@@ -83,6 +83,19 @@ export const eventsApi = {
     return response.data;
   },
 
+  /**
+   * Huỷ sự kiện: sự kiện vẫn còn trong hệ thống ở trạng thái "Đã huỷ", dữ liệu
+   * đăng ký / điểm danh được giữ nguyên. Lý do bắt buộc với sự kiện đang mở
+   * đăng ký — backend ghép lý do vào thông báo gửi cho sinh viên.
+   */
+  async cancel(eventId, reason) {
+    const response = await api.post(
+      `/api/organizer/events/${eventId}/cancel`,
+      { reason: reason || null },
+    );
+    return response.data;
+  },
+
   async remove(eventId) {
     const response = await api.delete(`/api/organizer/events/${eventId}`);
     return response.data;

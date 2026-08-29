@@ -125,6 +125,14 @@ def register_for_event(
             detail=f'Không tìm thấy sự kiện với ID "{event_id}".',
         )
 
+    # `get_event_by_id` cố tình trả về cả sự kiện đã huỷ / đã đóng để trang chi
+    # tiết còn mở được từ thông báo huỷ. Nhưng ĐĂNG KÝ thì phải chặn ở đây.
+    if str(event.event_status or "").upper() != event_service.DB_PUBLISHED:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Sự kiện này đã bị huỷ hoặc đã kết thúc nên không thể đăng ký.",
+        )
+
     count = registration_service.get_registration_count(event_id)
     active_reg = registration_service.find_registration(event_id, current_user.id, include_cancelled=False)
     already_registered = active_reg is not None

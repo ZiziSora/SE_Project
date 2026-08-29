@@ -8,6 +8,7 @@ from app.models.user import User
 from app.schemas.organizer_event import (
     AIDescriptionIn,
     AIDescriptionOut,
+    EventCancelIn,
     EventCreate,
     EventListOut,
     EventStatusUpdate,
@@ -154,6 +155,21 @@ def cancel_pending_revision(
 ):
     return event_service.cancel_pending_revision(
         event_id, str(current_user.user_id)
+    )
+
+
+@router.post(
+    "/{event_id}/cancel",
+    response_model=OrganizerEventOut,
+    summary="Huỷ sự kiện và báo cho sinh viên đã đăng ký",
+)
+def cancel_event(
+    event_id: str,
+    payload: EventCancelIn,
+    current_user: User = Depends(require_approved_organizer),
+):
+    return event_service.cancel_event(
+        event_id, str(current_user.user_id), payload.reason
     )
 
 
