@@ -79,10 +79,14 @@ def get_filtered_events_service(
     registered_counts: Dict[str, int] = {}
     
     if event_ids:
-        regs_resp = supabase.table('event_registrations').select('event_id').in_('event_id', event_ids).execute()
+        regs_resp = supabase.table('event_registrations').select('event_id, registration_status').in_('event_id', event_ids).execute()
         regs = regs_resp.data if hasattr(regs_resp, 'data') else (regs_resp.get('data', []) if isinstance(regs_resp, dict) else [])
         for r in (regs or []):
             eid = r.get('event_id')
+            # Đăng ký đã huỷ không chiếm chỗ — phải khớp với cách đếm ở
+            # event_service._registration_counts và registration_service.
+            if str(r.get('registration_status') or '').upper() == 'CANCELLED':
+                continue
             if eid:
                 registered_counts[eid] = registered_counts.get(eid, 0) + 1
 

@@ -1,16 +1,16 @@
 import { useEffect, useState } from "react"
-import { ArrowRight, Eye, Pencil, Trash2 } from "lucide-react"
+import { ArrowRight, CalendarX2, Eye, Pencil, QrCode, Trash2 } from "lucide-react";
 import { Link } from "react-router-dom"
-import { toast } from "react-toastify"
 import { cn } from "../lib/utils"
 import { eventsApi } from "../api/eventApi.js"
-import ConfirmDialog from "./ConfirmDialog.jsx"
+import EventRemovalDialog from "./EventRemovalDialog.jsx"
 import {
-  extractApiErrorMessage,
   formatDateTime,
   formatRegistered,
+  getRemovalAction,
   getStatusDisplay,
   PENDING_REVISION_BADGE,
+  REMOVAL_MODE,
 } from "../utils/eventManagementUtils.js"
 
 const headers = ["TÊN SỰ KIỆN", "THỜI GIAN", "TRẠNG THÁI", "NGƯỜI ĐĂNG KÝ", "THAO TÁC"]
@@ -23,9 +23,8 @@ export function EventsTable() {
   const [rows, setRows] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  // Sự kiện đang chờ xác nhận xoá (null = không mở hộp thoại)
-  const [pendingDelete, setPendingDelete] = useState(null)
-  const [isDeleting, setIsDeleting] = useState(false)
+  // Sự kiện đang chờ xác nhận huỷ / xoá (null = không mở hộp thoại)
+  const [pendingRemoval, setPendingRemoval] = useState(null)
 
   useEffect(() => {
     let cancelled = false
@@ -48,22 +47,6 @@ export function EventsTable() {
       cancelled = true
     }
   }, [])
-
-  const confirmDelete = async () => {
-    if (!pendingDelete?.event_id || isDeleting) return
-    setIsDeleting(true)
-    try {
-      await eventsApi.remove(pendingDelete.event_id)
-      setRows((prev) => prev.filter((row) => row.event_id !== pendingDelete.event_id))
-      toast.success("Đã xoá sự kiện thành công")
-      setPendingDelete(null)
-    } catch (err) {
-      console.error("Lỗi xoá sự kiện:", err)
-      toast.error(extractApiErrorMessage(err, "Không xoá được sự kiện."))
-    } finally {
-      setIsDeleting(false)
-    }
-  }
 
   return (
     // KHÔNG dùng flex-1 / h-full: bảng cao đúng bằng nội dung, ít sự kiện thì khung
@@ -115,6 +98,10 @@ export function EventsTable() {
             ) : (
               rows.map((row) => {
                 const status = getStatusDisplay(row.event_status)
+                // Huỷ hay xoá là hai việc khác nhau — icon phải nói đúng việc
+                const removal = getRemovalAction(row)
+                const RemovalIcon =
+                  removal.mode === REMOVAL_MODE.CANCEL ? CalendarX2 : Trash2
                 return (
                   <tr key={row.event_id ?? row.title}>
                     {/* Cố định chiều rộng cột Tên sự kiện để chữ tự động xuống dòng gọn gàng */}
@@ -156,6 +143,14 @@ export function EventsTable() {
 
                     <td className={cn(cellCls, "whitespace-nowrap")}>
                       <div className="flex items-center justify-end gap-3 text-muted-foreground">
+                        <Link
+                          to={`/organizer/events/${row.event_id}/checkin`}
+                          aria-label={`Điểm danh check-in ${row.title}`}
+                          title="Điểm danh Check-in"
+                          className="hover:text-purple-600 text-purple-700 font-bold flex items-center gap-1"
+                        >
+                          <QrCode className="size-4" aria-hidden="true" />
+                        </Link>
                         {row.can_edit && (
                           <Link
                             to={`/organizer/edit-event/${row.event_id}`}
@@ -175,11 +170,12 @@ export function EventsTable() {
                         {row.can_delete !== false && (
                           <button
                             type="button"
-                            onClick={() => setPendingDelete(row)}
-                            aria-label={`Xóa ${row.title}`}
+                            onClick={() => setPendingRemoval(row)}
+                            aria-label={`${removal.actionLabel} ${row.title}`}
+                            title={removal.confirmLabel}
                             className="hover:text-destructive"
                           >
-                            <Trash2 className="size-[18px]" aria-hidden="true" />
+                            <RemovalIcon className="size-[18px]" aria-hidden="true" />
                           </button>
                         )}
                       </div>
@@ -193,18 +189,21 @@ export function EventsTable() {
       </div>
 
 
-      <ConfirmDialog
-        open={Boolean(pendingDelete)}
-        tone="danger"
-        icon={Trash2}
-        title="Xoá sự kiện?"
-        description="Sự kiện sẽ bị xoá khỏi hệ thống cùng toàn bộ dữ liệu đăng ký và điểm danh đi kèm. Thao tác này không thể hoàn tác."
-        detailTitle={pendingDelete?.title ?? "Sự kiện chưa có tên"}
-        detailSubtitle={pendingDelete?.event_id}
-        confirmLabel="Xoá sự kiện"
-        isSubmitting={isDeleting}
-        onClose={() => !isDeleting && setPendingDelete(null)}
-        onConfirm={confirmDelete}
+      {/* Xoá thì bỏ hàng khỏi bảng; huỷ thì sự kiện vẫn còn (trạng thái "Đã
+          huỷ") nên chỉ thay bản ghi tại chỗ. */}
+      <EventRemovalDialog
+        event={pendingRemoval}
+        onClose={() => setPendingRemoval(null)}
+        onDeleted={(eventId) =>
+          setRows((prev) => prev.filter((row) => row.event_id !== eventId))
+        }
+        onCancelled={(updated) =>
+          setRows((prev) =>
+            prev.map((row) =>
+              row.event_id === updated.event_id ? { ...row, ...updated } : row,
+            ),
+          )
+        }
       />
 
       {/* Footer luôn dính đáy bảng, không bị đẩy khỏi màn hình */}

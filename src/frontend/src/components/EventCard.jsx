@@ -13,7 +13,10 @@ export default function EventCard({
     date,
     location,
     isFeatured = false,
+    reason,
+    role,
 }) {
+    const isOrganizer = role === "organizer";
     const detailPath = `/events/${eventId}`;
 
     return (
@@ -58,6 +61,12 @@ export default function EventCard({
                     {faculty || "Đơn vị tổ chức"}
                 </p>
 
+                {reason && (
+                    <p className="text-xs text-[#7C3AED] italic line-clamp-2">
+                        {reason}
+                    </p>
+                )}
+
                 <div className="flex flex-col gap-1 mt-auto pt-1">
                     <div className="flex items-center gap-1.5 text-xs text-gray-500">
                         <Calendar className="h-3.5 w-3.5 shrink-0 text-[#6D28D9]" />
@@ -72,16 +81,22 @@ export default function EventCard({
                 <div className="flex gap-2 mt-3">
                     <Link
                         to={detailPath}
-                        className="flex-1 py-2 px-3 text-center text-xs font-semibold rounded-lg border border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300 active:scale-[0.98] transition"
+                        className={`flex-1 py-2 px-3 text-center text-xs font-semibold rounded-lg transition active:scale-[0.98] ${
+                            isOrganizer
+                                ? "text-white bg-[#7C3AED] hover:bg-[#6D28D9] shadow-sm"
+                                : "border border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300"
+                        }`}
                     >
                         Xem thông tin
                     </Link>
-                    <Link
-                        to={detailPath}
-                        className="flex-1 py-2 px-3 text-center text-xs font-semibold rounded-lg text-white bg-[#7C3AED] hover:bg-[#6D28D9] active:scale-[0.98] transition shadow-sm"
-                    >
-                        Đăng ký
-                    </Link>
+                    {!isOrganizer && (
+                        <Link
+                            to={detailPath}
+                            className="flex-1 py-2 px-3 text-center text-xs font-semibold rounded-lg text-white bg-[#7C3AED] hover:bg-[#6D28D9] active:scale-[0.98] transition shadow-sm"
+                        >
+                            Đăng ký
+                        </Link>
+                    )}
                 </div>
             </div>
         </div>

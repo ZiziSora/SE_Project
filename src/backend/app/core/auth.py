@@ -1,3 +1,5 @@
+import logging
+
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
@@ -7,6 +9,8 @@ from app.database import get_db, supabase
 from app.models.enum import UserRole, UserStatus
 from app.models.user import User
 
+
+logger = logging.getLogger(__name__)
 
 security = HTTPBearer()
 
@@ -32,6 +36,11 @@ def get_current_user(
             detail="Mã truy cập không hợp lệ hoặc đã hết hạn.",
         ) from error
     except Exception as error:
+        logger.exception(
+            "Không gọi được Supabase Auth khi kiểm tra token (%s): %s",
+            type(error).__name__,
+            error,
+        )
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Dịch vụ xác thực đang tạm thời không khả dụng.",

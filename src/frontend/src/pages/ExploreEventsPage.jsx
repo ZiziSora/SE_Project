@@ -15,7 +15,32 @@ export default function ExploreEventsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
-  const featuredEvents = events.slice(0, 3);
+  const [recommendedEvents, setRecommendedEvents] = useState([]);
+  const [loadingRecommendations, setLoadingRecommendations] = useState(true);
+
+  // Gợi ý cá nhân hoá (lịch sử đăng ký/lưu + AI xếp hạng) — độc lập với bộ lọc bên dưới
+  useEffect(() => {
+    const controller = new AbortController();
+
+    async function fetchRecommendations() {
+      setLoadingRecommendations(true);
+      try {
+        const data = await publicEventApi.getRecommendations(3);
+        if (!controller.signal.aborted) {
+          setRecommendedEvents(data?.recommendations || []);
+        }
+      } catch (err) {
+        if (err.name !== "CanceledError") {
+          console.error("Không thể tải gợi ý sự kiện:", err);
+        }
+      } finally {
+        if (!controller.signal.aborted) setLoadingRecommendations(false);
+      }
+    }
+
+    fetchRecommendations();
+    return () => controller.abort();
+  }, []);
 
   // Gọi API lấy dữ liệu từ FastAPI mỗi khi bộ lọc thay đổi
   useEffect(() => {
@@ -83,17 +108,22 @@ export default function ExploreEventsPage() {
             <h2 className="text-sm font-bold text-white">Gợi ý cho bạn</h2>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-            {featuredEvents.length > 0 ? (
-              featuredEvents.map((event) => (
+            {loadingRecommendations ? (
+              <p className="col-span-full py-6 text-center text-sm font-medium text-white/80">
+                Đang tìm sự kiện phù hợp với bạn...
+              </p>
+            ) : recommendedEvents.length > 0 ? (
+              recommendedEvents.map((event) => (
                 <EventCard
-                  key={event.event_id || event.id}
-                  eventId={event.event_id || event.id}
+                  key={event.event_id}
+                  eventId={event.event_id}
                   image={event.banner_url}
                   badgeText="Gợi ý"
                   title={event.title}
-                  faculty={event.department_name || "Đơn vị tổ chức"}
+                  faculty={event.category_name || "Đơn vị tổ chức"}
                   date={`${event.start_time || ""}`}
                   location={event.location}
+                  reason={event.reason}
                   isFeatured
                 />
               ))

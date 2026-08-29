@@ -1,6 +1,6 @@
 from unittest.mock import patch
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, status
 from fastapi.testclient import TestClient
 
 from app.core.auth import require_approved_organizer
@@ -82,3 +82,59 @@ def test_create_event_ignores_client_organizer_id(mock_create_event):
     payload, organizer_id = mock_create_event.call_args.args
     assert not hasattr(payload, "organizer_id")
     assert organizer_id == ORGANIZER_ID
+
+
+@patch("app.services.ai_description_service.generate_event_description")
+def test_ai_description_generate_mode_when_no_current_text(mock_generate):
+    mock_generate.return_value = "Đoạn mô tả do AI viết mới."
+    client = _build_client()
+
+    response = client.post(
+        "/api/organizer/events/ai/description",
+        json={"title": "Hội thảo AI", "category_name": "Công nghệ"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "description": "Đoạn mô tả do AI viết mới.",
+        "mode": "generate",
+    }
+    assert mock_generate.call_args.args[0].title == "Hội thảo AI"
+
+
+@patch("app.services.ai_description_service.generate_event_description")
+def test_ai_description_refine_mode_when_current_text_present(mock_generate):
+    mock_generate.return_value = "Đoạn mô tả đã được trau chuốt."
+    client = _build_client()
+
+    response = client.post(
+        "/api/organizer/events/ai/description",
+        json={"title": "Hội thảo AI", "current_description": "  mô tả nháp  "},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["mode"] == "refine"
+
+
+def test_ai_description_rejects_missing_title():
+    client = _build_client()
+
+    response = client.post("/api/organizer/events/ai/description", json={})
+
+    assert response.status_code == 422
+
+
+@patch("app.services.ai_description_service.generate_event_description")
+def test_ai_description_propagates_service_unavailable(mock_generate):
+    mock_generate.side_effect = HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail="Tính năng viết mô tả bằng AI chưa được cấu hình (thiếu GEMINI_API_KEY).",
+    )
+    client = _build_client()
+
+    response = client.post(
+        "/api/organizer/events/ai/description",
+        json={"title": "Hội thảo AI"},
+    )
+
+    assert response.status_code == 503

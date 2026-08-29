@@ -11,7 +11,6 @@ export default function ParticipantEventsPage() {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [isMock, setIsMock] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -24,7 +23,6 @@ export default function ParticipantEventsPage() {
         const result = await participantsApi.listEvents({ search: search || undefined });
         if (cancelled) return;
         setEvents(result.items);
-        setIsMock(result.is_mock);
       } catch (err) {
         console.error("Lỗi tải danh sách sự kiện:", err);
         if (!cancelled) setError("Không tải được danh sách sự kiện. Vui lòng thử lại.");
@@ -52,11 +50,6 @@ export default function ParticipantEventsPage() {
             <p className="mt-1 text-sm text-muted-foreground">
               Vui lòng chọn một sự kiện để tiếp tục.
             </p>
-            {isMock && (
-              <p className="mt-2 inline-flex rounded-md bg-yellow-100 px-2.5 py-1 font-mono text-xs font-medium text-yellow-700">
-                Đang hiển thị dữ liệu mẫu — API chưa sẵn sàng
-              </p>
-            )}
           </header>
 
           <div className="relative w-full max-w-md">

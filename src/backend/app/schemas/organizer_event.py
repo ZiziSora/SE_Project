@@ -97,6 +97,57 @@ class EventStatusUpdate(BaseModel):
     event_status: EventStatus
 
 
+class EventCancelIn(BaseModel):
+    """Yêu cầu huỷ sự kiện của Ban tổ chức.
+
+    Lý do KHÔNG bắt buộc ở tầng schema vì còn tuỳ trạng thái: sự kiện đang mở
+    đăng ký thì bắt buộc (còn sinh viên để thông báo), sự kiện mới chờ duyệt thì
+    không. Ràng buộc đó nằm ở `event_service.cancel_event`.
+    """
+
+    reason: Optional[str] = Field(default=None, max_length=500)
+
+    @field_validator("reason", mode="before")
+    @classmethod
+    def _strip_blank(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            return value.strip() or None
+        return value
+
+
+class AIDescriptionIn(BaseModel):
+    """Ngữ cảnh gửi lên để AI viết / hoàn thiện mô tả sự kiện.
+
+    `current_description` trống  -> viết mới.
+    `current_description` có chữ -> hoàn thiện đoạn đang có.
+    """
+
+    title: str = Field(..., min_length=1, max_length=255)
+    category_name: Optional[str] = Field(None, max_length=255)
+    location: Optional[str] = Field(None, max_length=255)
+    start_time: Optional[datetime] = None
+    end_time: Optional[datetime] = None
+    capacity: Optional[int] = Field(None, ge=1, le=1_000_000)
+    current_description: Optional[str] = Field(None, max_length=5000)
+
+    @field_validator(
+        "title", "category_name", "location", "current_description", mode="before"
+    )
+    @classmethod
+    def _strip_text(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            value = value.strip()
+            return value or None
+        return value
+
+
+class AIDescriptionOut(BaseModel):
+    description: str
+    # "generate" khi viết mới, "refine" khi hoàn thiện đoạn có sẵn — tiện cho
+    # frontend hiển thị đúng thông báo.
+    mode: str
+
+
 class OrganizerEventOut(BaseModel):
     event_id: Optional[str] = None
     title: Optional[str] = None

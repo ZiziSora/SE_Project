@@ -1,23 +1,26 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { toast } from "react-toastify";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import StudentHeader from "../components/common/StudentHeader.jsx";
+import OrganizerHeader from "../components/common/OrganizerHeader.jsx";
 import { supabase } from "../lib/supabase";
 import { publicEventApi } from "../api/eventApi.js";
 import {
   Calendar,
   Users,
   MapPin,
-  Tag,
   Loader2,
   AlertCircle,
+  CalendarX2,
   RotateCcw,
+  ArrowLeft,
 } from "lucide-react";
-import { EventPoster } from "../components/EventDetail/EventPoster";
-import { EventDetails } from "../components/EventDetail/EventDetails";
-import { EventDescription } from "../components/EventDetail/EventDescription";
-import { RegisterActionBar } from "../components/EventDetail/RegisterActionBar";
-import { BookmarkButton } from "../components/EventDetail/BookmarkButton";
+import { EventPoster } from "../components/EventDetail/EventPoster.jsx";
+import { EventDetails } from "../components/EventDetail/EventDetails.jsx";
+import { EventDescription } from "../components/EventDetail/EventDescription.jsx";
+import { RegisterActionBar } from "../components/EventDetail/RegisterActionBar.jsx";
+import { BookmarkButton } from "../components/EventDetail/BookmarkButton.jsx";
+import { OrganizerSpotlight } from "../components/EventDetail/OrganizerSpotlight.jsx";
 import {
   DEFAULT_EVENT_ID,
   formatVietnameseDate,
@@ -43,6 +46,8 @@ export function EventDetailPage() {
   const [dataLoading, setDataLoading] = useState(true);
   const [registerLoading, setRegisterLoading] = useState(false);
   const [feedback, setFeedback] = useState({ type: null, message: "" });
+  const [isRegistrationFloating, setIsRegistrationFloating] = useState(false);
+  const registrationAnchorRef = useRef(null);
 
   // State quản lý Bookmark (Lưu sự kiện) - chỉ dành cho role Student
   const [saved, setSaved] = useState(false);
@@ -51,6 +56,12 @@ export function EventDetailPage() {
     Boolean(user) &&
     (user?.user_metadata?.role === "student" ||
       localStorage.getItem("role") === "student");
+
+  // Ban tổ chức chỉ được xem chi tiết sự kiện, không thể đăng ký tham gia.
+  const isOrganizer =
+    Boolean(user) &&
+    (user?.user_metadata?.role === "organizer" ||
+      localStorage.getItem("role") === "organizer");
 
   /**
    * 1. Lấy chi tiết sự kiện từ Backend API (GET /events/:eventId)
@@ -155,7 +166,10 @@ export function EventDetailPage() {
           await publicEventApi.getRegistrationStatus(currentEventId);
         if (isMounted) {
           setCount(status.count);
-          setRegistered(status.registered);
+          setRegistered(
+            Boolean(status.registered) &&
+              String(status.status || "").toUpperCase() !== "CANCELLED",
+          );
         }
       } catch (err) {
         console.error("Lỗi khi tải trạng thái đăng ký:", err);
@@ -199,6 +213,43 @@ export function EventDetailPage() {
       isMounted = false;
     };
   }, [currentEventId, isStudent]);
+
+  useEffect(() => {
+    const registrationAnchor = registrationAnchorRef.current;
+    if (!registrationAnchor || eventLoading || eventError) return undefined;
+
+    let animationFrameId = null;
+
+    const updateRegistrationPosition = () => {
+      animationFrameId = null;
+      const headerOffset = window.innerWidth >= 640 ? 88 : 72;
+      const shouldFloat =
+        window.scrollY > 0 &&
+        registrationAnchor.getBoundingClientRect().top <= headerOffset;
+
+      setIsRegistrationFloating((current) =>
+        current === shouldFloat ? current : shouldFloat,
+      );
+    };
+
+    const requestRegistrationUpdate = () => {
+      if (animationFrameId === null) {
+        animationFrameId = window.requestAnimationFrame(updateRegistrationPosition);
+      }
+    };
+
+    window.addEventListener("scroll", requestRegistrationUpdate, { passive: true });
+    window.addEventListener("resize", requestRegistrationUpdate);
+    requestRegistrationUpdate();
+
+    return () => {
+      window.removeEventListener("scroll", requestRegistrationUpdate);
+      window.removeEventListener("resize", requestRegistrationUpdate);
+      if (animationFrameId !== null) {
+        window.cancelAnimationFrame(animationFrameId);
+      }
+    };
+  }, [currentEventId, eventError, eventLoading]);
 
   // 4. Xử lý nút Bookmark (Lưu sự kiện)
   const handleToggleBookmark = async () => {
@@ -250,11 +301,17 @@ export function EventDetailPage() {
       setFeedback(
         result.already_registered
           ? { type: "info", message: "Bạn đã đăng ký sự kiện này từ trước!" }
-          : {
-              type: "success",
-              message:
-                "Đăng ký thành công! Bạn đã giữ được chỗ tham gia sự kiện.",
-            },
+          : result.is_waitlisted
+            ? {
+                type: "warning",
+                message:
+                  "Sự kiện đã hết chỗ chính thức. Bạn đã được thêm vào Danh sách chờ (WAITLISTED)!",
+              }
+            : {
+                type: "success",
+                message:
+                  "Đăng ký thành công! Bạn đã giữ được chỗ tham gia sự kiện.",
+              },
       );
     } catch (err) {
       if (err.response?.status === 401) {
@@ -276,79 +333,84 @@ export function EventDetailPage() {
     }
   };
 
-  // Map dữ liệu từ Event (trả về bởi Backend API) vào mảng chi tiết UI
+  const schedule = event
+    ? {
+        icon: Calendar,
+        items: [
+          {
+            label: "Bắt đầu",
+            value: formatVietnameseDate(event.start_time),
+            subValue: formatVietnameseTime(event.start_time),
+          },
+          {
+            label: "Kết thúc",
+            value: formatVietnameseDate(event.end_time),
+            subValue: formatVietnameseTime(event.end_time),
+          },
+          {
+            label: "Hạn đăng ký",
+            value: formatVietnameseDate(event.registration_deadline),
+            subValue: formatVietnameseTime(event.registration_deadline),
+          },
+        ],
+      }
+    : { icon: Calendar, items: [] };
+
   const details = event
     ? [
         {
-          icon: Calendar,
-          label: "Ngày & giờ bắt đầu",
-          value: formatVietnameseDate(event.start_time),
-          subValue: formatVietnameseTime(event.start_time),
-        },
-        {
-          icon: Calendar,
-          label: "Ngày & giờ kết thúc",
-          value: formatVietnameseDate(event.end_time),
-          subValue: formatVietnameseTime(event.end_time),
-        },
-        {
-          icon: Calendar,
-          label: "Hạn chót đăng ký",
-          value: formatVietnameseDate(event.registration_deadline),
-          subValue: formatVietnameseTime(event.registration_deadline),
-        },
-        {
           icon: Users,
-          label: "Số lượng tham gia tối đa",
+          label: "Quy mô sự kiện",
           value: event.capacity
             ? `${event.capacity} Sinh viên`
             : "Không giới hạn",
+          subValue: "Sức chứa tối đa",
+          className: "col-span-1 bg-violet-50/70",
         },
         {
           icon: MapPin,
           label: "Địa điểm",
           value: event.location || "Chưa cập nhật địa điểm",
-        },
-        {
-          icon: Tag,
-          label: "Lĩnh vực / Danh mục",
-          value: event.category_name || "Chưa phân loại",
+          subValue: "Thông tin địa điểm tổ chức",
+          className: "col-span-1",
         },
       ]
     : [];
 
-  const maxCapacity = event?.capacity || 250;
+  const maxCapacity = event?.capacity ?? null;
+  // Sự kiện đã huỷ vẫn mở được trang chi tiết (link trong thông báo huỷ trỏ về
+  // đây), nhưng không được mời đăng ký nữa.
+  const isCancelled =
+    String(event?.event_status || "").toUpperCase() === "CANCELLED";
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header Navigation */}
-      <StudentHeader />
+    <div className="min-h-screen w-full max-w-full overflow-x-clip bg-white font-inter text-[#21182c]">
+      {/* Header Navigation - hiển thị theo đúng role đang đăng nhập */}
+      {isOrganizer ? <OrganizerHeader /> : <StudentHeader />}
 
-      <main className="max-w-5xl mx-auto px-6 md:px-10 py-10 pb-20">
-        {/* State 1: Fallback UI khi đang Loading dữ liệu từ Backend API */}
+      <main className="w-full max-w-full overflow-x-clip">
         {eventLoading && (
-          <div className="flex flex-col items-center justify-center py-24 bg-white rounded-2xl shadow-sm border border-gray-100 my-6">
-            <Loader2 className="w-12 h-12 animate-spin text-purple-600 mb-4" />
-            <h3 className="text-lg font-bold text-gray-800">
+          <div className="mx-auto my-16 flex min-h-[55vh] max-w-6xl flex-col items-center justify-center rounded-[2rem] border border-violet-100 bg-white px-6 text-center shadow-sm">
+            <Loader2 className="mb-5 size-11 animate-spin text-violet-700" />
+            <h3 className="text-xl font-semibold text-[#21182c]">
               Đang tải dữ liệu sự kiện...
             </h3>
-            <p className="text-sm text-gray-500 mt-1">
+            <p className="mt-2 text-sm text-slate-500">
               Vui lòng chờ trong giây lát.
             </p>
           </div>
         )}
 
-        {/* State 2: Fallback UI khi gặp lỗi hoặc không tìm thấy Event */}
         {!eventLoading && eventError && (
-          <div className="bg-rose-50 border border-rose-200 rounded-2xl p-8 my-6 text-center flex flex-col items-center">
-            <AlertCircle className="w-12 h-12 text-rose-600 mb-3" />
-            <h3 className="text-xl font-bold text-rose-900 mb-2">
+          <div className="mx-auto my-16 flex min-h-[55vh] max-w-4xl flex-col items-center justify-center rounded-[2rem] border border-rose-200 bg-rose-50 p-8 text-center">
+            <AlertCircle className="mb-4 size-12 text-rose-600" />
+            <h3 className="mb-2 text-2xl font-semibold text-rose-950">
               Không thể hiển thị sự kiện
             </h3>
-            <p className="text-sm text-rose-700 max-w-md mb-6">{eventError}</p>
+            <p className="mb-7 max-w-md text-sm leading-6 text-rose-700">{eventError}</p>
             <button
               onClick={() => fetchEventDetails(currentEventId)}
-              className="inline-flex items-center gap-2 bg-rose-600 hover:bg-rose-700 text-white font-semibold px-5 py-2.5 rounded-xl transition-all shadow-sm"
+              className="inline-flex items-center gap-2 rounded-full bg-rose-700 px-6 py-3 font-semibold text-white transition hover:bg-rose-800"
             >
               <RotateCcw size={16} />
               <span>Thử tải lại dữ liệu</span>
@@ -356,51 +418,128 @@ export function EventDetailPage() {
           </div>
         )}
 
-        {/* State 3: Hiển thị giao diện chính sau khi fetch dữ liệu thành công */}
         {!eventLoading && !eventError && event && (
-          <>
-            {/* Tiêu đề Sự kiện + Nút Bookmark (chỉ hiển thị với role Student) */}
-            <div className="flex items-start justify-between gap-4 mb-6">
-              <h1 className="text-2xl md:text-[28px] font-extrabold uppercase text-[#6D28D9] leading-snug max-w-3xl">
-                {event.title || "Sự kiện không có tiêu đề"}
-              </h1>
-              {isStudent && (
+          <section className="mx-auto max-w-7xl px-5 py-8 md:px-8 md:py-10">
+            <Link
+              to="/explore"
+              className="inline-flex items-center gap-2 text-sm font-semibold text-violet-700 transition hover:text-violet-900"
+            >
+              <ArrowLeft className="size-4" />
+              Quay lại khám phá
+            </Link>
+
+            {isCancelled && (
+              <div
+                role="status"
+                className="mt-6 flex items-start gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-5 py-4"
+              >
+                <CalendarX2 className="mt-0.5 size-5 shrink-0 text-rose-600" />
+                <div>
+                  <p className="font-semibold text-rose-950">
+                    Sự kiện này đã bị huỷ
+                  </p>
+                  <p className="mt-1 text-sm leading-6 text-rose-700">
+                    Ban tổ chức đã huỷ sự kiện nên không còn nhận đăng ký. Thông
+                    tin bên dưới được giữ lại để bạn tra cứu. Lý do huỷ nằm
+                    trong thông báo gửi tới bạn.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            <div className="mt-7">
+              <div className="min-w-0">
+                <h1 className="max-w-5xl text-[clamp(2.25rem,5vw,4.75rem)] font-semibold leading-[1.02] tracking-[-0.05em] text-[#21182c]">
+                  {event.title || "Sự kiện không có tiêu đề"}
+                </h1>
+                <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-slate-500">
+                  <span className="flex items-center gap-1.5">
+                    <MapPin className="size-4 text-violet-700" />
+                    {event.location || "Địa điểm đang cập nhật"}
+                  </span>
+                  <span className="hidden size-1 rounded-full bg-slate-300 sm:block" aria-hidden="true" />
+                  <span className="font-medium text-violet-700">
+                    {event.category_name || "Sự kiện sinh viên"}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div
+              ref={registrationAnchorRef}
+              className="mt-6 flex min-h-16 flex-wrap items-center justify-end gap-3"
+            >
+              {!isCancelled && isStudent && (
                 <BookmarkButton
                   saved={saved}
                   loading={bookmarkLoading}
                   onClick={handleToggleBookmark}
                 />
               )}
+              {!isCancelled && (
+              <div
+                className={
+                  isRegistrationFloating
+                    ? "pointer-events-none fixed bottom-5 right-4 z-40 sm:right-6 lg:bottom-auto lg:right-8 lg:top-28 2xl:right-12"
+                    : "pointer-events-none"
+                }
+              >
+                {/* Ban tổ chức chỉ xem, không đăng ký được */}
+                {isOrganizer ? (
+                  <div className="pointer-events-auto flex items-center gap-2 rounded-xl bg-gray-100 px-4 py-3 text-sm font-medium text-gray-500">
+                    <Users size={18} className="text-violet-700" />
+                    <span>
+                      {count}/{maxCapacity} sinh viên đã đăng ký · Ban tổ chức
+                      chỉ có thể xem chi tiết sự kiện.
+                    </span>
+                  </div>
+                ) : (
+                  <RegisterActionBar
+                    maxCapacity={maxCapacity}
+                    count={count}
+                    registered={registered}
+                    registerLoading={registerLoading}
+                    dataLoading={dataLoading}
+                    onRegister={handleRegister}
+                    feedback={feedback}
+                    user={user}
+                    floating={isRegistrationFloating}
+                  />
+                )}
+              </div>
+              )}
             </div>
 
-            {/* Banner Poster */}
-            <EventPoster imageUrl={event.banner_url} title={event.title} />
+            <div className="mt-7 grid grid-flow-dense items-stretch gap-6 lg:grid-cols-2">
+              <div className="h-[clamp(21rem,72vw,35rem)] min-w-0 overflow-hidden rounded-3xl border border-slate-200 lg:h-auto">
+                <EventPoster imageUrl={event.banner_url} title={event.title} />
+              </div>
 
-            {/* Khung Thông tin chi tiết */}
-            <h2 className="text-xl font-bold mb-4 text-gray-900">
-              Chi tiết Sự kiện
-            </h2>
-            <EventDetails details={details} />
+              <aside className="min-w-0 space-y-5">
+                <section>
+                  <h2 className="text-2xl font-semibold tracking-[-0.03em] text-[#21182c]">
+                    Thông tin sự kiện
+                  </h2>
+                  <div className="mt-5">
+                    <EventDetails schedule={schedule} details={details} />
+                  </div>
+                </section>
 
-            {/* Mô tả sự kiện */}
-            <EventDescription
-              text={
-                event.description || "Chưa có mô tả chi tiết cho sự kiện này."
-              }
-            />
+                <OrganizerSpotlight organizer={event.organizer} />
+              </aside>
+            </div>
 
-            {/* Thanh đăng ký tham gia */}
-            <RegisterActionBar
-              maxCapacity={maxCapacity}
-              count={count}
-              registered={registered}
-              registerLoading={registerLoading}
-              dataLoading={dataLoading}
-              onRegister={handleRegister}
-              feedback={feedback}
-              user={user}
-            />
-          </>
+            <div className="mt-10 border-t border-slate-200 pt-9">
+              <div className="min-w-0 max-w-4xl">
+                <EventDescription
+                  key={event.event_id}
+                  text={
+                    event.description || "Chưa có mô tả chi tiết cho sự kiện này."
+                  }
+                />
+              </div>
+            </div>
+          </section>
         )}
       </main>
     </div>

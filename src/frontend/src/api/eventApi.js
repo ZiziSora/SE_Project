@@ -46,6 +46,19 @@ export const eventsApi = {
     return response.data;
   },
 
+  /**
+   * Viết / hoàn thiện mô tả sự kiện bằng AI.
+   * `current_description` trống -> viết mới; có chữ -> hoàn thiện đoạn đang có.
+   * @returns {Promise<{ description: string, mode: 'generate' | 'refine' }>}
+   */
+  async generateDescription(payload) {
+    const response = await api.post(
+      "/api/organizer/events/ai/description",
+      payload,
+    );
+    return response.data;
+  },
+
   async changeStatus(eventId, eventStatus) {
     const response = await api.patch(
       `/api/organizer/events/${eventId}/status`,
@@ -66,6 +79,19 @@ export const eventsApi = {
   async cancelRevision(eventId) {
     const response = await api.delete(
       `/api/organizer/events/${eventId}/revision`,
+    );
+    return response.data;
+  },
+
+  /**
+   * Huỷ sự kiện: sự kiện vẫn còn trong hệ thống ở trạng thái "Đã huỷ", dữ liệu
+   * đăng ký / điểm danh được giữ nguyên. Lý do bắt buộc với sự kiện đang mở
+   * đăng ký — backend ghép lý do vào thông báo gửi cho sinh viên.
+   */
+  async cancel(eventId, reason) {
+    const response = await api.post(
+      `/api/organizer/events/${eventId}/cancel`,
+      { reason: reason || null },
     );
     return response.data;
   },
@@ -113,6 +139,18 @@ export const publicEventApi = {
 
   async listOngoingEvents() {
     const response = await api.get("/api/events/ongoing");
+    return response.data;
+  },
+
+  async getRecommendations(limit = 6) {
+    const response = await api.get("/api/events/recommendations", {
+      params: { limit },
+    });
+    return response.data;
+  },
+
+  async listSavedEvents() {
+    const response = await api.get("/api/events/saved");
     return response.data;
   },
 

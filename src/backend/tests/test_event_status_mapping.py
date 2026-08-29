@@ -233,6 +233,9 @@ def test_sua_su_kien_cong_khai_thi_tao_ban_cho_duyet_khong_ghi_de(
     )
 
 
+# Huỷ sự kiện công khai còn kéo theo thông báo cho sinh viên đã đăng ký — mock
+# lại để test này chỉ nói về việc ghi thẳng xuống bảng `events`.
+@patch("app.services.event_service.notification_service")
 @patch("app.services.event_revision_service.submit_revision")
 @patch("app.services.event_service._validate_capacity_against_registrations")
 @patch("app.services.event_service._registration_counts", return_value={})
@@ -240,7 +243,7 @@ def test_sua_su_kien_cong_khai_thi_tao_ban_cho_duyet_khong_ghi_de(
 @patch("app.services.event_service._get_raw")
 @patch("app.services.event_service.get_supabase")
 def test_huy_su_kien_cong_khai_van_ghi_thang_khong_cho_duyet(
-    mock_get_supabase, mock_get_raw, _cats, _counts, _cap, mock_submit
+    mock_get_supabase, mock_get_raw, _cats, _counts, _cap, mock_submit, _notify
 ):
     """Huỷ sự kiện là quyết định của Ban tổ chức, không phải nội dung cần duyệt."""
     current = {

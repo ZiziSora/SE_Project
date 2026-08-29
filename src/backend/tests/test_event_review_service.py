@@ -58,6 +58,51 @@ def test_list_pending_events_filters_pending_approval_status():
     assert result["items"][0]["category_name"] == "Công nghệ"
 
 
+def _pending_query(events):
+    query = MagicMock()
+    query.options.return_value = query
+    query.filter.return_value = query
+    query.order_by.return_value = query
+    query.all.return_value = events
+    db = MagicMock()
+    db.query.return_value = query
+    return db, query
+
+
+def test_list_pending_events_skips_cancelled_events():
+    """Huỷ sự kiện chỉ đổi `event_status`, `approval_status` vẫn là PENDING.
+
+    Nếu hàng đợi duyệt chỉ lọc theo approval_status thì sự kiện Ban tổ chức
+    đã huỷ vẫn nằm chờ Admin — đúng lỗi người dùng báo.
+    """
+    db, query = _pending_query([])
+
+    list_pending_events(db)
+
+    conditions = query.filter.call_args.args
+    assert len(conditions) == 2, "phải lọc thêm điều kiện trên event_status"
+    assert "event_status" in str(conditions[1])
+
+
+def test_approve_event_rejects_cancelled_event():
+    event = SimpleNamespace(
+        approval_status=ApprovalStatus.PENDING,
+        event_status=EventStatus.CANCELLED,
+    )
+    query = MagicMock()
+    query.filter.return_value = query
+    query.with_for_update.return_value = query
+    query.first.return_value = event
+    db = MagicMock()
+    db.query.return_value = query
+
+    with pytest.raises(HTTPException) as exc_info:
+        approve_event(db, EVENT_ID)
+
+    assert exc_info.value.status_code == 409
+    db.commit.assert_not_called()
+
+
 def test_approve_event_publishes_pending_event():
     event = SimpleNamespace(
         event_id=EVENT_ID,

@@ -1,10 +1,12 @@
 import { useState, useEffect } from "react";
-import { AlertTriangle, Loader2, Calendar } from "lucide-react";
-import Toast from "../components/Toast";
-import TabNavigation from "../components/TabNavigation";
-import RegistrationEventCard from "../components/RegistrationEventCard";
-import CancelModal from "../components/CancelModal";
+import { AlertTriangle, Bookmark, Calendar, Loader2 } from "lucide-react";
+import Toast from "../components/Toast.jsx";
+import TabNavigation from "../components/TabNavigation.jsx";
+import RegistrationEventCard from "../components/RegistrationEventCard.jsx";
+import EventCard from "../components/EventCard.jsx";
+import CancelModal from "../components/CancelModal.jsx";
 import StudentHeader from "../components/common/StudentHeader.jsx";
+import { publicEventApi } from "../api/eventApi.js";
 import {
   cancelRegistration,
   getMyEvents,
@@ -13,6 +15,7 @@ import {
 export default function MyEventsPage() {
   const [activeTab, setActiveTab] = useState("Sắp diễn ra");
   const [registrations, setRegistrations] = useState([]);
+  const [savedEvents, setSavedEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -25,8 +28,12 @@ export default function MyEventsPage() {
       setLoading(true);
       setError(null);
 
-      const data = await getMyEvents();
-      setRegistrations(data || []);
+      const [registrationData, savedEventData] = await Promise.all([
+        getMyEvents(),
+        publicEventApi.listSavedEvents(),
+      ]);
+      setRegistrations(registrationData || []);
+      setSavedEvents(savedEventData || []);
     } catch (err) {
       console.error("Lỗi khi tải danh sách sự kiện:", err);
       setError("Không thể tải danh sách sự kiện. Vui lòng thử lại sau.");
@@ -132,6 +139,7 @@ export default function MyEventsPage() {
     const rawStatus = (item.registration_status || "REGISTERED").toUpperCase();
 
     if (rawStatus === "CANCELLED") return "CANCELLED";
+    if (rawStatus === "WAITLISTED" || rawStatus === "WAITLIST") return "WAITLISTED";
     if (rawStatus === "CHECKED_IN" || rawStatus === "ATTENDED" || rawStatus === "CHECK_IN") {
       return "ATTENDED";
     }
@@ -150,14 +158,33 @@ export default function MyEventsPage() {
     return "REGISTERED";
   };
 
+  const formatSavedEventDate = (startTimeStr) => {
+    if (!startTimeStr) return "Thời gian chưa được cập nhật";
+
+    const date = new Date(startTimeStr);
+    if (Number.isNaN(date.getTime())) return "Thời gian chưa được cập nhật";
+
+    return date.toLocaleString("vi-VN", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
   const filteredRegistrations = registrations.filter((item) => {
     const status = getEffectiveStatus(item);
-    if (activeTab === "Sắp diễn ra") return status === "REGISTERED";
+    if (activeTab === "Sắp diễn ra") return status === "REGISTERED" || status === "WAITLISTED";
     if (activeTab === "Đã tham gia") return status === "ATTENDED";
     if (activeTab === "Vắng mặt") return status === "ABSENT";
     if (activeTab === "Đã hủy") return status === "CANCELLED";
     return true;
   });
+  const isSavedTab = activeTab === "Đã lưu";
+  const visibleItemCount = isSavedTab
+    ? savedEvents.length
+    : filteredRegistrations.length;
 
   return (
     <div className="min-h-screen bg-[#f8f9fa] font-sans text-gray-900">
@@ -175,6 +202,7 @@ export default function MyEventsPage() {
             activeTab={activeTab}
             setActiveTab={setActiveTab}
             registrations={registrations}
+            savedEvents={savedEvents}
             getEffectiveStatus={getEffectiveStatus}
           />
 
@@ -194,26 +222,52 @@ export default function MyEventsPage() {
                 Thử lại
               </button>
             </div>
-          ) : filteredRegistrations.length === 0 ? (
+          ) : visibleItemCount === 0 ? (
             <div className="bg-white border border-gray-100 rounded-2xl p-12 mt-8 text-center text-gray-400 shadow-sm">
-              <Calendar className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-              <h3 className="text-base font-bold text-gray-700">Chưa có sự kiện nào</h3>
+              {isSavedTab ? (
+                <Bookmark className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+              ) : (
+                <Calendar className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+              )}
+              <h3 className="text-base font-bold text-gray-700">
+                {isSavedTab ? "Chưa lưu sự kiện nào" : "Chưa có sự kiện nào"}
+              </h3>
               <p className="text-xs text-gray-500 mt-1">
-                Bạn chưa có sự kiện nào ở mục "{activeTab}".
+                {isSavedTab
+                  ? "Các sự kiện bạn bookmark sẽ xuất hiện tại đây."
+                  : `Bạn chưa có sự kiện nào ở mục "${activeTab}".`}
               </p>
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
-              {filteredRegistrations.map((item) => (
-                <RegistrationEventCard
-                  key={item.registration_id}
-                  item={item}
-                  getEffectiveStatus={getEffectiveStatus}
-                  canCancelRegistration={canCancelRegistration}
-                  formatEventDate={formatEventDate}
-                  onSelectCancel={setSelectedRegistration}
-                />
-              ))}
+              {isSavedTab
+                ? savedEvents.map((item) => {
+                    const event = item.events;
+                    if (!event) return null;
+
+                    return (
+                      <EventCard
+                        key={item.event_id}
+                        eventId={event.event_id}
+                        image={event.banner_url}
+                        badgeText="Đã lưu"
+                        title={event.title}
+                        faculty={event.organizer?.name || "Sự kiện đã lưu"}
+                        date={formatSavedEventDate(event.start_time)}
+                        location={event.location}
+                      />
+                    );
+                  })
+                : filteredRegistrations.map((item) => (
+                    <RegistrationEventCard
+                      key={item.registration_id}
+                      item={item}
+                      getEffectiveStatus={getEffectiveStatus}
+                      canCancelRegistration={canCancelRegistration}
+                      formatEventDate={formatEventDate}
+                      onSelectCancel={setSelectedRegistration}
+                    />
+                  ))}
             </div>
           )}
         </div>

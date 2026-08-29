@@ -1,17 +1,17 @@
 import { useEffect, useState } from "react"
-import { ChevronDown, ChevronLeft, ChevronRight, Eye, Pencil, Search, Trash2 } from "lucide-react"
+import { CalendarX2, ChevronDown, ChevronLeft, ChevronRight, Eye, Pencil, Search, Trash2 } from "lucide-react"
 import { Link } from "react-router-dom"
-import { toast } from "react-toastify"
 import { cn } from "../lib/utils"
 import { eventsApi } from "../api/eventApi.js"
-import ConfirmDialog from "./ConfirmDialog.jsx"
+import EventRemovalDialog from "./EventRemovalDialog.jsx"
 import {
-  extractApiErrorMessage,
   FILTER_TO_STATUS,
   formatDateTime,
   formatRegistered,
+  getRemovalAction,
   getStatusDisplay,
   PENDING_REVISION_BADGE,
+  REMOVAL_MODE,
 } from "../utils/eventManagementUtils.js"
 
 const filters = ["Tất cả", "Đang mở đăng ký", "Đang diễn ra", "Chờ duyệt", "Bản nháp", "Đã kết thúc", "Đã hủy"]
@@ -37,9 +37,8 @@ export function FullEventsTable() {
 
   const [events, setEvents] = useState([])
   const [totalPages, setTotalPages] = useState(1)
-  // Sự kiện đang chờ xác nhận xoá (null = không mở hộp thoại)
-  const [pendingDelete, setPendingDelete] = useState(null)
-  const [isDeleting, setIsDeleting] = useState(false)
+  // Sự kiện đang chờ xác nhận huỷ / xoá (null = không mở hộp thoại)
+  const [pendingRemoval, setPendingRemoval] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
@@ -74,22 +73,6 @@ export function FullEventsTable() {
       clearTimeout(timer)
     }
   }, [search, activeFilter, sort, page])
-
-  const confirmDelete = async () => {
-    if (!pendingDelete?.event_id || isDeleting) return
-    setIsDeleting(true)
-    try {
-      await eventsApi.remove(pendingDelete.event_id)
-      setEvents((prev) => prev.filter((row) => row.event_id !== pendingDelete.event_id))
-      toast.success("Đã xoá sự kiện thành công")
-      setPendingDelete(null)
-    } catch (err) {
-      console.error("Lỗi xoá sự kiện:", err)
-      toast.error(extractApiErrorMessage(err, "Không xoá được sự kiện."))
-    } finally {
-      setIsDeleting(false)
-    }
-  }
 
   return (
     // KHÔNG dùng h-full: khung cao đúng bằng nội dung nên ít sự kiện thì bảng
@@ -210,6 +193,10 @@ export function FullEventsTable() {
               ) : (
                 events.map((row) => {
                   const statusInfo = getStatusDisplay(row.event_status)
+                  // Huỷ hay xoá là hai việc khác nhau — icon phải nói đúng việc
+                  const removal = getRemovalAction(row)
+                  const RemovalIcon =
+                    removal.mode === REMOVAL_MODE.CANCEL ? CalendarX2 : Trash2
                   return (
                     <tr key={row.event_id ?? row.title}>
                       {/* Giới hạn chiều rộng cột Tên sự kiện để tự xuống dòng gọn gàng */}
@@ -270,11 +257,12 @@ export function FullEventsTable() {
                           {row.can_delete !== false && (
                             <button
                               type="button"
-                              onClick={() => setPendingDelete(row)}
-                              aria-label={`Xóa ${row.title}`}
+                              onClick={() => setPendingRemoval(row)}
+                              aria-label={`${removal.actionLabel} ${row.title}`}
+                              title={removal.confirmLabel}
                               className="hover:text-destructive"
                             >
-                              <Trash2 className="size-[18px]" aria-hidden="true" />
+                              <RemovalIcon className="size-[18px]" aria-hidden="true" />
                             </button>
                           )}
                         </div>
@@ -313,18 +301,21 @@ export function FullEventsTable() {
         </div>
       </section>
 
-      <ConfirmDialog
-        open={Boolean(pendingDelete)}
-        tone="danger"
-        icon={Trash2}
-        title="Xoá sự kiện?"
-        description="Sự kiện sẽ bị xoá khỏi hệ thống cùng toàn bộ dữ liệu đăng ký và điểm danh đi kèm. Thao tác này không thể hoàn tác."
-        detailTitle={pendingDelete?.title ?? "Sự kiện chưa có tên"}
-        detailSubtitle={pendingDelete?.event_id}
-        confirmLabel="Xoá sự kiện"
-        isSubmitting={isDeleting}
-        onClose={() => !isDeleting && setPendingDelete(null)}
-        onConfirm={confirmDelete}
+      {/* Xoá thì bỏ hàng khỏi bảng; huỷ thì sự kiện vẫn còn (trạng thái "Đã
+          huỷ") nên chỉ thay bản ghi tại chỗ. */}
+      <EventRemovalDialog
+        event={pendingRemoval}
+        onClose={() => setPendingRemoval(null)}
+        onDeleted={(eventId) =>
+          setEvents((prev) => prev.filter((row) => row.event_id !== eventId))
+        }
+        onCancelled={(updated) =>
+          setEvents((prev) =>
+            prev.map((row) =>
+              row.event_id === updated.event_id ? { ...row, ...updated } : row,
+            ),
+          )
+        }
       />
     </div>
   )

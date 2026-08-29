@@ -13,7 +13,9 @@ const cellCls = "border-t border-border px-5 py-3";
 
 /** Một dòng trong bảng danh sách người tham gia. */
 export default function ParticipantRow({ participant, onCheckIn, isSubmitting }) {
-  const checkedIn = isCheckedIn(participant);
+  // Ưu tiên kiểm tra trực tiếp registration_status
+  const checkedIn =
+    participant.registration_status === "CHECKED_IN" || isCheckedIn(participant);
 
   return (
     <tr>
@@ -35,7 +37,7 @@ export default function ParticipantRow({ participant, onCheckIn, isSubmitting })
       </td>
 
       <td className={cn(cellCls, "text-sm text-muted-foreground whitespace-nowrap")}>
-        {formatRegisteredAt(participant.registered_at)}
+        {formatRegisteredAt(participant.registered_at ?? participant.created_at)}
       </td>
 
       <td className={cn(cellCls, "whitespace-nowrap")}>
@@ -43,7 +45,9 @@ export default function ParticipantRow({ participant, onCheckIn, isSubmitting })
       </td>
 
       <td className={cn(cellCls, "font-mono text-sm text-muted-foreground whitespace-nowrap")}>
-        {formatCheckedInAt(participant.checked_in_at)}
+        {checkedIn && participant.checked_in_at
+          ? formatCheckedInAt(participant.checked_in_at)
+          : "--"}
       </td>
 
       <td className={cn(cellCls, "whitespace-nowrap")}>
