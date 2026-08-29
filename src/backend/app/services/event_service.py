@@ -779,6 +779,7 @@ def _registration_counts(event_ids: list[str]) -> dict[str, int]:
             .select("event_id, registration_status")
             .in_("event_id", ids)
             .neq("registration_status", "CANCELLED")
+            .neq("registration_status", "WAITLISTED")
             .execute()
         )
     except Exception:  # noqa: BLE001
@@ -791,7 +792,7 @@ def _registration_counts(event_ids: list[str]) -> dict[str, int]:
     counts: dict[str, int] = {}
     for row in res.data or []:
         reg_status = str(row.get("registration_status") or "").upper()
-        if reg_status == DB_REGISTRATION_CANCELLED:
+        if reg_status in (DB_REGISTRATION_CANCELLED, "WAITLISTED", "WAITLIST"):
             continue
         key = str(row.get("event_id"))
         counts[key] = counts.get(key, 0) + 1

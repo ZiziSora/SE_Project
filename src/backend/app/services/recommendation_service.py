@@ -76,7 +76,8 @@ def _fetch_registration_counts(event_ids: list[str]) -> dict[str, int]:
     )
     counts: dict[str, int] = {}
     for row in res.data or []:
-        if (row.get("registration_status") or "").upper() == "CANCELLED":
+        reg_status = (row.get("registration_status") or "").upper()
+        if reg_status in ("CANCELLED", "WAITLISTED", "WAITLIST"):
             continue
         eid = row.get("event_id")
         if eid:
@@ -252,8 +253,10 @@ def _rerank_with_llm(
         return None
 
     try:
-        from google import genai
-    except ImportError:
+        import importlib
+
+        genai = importlib.import_module("google.genai")
+    except Exception:
         logger.warning("Thư viện google-genai chưa được cài, bỏ qua bước gợi ý bằng AI.")
         return None
 

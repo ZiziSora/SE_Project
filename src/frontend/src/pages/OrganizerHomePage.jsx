@@ -47,7 +47,11 @@ export default function OrganizerHomePage() {
                                     faculty={event.department_name || 'Đơn vị tổ chức'}
                                     date={`${event.start_time || ''}`}
                                     location={event.location}
-                                    badgeText={event.registered_count > 0 ? `${event.registered_count} đã đăng ký` : 'Mới'}
+                                    badgeText={
+                                        event.registered_count > 0
+                                            ? `${event.capacity ? Math.min(event.registered_count, event.capacity) : event.registered_count} đã đăng ký`
+                                            : 'Mới'
+                                    }
                                     {...event}
                                 />
                             ))
