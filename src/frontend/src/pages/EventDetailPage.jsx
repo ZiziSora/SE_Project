@@ -10,6 +10,7 @@ import {
   MapPin,
   Loader2,
   AlertCircle,
+  CalendarX2,
   RotateCcw,
   ArrowLeft,
 } from "lucide-react";
@@ -361,6 +362,10 @@ export function EventDetailPage() {
     : [];
 
   const maxCapacity = event?.capacity ?? null;
+  // Sự kiện đã huỷ vẫn mở được trang chi tiết (link trong thông báo huỷ trỏ về
+  // đây), nhưng không được mời đăng ký nữa.
+  const isCancelled =
+    String(event?.event_status || "").toUpperCase() === "CANCELLED";
 
   return (
     <div className="min-h-screen w-full max-w-full overflow-x-clip bg-white font-inter text-[#21182c]">
@@ -406,6 +411,25 @@ export function EventDetailPage() {
               Quay lại khám phá
             </Link>
 
+            {isCancelled && (
+              <div
+                role="status"
+                className="mt-6 flex items-start gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-5 py-4"
+              >
+                <CalendarX2 className="mt-0.5 size-5 shrink-0 text-rose-600" />
+                <div>
+                  <p className="font-semibold text-rose-950">
+                    Sự kiện này đã bị huỷ
+                  </p>
+                  <p className="mt-1 text-sm leading-6 text-rose-700">
+                    Ban tổ chức đã huỷ sự kiện nên không còn nhận đăng ký. Thông
+                    tin bên dưới được giữ lại để bạn tra cứu. Lý do huỷ nằm
+                    trong thông báo gửi tới bạn.
+                  </p>
+                </div>
+              </div>
+            )}
+
             <div className="mt-7">
               <div className="min-w-0">
                 <h1 className="max-w-5xl text-[clamp(2.25rem,5vw,4.75rem)] font-semibold leading-[1.02] tracking-[-0.05em] text-[#21182c]">
@@ -428,13 +452,14 @@ export function EventDetailPage() {
               ref={registrationAnchorRef}
               className="mt-6 flex min-h-16 flex-wrap items-center justify-end gap-3"
             >
-              {isStudent && (
+              {!isCancelled && isStudent && (
                 <BookmarkButton
                   saved={saved}
                   loading={bookmarkLoading}
                   onClick={handleToggleBookmark}
                 />
               )}
+              {!isCancelled && (
               <div
                 className={
                   isRegistrationFloating
@@ -454,6 +479,7 @@ export function EventDetailPage() {
                   floating={isRegistrationFloating}
                 />
               </div>
+              )}
             </div>
 
             <div className="mt-7 grid grid-flow-dense items-stretch gap-6 lg:grid-cols-2">

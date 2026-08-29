@@ -13,7 +13,9 @@ const SelectedCard = ({ role }) => {
 
   return (
     <div
-      className="w-99.25 h-38.25 border border-gray-200 shadow-xl rounded-lg mb-10 p-5 flex flex-row gap-4 hover:border-purple-600 hover:-translate-y-2 duration-200"
+      // Cả thẻ là một nút bấm được nhưng lại là <div>, nên quy tắc con trỏ chung
+      // trong index.css không với tới — phải khai báo class ở đây.
+      className="w-99.25 h-38.25 cursor-pointer border border-gray-200 shadow-xl rounded-lg mb-10 p-5 flex flex-row gap-4 hover:border-purple-600 hover:-translate-y-2 duration-200"
       onClick={handleClick}
     >
       <Icon className="bg-[#E5EEFF] w-8 h-8 p-1.5 rounded-md text-[#630ED4]" />

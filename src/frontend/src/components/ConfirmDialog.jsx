@@ -23,6 +23,15 @@ import { cn } from "../lib/utils";
  * @param {string}   [props.detailSubtitle]  Dòng phụ mờ (mã sự kiện...)
  * @param {string}   props.confirmLabel
  * @param {boolean}  [props.isSubmitting]
+ *
+ * Ô nhập lý do (tuỳ chọn): chỉ hiện khi truyền `onReasonChange`. Dùng cho những
+ * thao tác mà người bị ảnh hưởng cần biết VÌ SAO — ví dụ huỷ sự kiện đang mở
+ * đăng ký thì lý do được gửi kèm trong thông báo tới sinh viên.
+ * @param {string}   [props.reasonLabel]
+ * @param {string}   [props.reasonPlaceholder]
+ * @param {string}   [props.reasonValue]
+ * @param {(value: string) => void} [props.onReasonChange]
+ * @param {boolean}  [props.reasonRequired]  Bỏ trống thì nút xác nhận bị khoá
  */
 export default function ConfirmDialog({
   open,
@@ -35,10 +44,17 @@ export default function ConfirmDialog({
   confirmLabel,
   cancelLabel = "Quay lại",
   isSubmitting = false,
+  reasonLabel,
+  reasonPlaceholder,
+  reasonValue = "",
+  onReasonChange,
+  reasonRequired = false,
   onClose,
   onConfirm,
 }) {
   const isDanger = tone === "danger";
+  const showReason = typeof onReasonChange === "function";
+  const missingReason = showReason && reasonRequired && !reasonValue.trim();
 
   useEffect(() => {
     if (!open) return undefined;
@@ -117,6 +133,31 @@ export default function ConfirmDialog({
           </div>
         )}
 
+        {showReason && (
+          <div className="mt-5">
+            <label
+              htmlFor="confirm-dialog-reason"
+              className="block text-sm font-semibold text-foreground"
+            >
+              {reasonLabel ?? "Lý do"}
+              {reasonRequired && <span className="text-destructive"> *</span>}
+            </label>
+            <textarea
+              id="confirm-dialog-reason"
+              rows={3}
+              maxLength={500}
+              value={reasonValue}
+              disabled={isSubmitting}
+              placeholder={reasonPlaceholder}
+              onChange={(changeEvent) => onReasonChange(changeEvent.target.value)}
+              className="mt-2 w-full resize-none rounded-xl border border-border bg-card px-3.5 py-2.5 text-sm leading-6 text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-primary disabled:cursor-not-allowed disabled:opacity-50"
+            />
+            <p className="mt-1.5 text-right font-mono text-xs text-muted-foreground">
+              {reasonValue.length}/500
+            </p>
+          </div>
+        )}
+
         <div className="mt-6 flex flex-col-reverse gap-2.5 sm:flex-row sm:justify-end">
           <button
             type="button"
@@ -129,7 +170,7 @@ export default function ConfirmDialog({
           <button
             type="button"
             onClick={onConfirm}
-            disabled={isSubmitting}
+            disabled={isSubmitting || missingReason}
             className={cn(
               "inline-flex h-11 cursor-pointer items-center justify-center gap-2 rounded-xl px-5 text-sm font-semibold text-white shadow-sm transition-all disabled:cursor-not-allowed disabled:opacity-45",
               isDanger

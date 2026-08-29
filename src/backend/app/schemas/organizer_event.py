@@ -97,6 +97,24 @@ class EventStatusUpdate(BaseModel):
     event_status: EventStatus
 
 
+class EventCancelIn(BaseModel):
+    """Yêu cầu huỷ sự kiện của Ban tổ chức.
+
+    Lý do KHÔNG bắt buộc ở tầng schema vì còn tuỳ trạng thái: sự kiện đang mở
+    đăng ký thì bắt buộc (còn sinh viên để thông báo), sự kiện mới chờ duyệt thì
+    không. Ràng buộc đó nằm ở `event_service.cancel_event`.
+    """
+
+    reason: Optional[str] = Field(default=None, max_length=500)
+
+    @field_validator("reason", mode="before")
+    @classmethod
+    def _strip_blank(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            return value.strip() or None
+        return value
+
+
 class OrganizerEventOut(BaseModel):
     event_id: Optional[str] = None
     title: Optional[str] = None
