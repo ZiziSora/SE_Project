@@ -16,6 +16,7 @@ const InputField = ({
   required = false,
   autoComplete,
   minLength,
+  disabled = false,
   variant = "default",
 }) => {
   const isSignup = variant === "signup";
@@ -55,6 +56,7 @@ const InputField = ({
             required={required}
             autoComplete={autoComplete}
             minLength={minLength}
+            disabled={disabled}
           />
         ) : (
           <input
@@ -69,6 +71,7 @@ const InputField = ({
             required={required}
             autoComplete={autoComplete}
             minLength={minLength}
+            disabled={disabled}
           />
         )}
 

@@ -51,6 +51,8 @@ def test_review_organizer_request_notifies_applicant(
         user_id=ORGANIZER_ID,
         status=OrganizerRequestStatus.PENDING,
         reviewed_by=None,
+        reason="Đăng ký tổ chức hoạt động học thuật.",
+        rejected_reason=None,
     )
     user = SimpleNamespace(user_id=ORGANIZER_ID, status=UserStatus.PENDING)
     request_query = MagicMock()
@@ -69,6 +71,11 @@ def test_review_organizer_request_notifies_applicant(
         request_id=REQUEST_ID,
         decision=decision,
         admin_id=ADMIN_ID,
+        decision_reason=(
+            "Thiếu tài liệu minh chứng."
+            if decision == OrganizerRequestStatus.REJECTED
+            else None
+        ),
     )
 
     assert user.status == user_status
@@ -79,3 +86,7 @@ def test_review_organizer_request_notifies_applicant(
     assert payload["event_id"] is None
     assert payload["notification_type"] == notification_type
     assert payload["title"] == title
+    if decision == OrganizerRequestStatus.REJECTED:
+        assert request.reason == "Đăng ký tổ chức hoạt động học thuật."
+        assert request.rejected_reason == "Thiếu tài liệu minh chứng."
+        assert "Thiếu tài liệu minh chứng." in payload["content"]

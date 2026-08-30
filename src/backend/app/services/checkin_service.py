@@ -12,7 +12,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
 from app.models.checkin_qr import EventCheckinQR
-from app.models.enum import RegistrationStatus, UserRole
+from app.models.enum import RegistrationStatus, UserRole, UserStatus
 from app.models.event import Event
 from app.models.registration import EventRegistration
 from app.models.user import User
@@ -41,6 +41,17 @@ def _format_registration_status(status_val: object | None) -> str:
     if val_str == "CHECK_IN":
         return "CHECKED_IN"
     return val_str
+
+
+def _require_active_checkin_manager(current_user: User) -> None:
+    if (
+        current_user.role == UserRole.ORGANIZER
+        and current_user.status != UserStatus.ACTIVE
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Tài khoản Ban tổ chức chưa được phê duyệt.",
+        )
 
 
 def _generate_manual_code(db: Session) -> str:
@@ -165,6 +176,7 @@ def process_checkin(
     event_id: Optional[UUID] = None,
 ) -> CheckinSuccessResponse:
     """Process event check-in via QR token or manual code with validation & safety locks."""
+    _require_active_checkin_manager(current_user)
     clean_code = code.strip()
     if not clean_code:
         raise HTTPException(
@@ -331,6 +343,7 @@ def get_event_checkin_stats(
     current_user: User,
 ) -> EventCheckinStatsResponse:
     """Get check-in statistics and participant list for event organizers."""
+    _require_active_checkin_manager(current_user)
     event = db.query(Event).filter(Event.event_id == event_id).first()
     if not event:
         raise HTTPException(
@@ -397,6 +410,7 @@ def manual_checkin_participant(
     code: Optional[str] = None,
 ) -> CheckinSuccessResponse:
     """Thực hiện điểm danh thủ công cho sinh viên / người tham dự sự kiện."""
+    _require_active_checkin_manager(current_user)
     event = db.query(Event).filter(Event.event_id == event_id).first()
     if not event:
         raise HTTPException(

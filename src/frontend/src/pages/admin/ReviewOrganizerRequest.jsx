@@ -117,7 +117,7 @@ export default function ReviewOrganizerRequest() {
     setRefreshKey((key) => key + 1);
   };
 
-  const confirmRequestAction = async () => {
+  const confirmRequestAction = async (reason) => {
     if (!pendingAction || isSubmitting) return;
 
     setIsSubmitting(true);
@@ -125,6 +125,7 @@ export default function ReviewOrganizerRequest() {
       const result = await reviewOrganizerRequest(
         pendingAction.request.id,
         pendingAction.status,
+        reason,
       );
       toast.success(result.message);
       setPendingAction(null);
@@ -438,6 +439,11 @@ export default function ReviewOrganizerRequest() {
         onClose={() => setSelectedRequest(null)}
       />
       <ConfirmActionDialog
+        key={
+          pendingAction
+            ? `${pendingAction.request.id}-${pendingAction.status}`
+            : "no-action"
+        }
         action={pendingAction}
         isSubmitting={isSubmitting}
         onCancel={() => setPendingAction(null)}

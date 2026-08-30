@@ -84,6 +84,15 @@ const ROLE_CONFIG = {
   },
 };
 
+const LIMITED_ORGANIZER_NAV_ITEMS = [
+  { label: "Khám phá", to: "/explore", match: ["/explore", "/events"] },
+  {
+    label: "Trạng thái tài khoản",
+    to: "/organizer/status",
+    match: ["/organizer/status"],
+  },
+];
+
 function routeMatches(pathname, item) {
   if (item.exactMatch?.includes(pathname)) return true;
 
@@ -107,7 +116,16 @@ export default function RoleHeader({ role, avatarUrl: providedAvatarUrl }) {
   const displayedAvatarUrl = avatarUrl === failedAvatarUrl ? "" : avatarUrl;
   const isAdmin = role === "admin";
   const isOrganizer = role === "organizer";
-  const showCreateAction = isOrganizer && location.pathname !== "/organizer/create-event";
+  const canManageEvents = localStorage.getItem("can_manage_events") === "true";
+  const isLimitedOrganizer = isOrganizer && !canManageEvents;
+  const navItems = isLimitedOrganizer
+    ? LIMITED_ORGANIZER_NAV_ITEMS
+    : config.navItems;
+  const logoTo = isLimitedOrganizer ? "/explore" : config.logoTo;
+  const showCreateAction =
+    isOrganizer &&
+    canManageEvents &&
+    location.pathname !== "/organizer/create-event";
   const RoleIcon = isAdmin
     ? ShieldCheck
     : isOrganizer
@@ -183,7 +201,7 @@ export default function RoleHeader({ role, avatarUrl: providedAvatarUrl }) {
     <header className="sticky top-0 z-50 w-full border-b border-border/90 bg-card/90 font-inter backdrop-blur-xl">
       <div className="mx-auto flex h-16 w-full max-w-[1440px] items-center justify-between gap-4 px-4 sm:h-[72px] sm:px-8 lg:grid lg:grid-cols-[1fr_auto_1fr] lg:px-12 xl:px-16">
         <Link
-          to={config.logoTo}
+          to={logoTo}
           className="flex w-fit shrink-0 items-center gap-1 rounded-xl text-[#630ED4] transition-opacity hover:opacity-85 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#630ED4]"
           aria-label="UniEvent - về trang chính"
         >
@@ -197,7 +215,7 @@ export default function RoleHeader({ role, avatarUrl: providedAvatarUrl }) {
           className="hidden items-center rounded-full border border-border bg-background/75 p-1 shadow-[0_8px_28px_rgba(48,32,68,0.06)] lg:flex"
           aria-label={config.navLabel}
         >
-          {config.navItems.map((item) => {
+          {navItems.map((item) => {
             const active = routeMatches(location.pathname, item);
 
             return (
@@ -340,7 +358,7 @@ export default function RoleHeader({ role, avatarUrl: providedAvatarUrl }) {
           aria-label={`${config.navLabel} trên di động`}
         >
           <div className="mx-auto grid max-w-[1440px] gap-1">
-            {config.navItems.map((item) => {
+            {navItems.map((item) => {
               const active = routeMatches(location.pathname, item);
 
               return (

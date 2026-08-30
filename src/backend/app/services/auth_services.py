@@ -11,6 +11,7 @@ from app.schemas.auth import (
     LoginRequest,
     StudentSignUpRequest,
     OrganizerSignUpRequest,
+    OrganizerResubmitRequest,
     OrganizerProofFile,
     ResendVerificationRequest,
     ResendVerificationResponse,
@@ -243,6 +244,18 @@ def cleanup_organizer_signup(user_id, uploaded_paths: list[str]) -> None:
 
     try:
         supabase_admin.auth.admin.delete_user(user_id)
+    except Exception:
+        pass
+
+
+def cleanup_uploaded_organizer_proofs(uploaded_paths: list[str]) -> None:
+    if not uploaded_paths:
+        return
+
+    try:
+        supabase_admin.storage.from_(ORGANIZER_PROOF_BUCKET).remove(
+            uploaded_paths
+        )
     except Exception:
         pass
 
@@ -592,6 +605,224 @@ def signup_organizer(data: OrganizerSignUpRequest, db: Session):
     
 
 
+def _latest_organizer_request(
+    db: Session,
+    user_id,
+    *,
+    lock: bool = False,
+):
+    query = (
+        db.query(OrganizerRequest)
+        .filter(OrganizerRequest.user_id == user_id)
+        .order_by(
+            OrganizerRequest.create_at.desc(),
+            OrganizerRequest.request_id.desc(),
+        )
+    )
+    if lock:
+        query = query.with_for_update()
+    return query.first()
+
+
+def get_organizer_resubmission(
+    current_user: User,
+    db: Session,
+) -> dict:
+    if (
+        current_user.role != UserRole.ORGANIZER
+        or current_user.status != UserStatus.REJECTED
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Chỉ tài khoản Ban tổ chức bị từ chối mới có thể nộp lại hồ sơ.",
+        )
+
+    previous_request = _latest_organizer_request(
+        db,
+        current_user.user_id,
+    )
+    if (
+        previous_request is None
+        or previous_request.status != OrganizerRequestStatus.REJECTED
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Không tìm thấy hồ sơ bị từ chối để chỉnh sửa và nộp lại.",
+        )
+
+    attachments = (
+        db.query(OrganizerRequestAttachment)
+        .filter(
+            OrganizerRequestAttachment.request_id
+            == previous_request.request_id
+        )
+        .all()
+    )
+    return {
+        "user_id": current_user.user_id,
+        "email": current_user.email,
+        "full_name": current_user.full_name or "",
+        "department_name": current_user.department_name or "",
+        "previous_request_id": previous_request.request_id,
+        "request_reason": previous_request.reason or "",
+        "rejection_reason": (
+            previous_request.rejected_reason or "Không có lý do cụ thể."
+        ),
+        "attachments": [
+            {
+                "attachment_id": attachment.attachment_id,
+                "url": attachment.url,
+                "file_name": attachment.url.rsplit("/", 1)[-1],
+            }
+            for attachment in attachments
+        ],
+    }
+
+
+def resubmit_organizer_request(
+    data: OrganizerResubmitRequest,
+    current_user: User,
+    db: Session,
+) -> dict:
+    if (
+        current_user.role != UserRole.ORGANIZER
+        or current_user.status != UserStatus.REJECTED
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Chỉ tài khoản Ban tổ chức bị từ chối mới có thể nộp lại hồ sơ.",
+        )
+
+    if len(data.proof_urls) + len(data.proof_files) > 5:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Chỉ được gửi tối đa 5 tài liệu minh chứng.",
+        )
+
+    full_name = data.full_name.strip()
+    reason = data.reason.strip()
+    if not full_name or not reason:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Vui lòng nhập đầy đủ tên đơn vị và nội dung hồ sơ.",
+        )
+
+    decoded_proofs = decode_organizer_proofs(data.proof_files)
+    locked_user = (
+        db.query(User)
+        .filter(User.user_id == current_user.user_id)
+        .with_for_update()
+        .first()
+    )
+    if (
+        locked_user is None
+        or locked_user.role != UserRole.ORGANIZER
+        or locked_user.status != UserStatus.REJECTED
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Hồ sơ đã được nộp lại hoặc trạng thái tài khoản đã thay đổi.",
+        )
+
+    previous_request = _latest_organizer_request(
+        db,
+        current_user.user_id,
+        lock=True,
+    )
+    if (
+        previous_request is None
+        or previous_request.status != OrganizerRequestStatus.REJECTED
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Hồ sơ mới nhất không ở trạng thái có thể nộp lại.",
+        )
+
+    if data.proof_urls:
+        previous_attachments = (
+            db.query(OrganizerRequestAttachment)
+            .filter(
+                OrganizerRequestAttachment.request_id
+                == previous_request.request_id
+            )
+            .all()
+        )
+        allowed_urls = {attachment.url for attachment in previous_attachments}
+        if not set(data.proof_urls).issubset(allowed_urls):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Danh sách tài liệu giữ lại không hợp lệ.",
+            )
+
+    uploaded_paths = []
+    upload_warning = None
+    try:
+        request = OrganizerRequest(
+            user_id=current_user.user_id,
+            previous_request_id=previous_request.request_id,
+            reason=reason,
+            status=OrganizerRequestStatus.PENDING,
+        )
+        db.add(request)
+        db.flush()
+
+        try:
+            uploaded_urls, uploaded_paths = upload_organizer_proofs(
+                current_user.user_id,
+                decoded_proofs,
+            )
+        except HTTPException:
+            uploaded_urls = []
+            uploaded_paths = []
+            upload_warning = (
+                "Hồ sơ đã được nộp lại nhưng tài liệu mới chưa thể tải lên."
+            )
+
+        for url in [*data.proof_urls, *uploaded_urls]:
+            db.add(
+                OrganizerRequestAttachment(
+                    attachment_id=uuid.uuid4(),
+                    request_id=request.request_id,
+                    url=url,
+                )
+            )
+
+        locked_user.full_name = full_name
+        locked_user.department_name = data.department_name.strip() or None
+        locked_user.status = UserStatus.PENDING
+        db.commit()
+        db.refresh(request)
+    except HTTPException:
+        db.rollback()
+        cleanup_uploaded_organizer_proofs(uploaded_paths)
+        raise
+    except Exception as error:
+        db.rollback()
+        cleanup_uploaded_organizer_proofs(uploaded_paths)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Không thể nộp lại hồ sơ Ban tổ chức.",
+        ) from error
+
+    try:
+        notification_service.notify_admins_organizer_request_pending(
+            organizer_name=full_name,
+        )
+    except Exception:
+        logger.exception(
+            "Không thể tạo thông báo cho hồ sơ Ban tổ chức nộp lại %s.",
+            request.request_id,
+        )
+
+    return {
+        "message": "Đã nộp lại hồ sơ. Vui lòng chờ quản trị viên xét duyệt.",
+        "request_id": request.request_id,
+        "previous_request_id": previous_request.request_id,
+        "status": OrganizerRequestStatus.PENDING,
+        "warning": upload_warning,
+    }
+
+
 def login_service(body: LoginRequest, db: Session):
     email = str(body.email).strip().lower()
 
@@ -666,23 +897,17 @@ def login_service(body: LoginRequest, db: Session):
             db.commit()
             db.refresh(db_user)
 
+    rejection_reason = None
     if (
         db_user.role == UserRole.ORGANIZER
         and db_user.status == UserStatus.REJECTED
     ):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Tài khoản ban tổ chức đã bị từ chối.",
-        )
-
-    if (
-        db_user.role == UserRole.ORGANIZER
-        and db_user.status != UserStatus.ACTIVE
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Tài khoản ban tổ chức đang chờ quản trị viên phê duyệt.",
-        )
+        rejected_request = _latest_organizer_request(db, db_user.user_id)
+        rejection_reason = (
+            rejected_request.rejected_reason
+            if rejected_request is not None
+            else None
+        ) or "Không có lý do cụ thể."
 
     if (
         db_user.role != UserRole.ORGANIZER
@@ -704,6 +929,7 @@ def login_service(body: LoginRequest, db: Session):
             db_user.role == UserRole.ORGANIZER
             and db_user.status == UserStatus.ACTIVE
         ),
+        rejection_reason=rejection_reason,
     )
 
 

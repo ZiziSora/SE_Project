@@ -14,6 +14,7 @@ import {
   CalendarX2,
   RotateCcw,
   ArrowLeft,
+  Tag,
 } from "lucide-react";
 import { EventPoster } from "../components/EventDetail/EventPoster.jsx";
 import { EventDetails } from "../components/EventDetail/EventDetails.jsx";
@@ -384,33 +385,37 @@ export function EventDetailPage() {
     String(event?.event_status || "").toUpperCase() === "CANCELLED";
 
   return (
-    <div className="min-h-screen w-full max-w-full overflow-x-clip bg-white font-inter text-[#21182c]">
-      {/* Header Navigation - hiển thị theo đúng role đang đăng nhập */}
+    <div className="min-h-screen w-full max-w-full overflow-x-clip bg-[#fafafa] font-inter text-[#21182c]">
+      {/* Header Navigation */}
       {isOrganizer ? <OrganizerHeader /> : <StudentHeader />}
 
       <main className="w-full max-w-full overflow-x-clip">
+        {/* ── Loading state ── */}
         {eventLoading && (
-          <div className="mx-auto my-16 flex min-h-[55vh] max-w-6xl flex-col items-center justify-center rounded-[2rem] border border-violet-100 bg-white px-6 text-center shadow-sm">
-            <Loader2 className="mb-5 size-11 animate-spin text-violet-700" />
-            <h3 className="text-xl font-semibold text-[#21182c]">
+          <div className="mx-auto my-16 flex min-h-[55vh] max-w-4xl flex-col items-center justify-center px-6 text-center">
+            <div className="flex size-20 items-center justify-center rounded-3xl bg-violet-50">
+              <Loader2 className="size-9 animate-spin text-violet-600" />
+            </div>
+            <h3 className="mt-6 text-xl font-semibold text-slate-900">
               Đang tải dữ liệu sự kiện...
             </h3>
-            <p className="mt-2 text-sm text-slate-500">
-              Vui lòng chờ trong giây lát.
-            </p>
+            <p className="mt-2 text-sm text-slate-500">Vui lòng chờ trong giây lát.</p>
           </div>
         )}
 
+        {/* ── Error state ── */}
         {!eventLoading && eventError && (
-          <div className="mx-auto my-16 flex min-h-[55vh] max-w-4xl flex-col items-center justify-center rounded-[2rem] border border-rose-200 bg-rose-50 p-8 text-center">
-            <AlertCircle className="mb-4 size-12 text-rose-600" />
-            <h3 className="mb-2 text-2xl font-semibold text-rose-950">
+          <div className="mx-auto my-16 flex min-h-[55vh] max-w-3xl flex-col items-center justify-center rounded-3xl border border-rose-100 bg-gradient-to-b from-rose-50 to-white p-10 text-center">
+            <div className="flex size-16 items-center justify-center rounded-2xl bg-rose-100">
+              <AlertCircle className="size-8 text-rose-600" />
+            </div>
+            <h3 className="mt-5 text-2xl font-bold text-rose-950">
               Không thể hiển thị sự kiện
             </h3>
-            <p className="mb-7 max-w-md text-sm leading-6 text-rose-700">{eventError}</p>
+            <p className="mb-8 mt-3 max-w-md text-sm leading-6 text-rose-700">{eventError}</p>
             <button
               onClick={() => fetchEventDetails(currentEventId)}
-              className="inline-flex items-center gap-2 rounded-full bg-rose-700 px-6 py-3 font-semibold text-white transition hover:bg-rose-800"
+              className="inline-flex items-center gap-2 rounded-xl bg-rose-700 px-6 py-3 font-semibold text-white shadow-md shadow-rose-300/30 transition hover:-translate-y-0.5 hover:bg-rose-800 active:translate-y-0"
             >
               <RotateCcw size={16} />
               <span>Thử tải lại dữ liệu</span>
@@ -418,119 +423,137 @@ export function EventDetailPage() {
           </div>
         )}
 
+        {/* ── Main content ── */}
         {!eventLoading && !eventError && event && (
-          <section className="mx-auto max-w-7xl px-5 py-8 md:px-8 md:py-10">
-            <Link
-              to="/explore"
-              className="inline-flex items-center gap-2 text-sm font-semibold text-violet-700 transition hover:text-violet-900"
-            >
-              <ArrowLeft className="size-4" />
-              Quay lại khám phá
-            </Link>
+          <>
+            {/* ════ Hero / Header section ════ */}
+            <div className="event-detail-hero relative overflow-hidden">
+              {/* Decorative background */}
+              <div aria-hidden="true" className="event-detail-hero-bg pointer-events-none absolute inset-0" />
 
-            {isCancelled && (
-              <div
-                role="status"
-                className="mt-6 flex items-start gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-5 py-4"
-              >
-                <CalendarX2 className="mt-0.5 size-5 shrink-0 text-rose-600" />
-                <div>
-                  <p className="font-semibold text-rose-950">
-                    Sự kiện này đã bị huỷ
-                  </p>
-                  <p className="mt-1 text-sm leading-6 text-rose-700">
-                    Ban tổ chức đã huỷ sự kiện nên không còn nhận đăng ký. Thông
-                    tin bên dưới được giữ lại để bạn tra cứu. Lý do huỷ nằm
-                    trong thông báo gửi tới bạn.
-                  </p>
-                </div>
-              </div>
-            )}
+              <div className="relative mx-auto max-w-7xl px-5 pb-10 pt-8 md:px-8 md:pb-14 md:pt-10">
+                {/* Back link */}
+                <Link
+                  to="/explore"
+                  className="inline-flex items-center gap-2 rounded-full border border-violet-200/70 bg-white/80 px-4 py-2 text-sm font-semibold text-violet-700 shadow-sm backdrop-blur-sm transition hover:border-violet-400 hover:text-violet-900"
+                >
+                  <ArrowLeft className="size-4" />
+                  Quay lại khám phá
+                </Link>
 
-            <div className="mt-7">
-              <div className="min-w-0">
-                <h1 className="max-w-5xl text-[clamp(2.25rem,5vw,4.75rem)] font-semibold leading-[1.02] tracking-[-0.05em] text-[#21182c]">
-                  {event.title || "Sự kiện không có tiêu đề"}
-                </h1>
-                <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-slate-500">
-                  <span className="flex items-center gap-1.5">
-                    <MapPin className="size-4 text-violet-700" />
-                    {event.location || "Địa điểm đang cập nhật"}
-                  </span>
-                  <span className="hidden size-1 rounded-full bg-slate-300 sm:block" aria-hidden="true" />
-                  <span className="font-medium text-violet-700">
-                    {event.category_name || "Sự kiện sinh viên"}
-                  </span>
-                </div>
-              </div>
-            </div>
+                {/* Cancelled banner */}
+                {isCancelled && (
+                  <div
+                    role="status"
+                    className="mt-5 flex items-start gap-3 rounded-2xl border border-rose-200 bg-rose-50/90 px-5 py-4 backdrop-blur-sm"
+                  >
+                    <CalendarX2 className="mt-0.5 size-5 shrink-0 text-rose-600" />
+                    <div>
+                      <p className="font-bold text-rose-950">Sự kiện này đã bị huỷ</p>
+                      <p className="mt-1 text-sm leading-6 text-rose-700">
+                        Ban tổ chức đã huỷ sự kiện nên không còn nhận đăng ký. Thông
+                        tin bên dưới được giữ lại để bạn tra cứu. Lý do huỷ nằm
+                        trong thông báo gửi tới bạn.
+                      </p>
+                    </div>
+                  </div>
+                )}
 
-            <div
-              ref={registrationAnchorRef}
-              className="mt-6 flex min-h-16 flex-wrap items-center justify-end gap-3"
-            >
-              {!isCancelled && isStudent && (
-                <BookmarkButton
-                  saved={saved}
-                  loading={bookmarkLoading}
-                  onClick={handleToggleBookmark}
-                />
-              )}
-              {!isCancelled && (
-              <div
-                className={
-                  isRegistrationFloating
-                    ? "pointer-events-none fixed bottom-5 right-4 z-40 sm:right-6 lg:bottom-auto lg:right-8 lg:top-28 2xl:right-12"
-                    : "pointer-events-none"
-                }
-              >
-                {/* Ban tổ chức chỉ xem, không đăng ký được */}
-                {isOrganizer ? (
-                  <div className="pointer-events-auto flex items-center gap-2 rounded-xl bg-gray-100 px-4 py-3 text-sm font-medium text-gray-500">
-                    <Users size={18} className="text-violet-700" />
-                    <span>
-                      {count}/{maxCapacity} sinh viên đã đăng ký · Ban tổ chức
-                      chỉ có thể xem chi tiết sự kiện.
+                {/* Category + title */}
+                <div className="mt-6">
+                  {event.category_name && (
+                    <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-violet-200 bg-violet-50 px-3.5 py-1.5 text-xs font-bold uppercase tracking-widest text-violet-700">
+                      <Tag size={12} strokeWidth={2.5} aria-hidden="true" />
+                      {event.category_name}
+                    </div>
+                  )}
+                  <h1 className="max-w-5xl font-manrope text-[clamp(2rem,4.5vw,4rem)] font-extrabold leading-[1.06] tracking-[-0.04em] text-[#21182c]">
+                    {event.title || "Sự kiện không có tiêu đề"}
+                  </h1>
+                  <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm text-slate-500">
+                    <span className="flex items-center gap-1.5">
+                      <MapPin className="size-4 text-violet-500" aria-hidden="true" />
+                      {event.location || "Địa điểm đang cập nhật"}
                     </span>
                   </div>
-                ) : (
-                  <RegisterActionBar
-                    maxCapacity={maxCapacity}
-                    count={count}
-                    registered={registered}
-                    registerLoading={registerLoading}
-                    dataLoading={dataLoading}
-                    onRegister={handleRegister}
-                    feedback={feedback}
-                    user={user}
-                    floating={isRegistrationFloating}
-                  />
-                )}
+                </div>
+
+                {/* Action bar anchor */}
+                <div
+                  ref={registrationAnchorRef}
+                  className="mt-7 flex min-h-14 flex-wrap items-center gap-3"
+                >
+                  {!isCancelled && isStudent && (
+                    <BookmarkButton
+                      saved={saved}
+                      loading={bookmarkLoading}
+                      onClick={handleToggleBookmark}
+                    />
+                  )}
+                  {!isCancelled && (
+                    <div
+                      className={
+                        isRegistrationFloating
+                          ? "pointer-events-none fixed bottom-5 right-4 z-40 sm:right-6 lg:bottom-auto lg:right-8 lg:top-28 2xl:right-12"
+                          : "pointer-events-none"
+                      }
+                    >
+                      {isOrganizer ? (
+                        <div className="pointer-events-auto flex items-center gap-2 rounded-xl border border-slate-200 bg-white/90 px-4 py-3 text-sm font-medium text-slate-500 shadow-sm backdrop-blur-sm">
+                          <Users size={18} className="text-violet-600" />
+                          <span>
+                            {count}/{maxCapacity} đã đăng ký · Ban tổ chức chỉ xem chi tiết.
+                          </span>
+                        </div>
+                      ) : (
+                        <RegisterActionBar
+                          maxCapacity={maxCapacity}
+                          count={count}
+                          registered={registered}
+                          registerLoading={registerLoading}
+                          dataLoading={dataLoading}
+                          onRegister={handleRegister}
+                          feedback={feedback}
+                          user={user}
+                          floating={isRegistrationFloating}
+                        />
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
-              )}
             </div>
 
-            <div className="mt-7 grid grid-flow-dense items-stretch gap-6 lg:grid-cols-2">
-              <div className="h-[clamp(21rem,72vw,35rem)] min-w-0 overflow-hidden rounded-3xl border border-slate-200 lg:h-auto">
-                <EventPoster imageUrl={event.banner_url} title={event.title} />
+            {/* ════ Body ════ */}
+            <div className="mx-auto max-w-7xl px-5 pb-20 md:px-8">
+              {/* Two-column layout: Poster + Info sidebar */}
+              <div className="grid gap-6 lg:grid-cols-[1fr_380px] xl:grid-cols-[1fr_420px]">
+                {/* Left: Poster — stretches to fill */}
+                <div className="event-detail-poster-wrap min-h-0 overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-lg shadow-slate-900/5">
+                  <EventPoster imageUrl={event.banner_url} title={event.title} />
+                </div>
+
+                {/* Right: Sidebar — sticky on desktop */}
+                <aside className="flex flex-col gap-5 lg:sticky lg:top-24 lg:self-start">
+                  {/* Info panel */}
+                  <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
+                    <div className="border-b border-slate-100 px-5 py-4">
+                      <h2 className="font-manrope text-lg font-bold tracking-[-0.02em] text-[#21182c]">
+                        Thông tin sự kiện
+                      </h2>
+                    </div>
+                    <div className="p-4">
+                      <EventDetails schedule={schedule} details={details} />
+                    </div>
+                  </section>
+
+                  {/* Organizer */}
+                  <OrganizerSpotlight organizer={event.organizer} />
+                </aside>
               </div>
 
-              <aside className="min-w-0 space-y-5">
-                <section>
-                  <h2 className="text-2xl font-semibold tracking-[-0.03em] text-[#21182c]">
-                    Thông tin sự kiện
-                  </h2>
-                  <div className="mt-5">
-                    <EventDetails schedule={schedule} details={details} />
-                  </div>
-                </section>
-
-                <OrganizerSpotlight organizer={event.organizer} />
-              </aside>
-            </div>
-
-            <div className="mt-10 border-t border-slate-200 pt-9">
-              <div className="min-w-0 max-w-4xl">
+              {/* Description — outside the grid so sticky sidebar doesn't overlap */}
+              <div className="mt-6 overflow-hidden rounded-3xl border border-slate-200 bg-white p-7 shadow-sm md:p-9">
                 <EventDescription
                   key={event.event_id}
                   text={
@@ -539,7 +562,7 @@ export function EventDetailPage() {
                 />
               </div>
             </div>
-          </section>
+          </>
         )}
       </main>
     </div>

@@ -70,6 +70,7 @@ def _serialize_request(
 ) -> dict:
     return {
         "request_id": request.request_id,
+        "previous_request_id": request.previous_request_id,
         "user_id": user.user_id,
         "full_name": user.full_name or user.email,
         "email": user.email,
@@ -79,6 +80,7 @@ def _serialize_request(
             organization_type.name if organization_type else None
         ),
         "reason": request.reason,
+        "rejected_reason": request.rejected_reason,
         "status": request.status,
         "submitted_at": request.create_at,
         "reviewed_by": request.reviewed_by,
@@ -195,6 +197,7 @@ def review_organizer_request(
     request_id: UUID,
     decision: OrganizerRequestStatus,
     admin_id: UUID,
+    decision_reason: str | None = None,
 ) -> dict:
     request = (
         db.query(OrganizerRequest)
@@ -230,6 +233,16 @@ def review_organizer_request(
 
     request.status = decision
     request.reviewed_by = admin_id
+    if decision == OrganizerRequestStatus.REJECTED:
+        normalized_reason = (decision_reason or "").strip()
+        if not normalized_reason:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Vui lòng nhập lý do từ chối.",
+            )
+        request.rejected_reason = normalized_reason
+    else:
+        request.rejected_reason = None
     user.status = (
         UserStatus.ACTIVE
         if decision == OrganizerRequestStatus.APPROVED
@@ -258,7 +271,10 @@ def review_organizer_request(
     notification_content = (
         "Tài khoản của bạn đã được cấp quyền Ban tổ chức."
         if decision == OrganizerRequestStatus.APPROVED
-        else "Hồ sơ đăng ký Ban tổ chức của bạn chưa được chấp nhận."
+        else (
+            "Hồ sơ đăng ký Ban tổ chức của bạn chưa được chấp nhận. "
+            f"Lý do: {request.rejected_reason}"
+        )
     )
     try:
         notification_service.create_notification(

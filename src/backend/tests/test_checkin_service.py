@@ -6,7 +6,7 @@ import pytest
 from fastapi import HTTPException
 
 from app.models.checkin_qr import EventCheckinQR
-from app.models.enum import RegistrationStatus, UserRole
+from app.models.enum import RegistrationStatus, UserRole, UserStatus
 from app.models.event import Event
 from app.models.registration import EventRegistration
 from app.models.user import User
@@ -29,7 +29,26 @@ def sample_organizer():
         email="organizer@university.edu.vn",
         full_name="Ban Tổ Chức",
         role=UserRole.ORGANIZER,
+        status=UserStatus.ACTIVE,
     )
+
+
+def test_pending_organizer_cannot_check_in(mock_db):
+    organizer = User(
+        user_id=uuid.uuid4(),
+        email="pending@university.edu.vn",
+        role=UserRole.ORGANIZER,
+        status=UserStatus.PENDING,
+    )
+
+    with pytest.raises(HTTPException) as error:
+        process_checkin(
+            db=mock_db,
+            code="CHECKIN-CODE",
+            current_user=organizer,
+        )
+
+    assert error.value.status_code == 403
 
 
 @pytest.fixture

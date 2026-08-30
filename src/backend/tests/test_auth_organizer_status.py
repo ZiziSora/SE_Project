@@ -2,9 +2,6 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 from uuid import uuid4
 
-import pytest
-from fastapi import HTTPException
-
 from app.models.enum import UserRole, UserStatus
 from app.schemas.auth import LoginRequest
 from app.services import auth_services
@@ -30,7 +27,7 @@ def _db_with_user(user):
     return db
 
 
-def test_login_rejects_pending_organizer(monkeypatch):
+def test_login_allows_pending_organizer_without_management_permission(monkeypatch):
     user_id = uuid4()
     db_user = SimpleNamespace(
         user_id=user_id,
@@ -44,17 +41,53 @@ def test_login_rejects_pending_organizer(monkeypatch):
         lambda _credentials: _auth_response(user_id),
     )
 
-    with pytest.raises(HTTPException) as error:
-        auth_services.login_service(
-            LoginRequest(
-                email="organizer@university.edu",
-                password="secret123",
-            ),
-            db,
-        )
+    result = auth_services.login_service(
+        LoginRequest(
+            email="organizer@university.edu",
+            password="secret123",
+        ),
+        db,
+    )
 
-    assert error.value.status_code == 403
-    assert "chờ quản trị viên phê duyệt" in error.value.detail
+    assert result.status == "pending"
+    assert result.can_manage_events is False
+
+
+def test_login_returns_rejection_reason_for_rejected_organizer(monkeypatch):
+    user_id = uuid4()
+    db_user = SimpleNamespace(
+        user_id=user_id,
+        role=UserRole.ORGANIZER,
+        status=UserStatus.REJECTED,
+    )
+    rejected_request = SimpleNamespace(
+        rejected_reason="Thiếu quyết định thành lập.",
+    )
+    user_query = MagicMock()
+    user_query.filter.return_value.first.return_value = db_user
+    request_query = MagicMock()
+    request_query.filter.return_value.order_by.return_value.first.return_value = (
+        rejected_request
+    )
+    db = MagicMock()
+    db.query.side_effect = [user_query, request_query]
+    monkeypatch.setattr(
+        auth_services.supabase.auth,
+        "sign_in_with_password",
+        lambda _credentials: _auth_response(user_id),
+    )
+
+    result = auth_services.login_service(
+        LoginRequest(
+            email="organizer@university.edu",
+            password="secret123",
+        ),
+        db,
+    )
+
+    assert result.status == "rejected"
+    assert result.can_manage_events is False
+    assert result.rejection_reason == "Thiếu quyết định thành lập."
 
 
 def test_login_allows_approved_organizer(monkeypatch):

@@ -1,10 +1,38 @@
-from fastapi import APIRouter, status, Depends, Response, HTTPException
+from fastapi import APIRouter, Depends, Response, status
 from fastapi.security import HTTPAuthorizationCredentials
-from app.database import get_db
-from app.core.auth import security
-from app.schemas.auth import EmailVerificationResponse, LoginResponse, LoginRequest, SignUpResponse, StudentSignUpRequest, OrganizerSignUpRequest, ForgotPasswordRequest, ForgotPasswordResponse, ResendVerificationRequest, ResendVerificationResponse, VerificationStatusRequest
 from sqlalchemy.orm import Session
-from app.services.auth_services import signup_student, signup_organizer, login_service, logout_service, verify_email, forgot_password_service, resend_verification_email, get_email_verification_status
+
+from app.database import get_db
+from app.core.auth import get_current_user, security
+from app.models.user import User
+from app.schemas.auth import (
+    EmailVerificationResponse,
+    ForgotPasswordRequest,
+    ForgotPasswordResponse,
+    LoginRequest,
+    LoginResponse,
+    OrganizerResubmissionResponse,
+    OrganizerResubmitRequest,
+    OrganizerResubmitResponse,
+    OrganizerSignUpRequest,
+    ResendVerificationRequest,
+    ResendVerificationResponse,
+    SignUpResponse,
+    StudentSignUpRequest,
+    VerificationStatusRequest,
+)
+from app.services.auth_services import (
+    forgot_password_service,
+    get_email_verification_status,
+    get_organizer_resubmission,
+    login_service,
+    logout_service,
+    resend_verification_email,
+    resubmit_organizer_request,
+    signup_organizer,
+    signup_student,
+    verify_email,
+)
 
 router = APIRouter(prefix="/auth", tags=["Xác thực"])
 
@@ -17,6 +45,35 @@ def signup_student_route(data: StudentSignUpRequest, db: Session = Depends(get_d
 @router.post("/signup/organizer", response_model=SignUpResponse, summary="Đăng ký tài khoản ban tổ chức")
 def signup_organizer_route(data: OrganizerSignUpRequest, db: Session = Depends(get_db)):
     return signup_organizer(data, db)
+
+
+@router.get(
+    "/organizer/resubmission",
+    response_model=OrganizerResubmissionResponse,
+    summary="Lấy hồ sơ Ban tổ chức bị từ chối để chỉnh sửa",
+)
+def get_organizer_resubmission_route(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return get_organizer_resubmission(current_user=current_user, db=db)
+
+
+@router.post(
+    "/organizer/resubmission",
+    response_model=OrganizerResubmitResponse,
+    summary="Nộp lại hồ sơ Ban tổ chức bị từ chối",
+)
+def resubmit_organizer_route(
+    data: OrganizerResubmitRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    return resubmit_organizer_request(
+        data=data,
+        current_user=current_user,
+        db=db,
+    )
 
 
 @router.post("/login", response_model=LoginResponse, summary="Đăng nhập")

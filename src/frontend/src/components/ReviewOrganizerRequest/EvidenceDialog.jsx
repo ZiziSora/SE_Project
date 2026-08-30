@@ -52,6 +52,16 @@ export default function EvidenceDialog({ request, onClose }) {
             <dt className="text-xs font-semibold text-[#82778c]">Lý do đăng ký</dt>
             <dd className="mt-1.5 text-sm leading-6 text-[#5e5667]">{request.reason}</dd>
           </div>
+          {request.rejectedReason && (
+            <div className="py-4">
+              <dt className="text-xs font-semibold text-red-700">
+                Lý do từ chối
+              </dt>
+              <dd className="mt-1.5 text-sm leading-6 text-red-700">
+                {request.rejectedReason}
+              </dd>
+            </div>
+          )}
           <div className="py-4">
             <dt className="text-xs font-semibold text-[#82778c]">Thời gian gửi yêu cầu</dt>
             <dd className="mt-1.5 text-sm">

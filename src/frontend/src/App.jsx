@@ -22,6 +22,8 @@ import AdminStatisticsPage from "./pages/admin/AdminStatisticsPage.jsx";
 import ReviewOrganizerRequest from "./pages/admin/ReviewOrganizerRequest.jsx";
 import SelectRolePage from "./pages/auth/SelectRolePage.jsx";
 import SignupOrganizerPage from "./pages/auth/SignupOrganizerPage.jsx";
+import OrganizerResubmitWorkspacePage from "./pages/organizer/OrganizerResubmitWorkspacePage.jsx";
+import OrganizerAccountStatusPage from "./pages/organizer/OrganizerAccountStatusPage.jsx";
 import OrganizerSignupCompletePage from "./pages/OrganizerSignupCompletePage.jsx";
 import SignupStudentPage from "./pages/auth/SignupStudentPage.jsx";
 import StudentSignupCompletePage from "./pages/StudentSignupCompletePage.jsx";
@@ -75,7 +77,7 @@ function HomePage() {
   return canManageEvents ? (
     <ManageEvents />
   ) : (
-    <Navigate to="/explore" replace />
+    <Navigate to="/organizer/status" replace />
   );
 }
 
@@ -97,7 +99,7 @@ export default function App() {
         <Route
           path="/organizer"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requireEventManagement>
               <HomePage />
             </ProtectedRoute>
           }
@@ -105,7 +107,7 @@ export default function App() {
         <Route
           path="/organizer/home"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requireEventManagement>
               <OrganizerHomePage />
             </ProtectedRoute>
           }
@@ -113,7 +115,7 @@ export default function App() {
         <Route
           path="/organizer/create-event"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requireEventManagement>
               <CreateEvent />
             </ProtectedRoute>
           }
@@ -121,7 +123,7 @@ export default function App() {
         <Route
           path="/organizer/all-events"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requireEventManagement>
               <AllEvents />
             </ProtectedRoute>
           }
@@ -129,7 +131,7 @@ export default function App() {
         <Route
           path="/organizer/edit-event/:eventId"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requireEventManagement>
               <EditEvent />
             </ProtectedRoute>
           }
@@ -137,7 +139,7 @@ export default function App() {
         <Route
           path="/organizer/events/:eventId/checkin"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requireEventManagement>
               <OrganizerCheckinPage />
             </ProtectedRoute>
           }
@@ -145,7 +147,7 @@ export default function App() {
         <Route
           path="/edit-event/:eventId"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requireEventManagement>
               <EditEvent />
             </ProtectedRoute>
           }
@@ -153,8 +155,16 @@ export default function App() {
         <Route
           path="/organizer/events/:eventId"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requireEventManagement>
               <ViewEvent />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/organizer/status"
+          element={
+            <ProtectedRoute>
+              <OrganizerAccountStatusPage />
             </ProtectedRoute>
           }
         />
@@ -180,6 +190,10 @@ export default function App() {
           <Route path="callback" element={<AuthCallbackPage />} />
           <Route path="forgot-password" element={<ForgotPasswordPage />} />
           <Route path="reset-password" element={<ResetPasswordPage />} />
+          <Route
+            path="organizer/resubmit"
+            element={<OrganizerResubmitWorkspacePage />}
+          />
           <Route path="signup">
             <Route index element={<SelectRolePage />} />
             <Route path="student" element={<SignupStudentPage />} />
@@ -213,7 +227,7 @@ export default function App() {
         <Route
           path="/organizer/participants"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requireEventManagement>
               <ParticipantEventsPage />
             </ProtectedRoute>
           }
@@ -221,7 +235,7 @@ export default function App() {
         <Route
           path="/organizer/participants/:eventId"
           element={
-            <ProtectedRoute>
+            <ProtectedRoute requireEventManagement>
               <ParticipantDetailPage />
             </ProtectedRoute>
           }

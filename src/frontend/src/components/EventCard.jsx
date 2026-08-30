@@ -1,104 +1,497 @@
-import { Calendar, MapPin } from "lucide-react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
+import {
+  ArrowRight,
+  Building2,
+  CalendarDays,
+  Clock,
+  MapPin,
+  Sparkles,
+  Users,
+} from "lucide-react";
 
-const DEFAULT_IMAGE =
-    "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=600&auto=format&fit=crop&q=80";
+/* ─── Helpers ──────────────────────────────────────────────── */
+
+function formatEventDate(raw) {
+  if (!raw) return "Thời gian chưa cập nhật";
+  const d = new Date(raw);
+  if (isNaN(d.getTime())) return raw;
+
+  const time = d.toLocaleTimeString("vi-VN", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+  const date = d.toLocaleDateString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+  return `${time} · ${date}`;
+}
+
+function getRegistrationSignal(capacity, registeredCount, registrationDeadline) {
+  if (registrationDeadline && new Date(registrationDeadline) < new Date()) {
+    return {
+      kind: "closed",
+      label: "Đã đóng đăng ký",
+      className: "text-slate-500",
+    };
+  }
+
+  const maximum = Number(capacity);
+  const registered = Number(registeredCount);
+
+  if (!Number.isFinite(maximum) || maximum <= 0 || !Number.isFinite(registered)) {
+    return null;
+  }
+
+  const remaining = Math.max(maximum - registered, 0);
+  if (remaining === 0) {
+    return { kind: "full", label: "Đã đầy", className: "text-rose-600" };
+  }
+
+  if (registered / maximum >= 0.85) {
+    return {
+      kind: "nearly-full",
+      label: `Còn ${remaining} chỗ`,
+      className: "text-amber-600",
+    };
+  }
+
+  return null;
+}
+
+function getCapacityLabel(capacity, registeredCount) {
+  const maximum = Number(capacity);
+  const registered = Number(registeredCount);
+
+  if (!Number.isFinite(maximum) || maximum <= 0) {
+    return "Không giới hạn số lượng";
+  }
+
+  if (!Number.isFinite(registered)) {
+    return `${maximum} chỗ`;
+  }
+
+  return `${registered}/${maximum} người đã đăng ký`;
+}
+
+/** 0–100 fill percentage for the capacity bar */
+function getCapacityPercent(capacity, registeredCount) {
+  const maximum = Number(capacity);
+  const registered = Number(registeredCount);
+  if (!Number.isFinite(maximum) || maximum <= 0 || !Number.isFinite(registered)) return null;
+  return Math.min(100, Math.round((registered / maximum) * 100));
+}
+
+function hasRegisteredState(registrationStatus, isRegistered) {
+  const normalizedStatus = String(registrationStatus || "").toUpperCase();
+  return (
+    isRegistered === true ||
+    ["REGISTERED", "CONFIRMED", "ATTENDED"].includes(normalizedStatus)
+  );
+}
+
+function getHighlightSignal(
+  isRecommended,
+  registrationSignal,
+  registrationStatus,
+  isRegistered,
+) {
+  if (isRecommended) {
+    return {
+      label: "Dành cho bạn",
+      className: "bg-violet-600/90 text-white",
+      dotColor: "bg-white/80",
+    };
+  }
+
+  if (hasRegisteredState(registrationStatus, isRegistered)) {
+    return {
+      label: "Đã đăng ký",
+      className: "bg-emerald-600/90 text-white",
+      dotColor: "bg-white/80",
+    };
+  }
+
+  if (registrationSignal?.kind === "full") {
+    return {
+      label: "Đã đầy",
+      className: "bg-slate-900/80 text-white",
+      dotColor: null,
+    };
+  }
+
+  if (registrationSignal?.kind === "nearly-full") {
+    return {
+      label: "Sắp hết chỗ",
+      className: "bg-amber-400/95 text-amber-950",
+      dotColor: "bg-amber-700/60",
+    };
+  }
+
+  return null;
+}
+
+/** Category → accent colour mapping for placeholder backgrounds */
+const CATEGORY_COLORS = {
+  "Học thuật": { from: "#6366f1", to: "#818cf8" },
+  "Kỹ năng mềm": { from: "#0ea5e9", to: "#38bdf8" },
+  "Việc làm": { from: "#10b981", to: "#34d399" },
+  "Văn hóa - Nghệ thuật": { from: "#f59e0b", to: "#fbbf24" },
+  "Tình nguyện": { from: "#ec4899", to: "#f472b6" },
+  "Khởi nghiệp": { from: "#8b5cf6", to: "#a78bfa" },
+};
+
+const DEFAULT_GRADIENT = { from: "#7c3aed", to: "#a78bfa" };
+
+/* ─── Component ─────────────────────────────────────────────── */
 
 export default function EventCard({
-    eventId,
-    image,
-    badgeText,
-    title,
-    faculty,
-    date,
-    location,
-    isFeatured = false,
-    reason,
-    role,
+  eventId,
+  image,
+  badgeText,
+  title,
+  faculty,
+  date,
+  location,
+  category,
+  capacity,
+  registeredCount,
+  registrationDeadline,
+  registrationStatus,
+  registration_status: registrationStatusFromApi,
+  isRegistered,
+  is_registered: isRegisteredFromApi,
+  variant = "default",
+  isFeatured = false,
+  reason,
+  role,
+  canRegister = role !== "organizer",
+  isRegistrationOpen = true,
+  showOrganizer = true,
 }) {
-    const isOrganizer = role === "organizer";
-    const detailPath = `/events/${eventId}`;
+  const [imageFailed, setImageFailed] = useState(false);
+  const resolvedVariant = isFeatured ? "recommended-featured" : variant;
+  const isRecommended = resolvedVariant.startsWith("recommended");
+  const isFeaturedRecommendation =
+    resolvedVariant === "recommended-featured" ||
+    (resolvedVariant === "recommended" && isFeatured);
+  const isCompactRecommendation = resolvedVariant === "recommended-compact";
+  const displayTitle = title || "Tên sự kiện chưa cập nhật";
 
-    return (
-        <div
-            className={`bg-white rounded-2xl overflow-hidden flex flex-col transition-all duration-300 group ${
-                isFeatured
-                    ? "border-2 border-purple-300 shadow-lg shadow-purple-100 hover:shadow-xl hover:shadow-purple-200 hover:-translate-y-1"
-                    : "border border-gray-100 shadow-sm hover:shadow-md hover:-translate-y-0.5"
-            }`}
+  const registrationSignal = getRegistrationSignal(
+    capacity,
+    registeredCount,
+    registrationDeadline,
+  );
+  const showRegistrationButton = canRegister && isRegistrationOpen;
+  const highlightSignal = getHighlightSignal(
+    isRecommended,
+    registrationSignal,
+    registrationStatus ?? registrationStatusFromApi,
+    isRegistered ?? isRegisteredFromApi,
+  );
+  const hasCapacityData =
+    capacity !== undefined && capacity !== null && capacity !== "";
+  const showCapacity = Boolean(
+    !isCompactRecommendation && (registrationSignal || hasCapacityData),
+  );
+  const capacityPercent = getCapacityPercent(capacity, registeredCount);
+
+  const hasImage = image && !imageFailed;
+  const catColors = CATEGORY_COLORS[category] || DEFAULT_GRADIENT;
+
+  /* Article wrapper */
+  const articleClasses = [
+    "event-discovery-card group h-full overflow-hidden rounded-2xl border bg-white",
+    isRecommended
+      ? "event-discovery-card--recommended border-violet-200/70"
+      : "border-slate-200/80",
+    isFeaturedRecommendation ? "event-discovery-card--featured" : "",
+    isCompactRecommendation
+      ? "md:grid md:grid-cols-[8rem_minmax(0,1fr)]"
+      : "flex flex-col",
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  /* Image container */
+  const imageClasses = [
+    "relative overflow-hidden",
+    isFeaturedRecommendation
+      ? "aspect-[16/10] min-h-56 lg:min-h-72"
+      : isCompactRecommendation
+        ? "aspect-[16/10] md:aspect-auto md:h-full md:min-h-0"
+        : "aspect-[16/9]",
+  ].join(" ");
+
+  /* Content padding */
+  const contentClasses = [
+    "flex min-w-0 flex-1 flex-col",
+    isFeaturedRecommendation ? "p-6" : "p-5",
+  ].join(" ");
+
+  return (
+    <article className={articleClasses}>
+      {/* ── Image / Placeholder ── */}
+      <Link
+        to={`/events/${eventId}`}
+        className={`${imageClasses} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-violet-600`}
+        aria-label={`Xem chi tiết ${displayTitle}`}
+        tabIndex={-1}
+      >
+        {hasImage ? (
+          <img
+            src={image}
+            alt=""
+            className="event-discovery-image h-full w-full object-cover"
+            onError={() => setImageFailed(true)}
+          />
+        ) : (
+          /* Gradient placeholder with category icon */
+          <span
+            className="flex h-full min-h-36 flex-col items-center justify-center gap-2"
+            style={{
+              background: `linear-gradient(135deg, ${catColors.from} 0%, ${catColors.to} 100%)`,
+            }}
+          >
+            <CalendarDays
+              aria-hidden="true"
+              size={isFeaturedRecommendation ? 42 : 32}
+              strokeWidth={1.4}
+              className="text-white/80"
+            />
+            {category && (
+              <span className="text-xs font-semibold text-white/70">
+                {category}
+              </span>
+            )}
+          </span>
+        )}
+
+        {/* Subtle gradient overlay on real images for badge legibility */}
+        {hasImage && (
+          <span
+            aria-hidden="true"
+            className="absolute inset-0 bg-gradient-to-t from-slate-950/40 via-transparent to-transparent"
+          />
+        )}
+
+        {/* Category badge — bottom-left */}
+        {category && (
+          <span className="event-card-badge absolute bottom-3 left-3 max-w-[70%] truncate rounded-lg px-2.5 py-1.5 text-xs font-semibold backdrop-blur-[3px]">
+            {category}
+          </span>
+        )}
+
+        {/* Highlight badge — top-right */}
+        {highlightSignal && (
+          <span
+            className={`absolute right-3 top-3 flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold backdrop-blur-[3px] ${highlightSignal.className}`}
+          >
+            {highlightSignal.dotColor && (
+              <span
+                className={`size-1.5 rounded-full ${highlightSignal.dotColor}`}
+              />
+            )}
+            {highlightSignal.label}
+          </span>
+        )}
+      </Link>
+
+      {/* ── Content area ── */}
+      <div className={contentClasses}>
+        {!category && badgeText && (
+          <p className="mb-2 text-xs font-medium uppercase tracking-wider text-slate-500">
+            {badgeText}
+          </p>
+        )}
+
+        {/* Title */}
+        <Link
+          to={`/events/${eventId}`}
+          className="block rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-600 focus-visible:ring-offset-2"
         >
-            <div className={`relative overflow-hidden ${isFeatured ? "h-48" : "h-40"}`}>
-                <img
-                    src={image || DEFAULT_IMAGE}
-                    alt={title || "Sự kiện"}
-                    className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    onError={(event) => {
-                        event.currentTarget.onerror = null;
-                        event.currentTarget.src = DEFAULT_IMAGE;
-                    }}
+          <h3
+            className={`event-discovery-title font-bold leading-[1.3] tracking-[-0.015em] text-slate-900 ${
+              isFeaturedRecommendation
+                ? "text-[1.7rem] sm:text-[1.85rem]"
+                : isCompactRecommendation
+                  ? "line-clamp-2 text-[1.05rem]"
+                  : "line-clamp-2 text-[1.1rem]"
+            }`}
+          >
+            {displayTitle}
+          </h3>
+        </Link>
+
+        {/* AI reason */}
+        {reason && isRecommended && (
+          <p
+            className={`flex items-start gap-1.5 text-violet-700 ${
+              isFeaturedRecommendation
+                ? "mt-3 text-[0.9375rem] font-medium leading-6"
+                : "mt-2.5 text-[0.8125rem] leading-5"
+            }`}
+          >
+            <Sparkles
+              className="mt-0.5 shrink-0"
+              size={13}
+              strokeWidth={2}
+              aria-hidden="true"
+            />
+            <span className="line-clamp-2">{reason}</span>
+          </p>
+        )}
+
+        {reason && !isRecommended && (
+          <p className="mt-2 line-clamp-1 text-sm text-slate-500">{reason}</p>
+        )}
+
+        {/* Meta info */}
+        <div
+          className={`mt-4 space-y-2.5 text-[0.8125rem] leading-5 ${
+            isCompactRecommendation ? "md:text-[0.775rem]" : ""
+          }`}
+        >
+          {/* Date */}
+          <p className="flex items-center gap-2 text-slate-600">
+            <Clock
+              className="shrink-0 text-violet-400"
+              size={14}
+              strokeWidth={2}
+              aria-hidden="true"
+            />
+            <span className="font-medium">{formatEventDate(date)}</span>
+          </p>
+
+          {/* Location */}
+          <p className="flex items-center gap-2 text-slate-500">
+            <MapPin
+              className="shrink-0 text-slate-400"
+              size={14}
+              strokeWidth={2}
+              aria-hidden="true"
+            />
+            <span className="line-clamp-1">{location || "Địa điểm chưa cập nhật"}</span>
+          </p>
+
+          {/* Organizer */}
+          {showOrganizer && faculty && (
+            <p className="flex items-center gap-2 text-slate-500">
+              <Building2
+                className="shrink-0 text-slate-400"
+                size={14}
+                strokeWidth={2}
+                aria-hidden="true"
+              />
+              <span className="line-clamp-1">{faculty}</span>
+            </p>
+          )}
+
+          {/* Capacity with progress bar */}
+          {showCapacity && (
+            <div className="flex flex-col gap-1.5">
+              <p className="flex items-center gap-2">
+                <Users
+                  className="shrink-0 text-slate-400"
+                  size={14}
+                  strokeWidth={2}
+                  aria-hidden="true"
                 />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent" />
+                <span
+                  className={`text-[0.8125rem] font-medium ${
+                    registrationSignal?.kind === "full"
+                      ? "text-rose-600"
+                      : registrationSignal?.kind === "nearly-full"
+                        ? "text-amber-600"
+                        : registrationSignal?.kind === "closed"
+                          ? "text-slate-500"
+                          : "text-slate-600"
+                  }`}
+                >
+                  {registrationSignal?.label ||
+                    getCapacityLabel(capacity, registeredCount)}
+                </span>
+              </p>
 
-                {badgeText && (
-                    <span className="absolute top-2.5 left-2.5 bg-[#6D28D9] text-white text-xs font-semibold px-2.5 py-1 rounded-full shadow-md backdrop-blur-sm">
-                        {badgeText}
-                    </span>
-                )}
-
-                {isFeatured && (
-                    <span className="absolute top-2.5 right-2.5 bg-white/20 backdrop-blur-sm text-white text-xs font-medium px-2 py-0.5 rounded-full border border-white/30">
-                        ✨ Nổi bật
-                    </span>
-                )}
-            </div>
-
-            <div className="p-4 flex flex-col flex-1 gap-2">
-                <h3 className={`font-bold text-gray-800 leading-snug line-clamp-2 ${isFeatured ? "text-base" : "text-sm"}`}>
-                    {title || "Tên sự kiện chưa cập nhật"}
-                </h3>
-
-                <p className="text-xs text-gray-400 font-medium">
-                    {faculty || "Đơn vị tổ chức"}
-                </p>
-
-                {reason && (
-                    <p className="text-xs text-[#7C3AED] italic line-clamp-2">
-                        {reason}
-                    </p>
-                )}
-
-                <div className="flex flex-col gap-1 mt-auto pt-1">
-                    <div className="flex items-center gap-1.5 text-xs text-gray-500">
-                        <Calendar className="h-3.5 w-3.5 shrink-0 text-[#6D28D9]" />
-                        <span className="truncate">{date || "Thời gian chưa xác định"}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-xs text-gray-500">
-                        <MapPin className="h-3.5 w-3.5 shrink-0 text-[#6D28D9]" />
-                        <span className="truncate">{location || "Địa điểm chưa xác định"}</span>
-                    </div>
+              {/* Mini progress bar — only when we have numeric data */}
+              {capacityPercent !== null && (
+                <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+                  <div
+                    className={`h-full rounded-full transition-all duration-500 ${
+                      capacityPercent >= 100
+                        ? "bg-rose-500"
+                        : capacityPercent >= 85
+                          ? "bg-amber-500"
+                          : "bg-violet-500"
+                    }`}
+                    style={{ width: `${capacityPercent}%` }}
+                    role="progressbar"
+                    aria-valuenow={capacityPercent}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-label="Tỷ lệ đăng ký"
+                  />
                 </div>
-
-                <div className="flex gap-2 mt-3">
-                    <Link
-                        to={detailPath}
-                        className={`flex-1 py-2 px-3 text-center text-xs font-semibold rounded-lg transition active:scale-[0.98] ${
-                            isOrganizer
-                                ? "text-white bg-[#7C3AED] hover:bg-[#6D28D9] shadow-sm"
-                                : "border border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300"
-                        }`}
-                    >
-                        Xem thông tin
-                    </Link>
-                    {!isOrganizer && (
-                        <Link
-                            to={detailPath}
-                            className="flex-1 py-2 px-3 text-center text-xs font-semibold rounded-lg text-white bg-[#7C3AED] hover:bg-[#6D28D9] active:scale-[0.98] transition shadow-sm"
-                        >
-                            Đăng ký
-                        </Link>
-                    )}
-                </div>
+              )}
             </div>
+          )}
         </div>
-    );
+
+        {/* ── Action footer ── */}
+        <div
+          className={`mt-auto pt-4 ${
+            isRecommended
+              ? "border-t border-violet-100"
+              : "border-t border-slate-100"
+          }`}
+        >
+          {showRegistrationButton ? (
+            /* Two-button layout */
+            <div className="flex items-center gap-2">
+              <Link
+                to={`/events/${eventId}`}
+                className={`event-detail-action inline-flex items-center gap-1 text-sm font-semibold text-slate-500 hover:text-violet-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-600 focus-visible:ring-offset-2 ${
+                  isCompactRecommendation ? "text-xs" : ""
+                }`}
+              >
+                Xem chi tiết
+                <ArrowRight
+                  className="event-detail-arrow"
+                  size={14}
+                  aria-hidden="true"
+                />
+              </Link>
+
+              <Link
+                to={`/events/${eventId}`}
+                className={`event-register-action ml-auto inline-flex items-center justify-center gap-1.5 rounded-xl bg-violet-700 font-semibold text-white shadow-sm shadow-violet-300/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-600 focus-visible:ring-offset-2 ${
+                  isCompactRecommendation
+                    ? "min-h-9 px-3 text-xs"
+                    : "min-h-10 px-4 text-sm"
+                }`}
+              >
+                Đăng ký ngay
+              </Link>
+            </div>
+          ) : (
+            /* Single "Xem chi tiết" — full width pill */
+            <Link
+              to={`/events/${eventId}`}
+              className="event-detail-action group/link inline-flex w-full items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-700 transition-all hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-600 focus-visible:ring-offset-2"
+            >
+              Xem chi tiết
+              <ArrowRight
+                className="event-detail-arrow size-4"
+                aria-hidden="true"
+              />
+            </Link>
+          )}
+        </div>
+      </div>
+    </article>
+  );
 }
