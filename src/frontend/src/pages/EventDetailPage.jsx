@@ -42,6 +42,9 @@ export function EventDetailPage() {
   // State quản lý User & Đăng ký tham gia
   const [user, setUser] = useState(null);
   const [registered, setRegistered] = useState(false);
+  // Đã giữ chỗ CHÍNH THỨC hay mới chỉ đứng trong danh sách chờ — hai việc khác
+  // nhau, nên nút và thông báo phải nói khác nhau.
+  const [waitlisted, setWaitlisted] = useState(false);
   const [count, setCount] = useState(0);
   const [dataLoading, setDataLoading] = useState(true);
   const [registerLoading, setRegisterLoading] = useState(false);
@@ -165,11 +168,12 @@ export function EventDetailPage() {
         const status =
           await publicEventApi.getRegistrationStatus(currentEventId);
         if (isMounted) {
+          const normalizedStatus = String(status.status || "").toUpperCase();
           setCount(status.count);
           setRegistered(
-            Boolean(status.registered) &&
-              String(status.status || "").toUpperCase() !== "CANCELLED",
+            Boolean(status.registered) && normalizedStatus !== "CANCELLED",
           );
+          setWaitlisted(normalizedStatus === "WAITLISTED");
         }
       } catch (err) {
         console.error("Lỗi khi tải trạng thái đăng ký:", err);
@@ -298,6 +302,7 @@ export function EventDetailPage() {
       const result = await publicEventApi.registerForEvent(currentEventId);
       setCount(result.count);
       setRegistered(true);
+      setWaitlisted(Boolean(result.is_waitlisted));
       setFeedback(
         result.already_registered
           ? { type: "info", message: "Bạn đã đăng ký sự kiện này từ trước!" }
@@ -501,6 +506,7 @@ export function EventDetailPage() {
                     registerLoading={registerLoading}
                     dataLoading={dataLoading}
                     onRegister={handleRegister}
+                    waitlisted={waitlisted}
                     feedback={feedback}
                     user={user}
                     floating={isRegistrationFloating}

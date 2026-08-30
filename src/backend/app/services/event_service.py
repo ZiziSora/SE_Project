@@ -5,12 +5,13 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from typing import Any, Optional
 
 from fastapi import HTTPException, status
 from postgrest.exceptions import APIError
 
+from app.core.app_time import APP_TZ, now_naive_local
 from app.core.config import TABLE_CATEGORIES, TABLE_EVENTS, TABLE_REGISTRATIONS
 from app.core.supabase_client import get_supabase
 from app.models.enum import NotificationType
@@ -114,13 +115,13 @@ ORGANIZER_SETTABLE_STATUSES = {
 }
 
 
-def _now_naive_utc() -> datetime:
+def _now_naive_local() -> datetime:
     """Cột start_time / end_time là `timestamp` KHÔNG timezone.
 
-    Toàn bộ code hiện có coi giá trị naive trong DB là giờ UTC (xem `_aware`),
-    nên khi so sánh với hiện tại cũng phải dùng UTC dạng naive cho khớp.
+    Form ghi xuống đúng giờ đồng hồ người dùng nhập (giờ VN), nên mốc "bây giờ"
+    để so sánh cũng phải là giờ VN dạng naive — xem `app.core.app_time`.
     """
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+    return now_naive_local()
 
 
 def _derive_ui_status(row: dict[str, Any]) -> str:
@@ -135,7 +136,7 @@ def _derive_ui_status(row: dict[str, Any]) -> str:
 
     if db_status == DB_PUBLISHED:
         # Đã được duyệt: ONGOING / ENDED phụ thuộc mốc thời gian, không lưu trong DB
-        now = _now_naive_utc()
+        now = _now_naive_local()
         start = _naive(_parse_dt(row.get("start_time")))
         end = _naive(_parse_dt(row.get("end_time")))
         if end and now > end:
@@ -185,7 +186,7 @@ def _ui_status_to_db(ui_status: str) -> dict[str, Any]:
 
 def _apply_status_filter(query, ui_status: str):
     """Dịch bộ lọc trạng thái của UI thành điều kiện trên 2 cột DB."""
-    now = _now_naive_utc().isoformat()
+    now = _now_naive_local().isoformat()
 
     if ui_status == EventStatus.DRAFT.value:
         return query.eq("event_status", DB_DRAFT).or_(
@@ -360,7 +361,7 @@ def _public_organizer_profile(sb: Any, organizer_id: Any) -> Optional[dict[str, 
 
 def list_ongoing_events() -> list[PublicEventOut]:
     """Return approved public events whose scheduled time includes now."""
-    now = _now_naive_utc().isoformat()
+    now = _now_naive_local().isoformat()
     query = (
         get_supabase()
         .table(TABLE_EVENTS)
@@ -879,12 +880,10 @@ def _validate_changed_dates_not_past(
     nằm trong quá khứ, nếu kiểm tra cả trường không đổi thì mọi thao tác sửa nội
     dung khác đều bị chặn oan.
 
-    Lưu ý múi giờ: DB lưu `timestamp` không timezone và toàn bộ code coi giá trị
-    naive là giờ UTC (xem `_now_naive_utc`), trong khi form gửi lên giờ địa phương.
-    Giờ VN (UTC+7) luôn lớn hơn giờ UTC nên phép so sánh này không bao giờ báo nhầm
-    mốc tương lai thành quá khứ; phần kiểm tra sát giờ người dùng nằm ở EventForm.
+    Lưu ý múi giờ: DB lưu `timestamp` không timezone, giá trị là giờ đồng hồ VN
+    đúng như form gửi lên, nên so sánh với `_now_naive_local()` (cũng giờ VN).
     """
-    now = _now_naive_utc()
+    now = _now_naive_local()
     labels = {
         "start_time": "Thời gian bắt đầu sự kiện",
         "registration_deadline": "Hạn chót đăng ký",
@@ -924,16 +923,15 @@ def _validate_capacity_against_registrations(
         )
 
 
-def _aware(dt: Optional[datetime]) -> Optional[datetime]:
-    if dt and dt.tzinfo is None:
-        return dt.replace(tzinfo=timezone.utc)
-    return dt
-
-
 def _naive(dt: Optional[datetime]) -> Optional[datetime]:
-    """Ngược lại của `_aware` — đưa về naive UTC để so sánh với `_now_naive_utc`."""
+    """Bỏ timezone để so sánh cùng hệ quy chiếu với `_now_naive_local`.
+
+    Giá trị lấy từ DB là giờ đồng hồ (giờ VN) và không có timezone; nếu tầng
+    client có kèm offset thì quy về múi giờ ứng dụng trước khi bỏ, để không làm
+    xê dịch giờ mà người dùng đã nhập.
+    """
     if dt and dt.tzinfo is not None:
-        return dt.astimezone(timezone.utc).replace(tzinfo=None)
+        return dt.astimezone(APP_TZ).replace(tzinfo=None)
     return dt
 
 
@@ -951,8 +949,9 @@ def _to_organizer_event_out(
     # Trạng thái trả ra API là giá trị gộp 6 mức, suy từ 2 cột enum của DB
     event_status = _derive_ui_status(row)
 
-    deadline = _aware(_parse_dt(row.get("registration_deadline")))
-    now = datetime.now(timezone.utc)
+    # Hạn đăng ký cũng là giờ VN dạng naive → so với `now` cùng hệ quy chiếu
+    deadline = _naive(_parse_dt(row.get("registration_deadline")))
+    now = _now_naive_local()
     is_full = capacity is not None and registered >= int(capacity)
     is_open = (
         event_status == EventStatus.PUBLISHED.value

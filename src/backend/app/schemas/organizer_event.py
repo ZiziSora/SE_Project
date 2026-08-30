@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime
 from enum import Enum
 from typing import Any, Optional
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from app.core.app_time import as_local, now_local
 from app.schemas.event_revision import EventRevisionOut
 
 
@@ -221,9 +222,9 @@ def missing_required_fields(data: Any) -> list[str]:
     ]
 
 
-def _as_utc(value: datetime) -> datetime:
-    """Giá trị naive được coi là giờ UTC — đúng quy ước đang dùng ở event_service."""
-    return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value
+def _as_local(value: datetime) -> datetime:
+    """Giá trị naive là giờ VN — đúng quy ước ở `app.core.app_time`."""
+    return as_local(value)
 
 
 def _check_not_past(
@@ -231,10 +232,10 @@ def _check_not_past(
     deadline: Optional[datetime],
 ) -> None:
     """Chặn sự kiện đặt thời gian bắt đầu / hạn đăng ký đã trôi qua."""
-    now = datetime.now(timezone.utc)
-    if start and _as_utc(start) <= now:
+    now = now_local()
+    if start and _as_local(start) <= now:
         raise ValueError("Thời gian bắt đầu sự kiện không được ở trong quá khứ.")
-    if deadline and _as_utc(deadline) <= now:
+    if deadline and _as_local(deadline) <= now:
         raise ValueError("Hạn chót đăng ký không được ở trong quá khứ.")
 
 

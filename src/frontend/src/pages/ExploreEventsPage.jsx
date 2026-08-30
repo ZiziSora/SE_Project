@@ -1,9 +1,11 @@
-import { useState, useEffect } from "react";
+import { useCallback, useState, useEffect } from "react";
 import StudentHeader from "../components/common/StudentHeader.jsx";
 import FilterBar from "../components/FilterBar";
 import EventCard from "../components/EventCard";
+import Pagination from "../components/Pagination.jsx";
 import FloatingChatbox from "../components/FloatingChatbox";
 import { publicEventApi } from "../api/eventApi.js";
+import { getMyEvents } from "../api/registrationApi.js";
 
 export default function ExploreEventsPage() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -17,6 +19,44 @@ export default function ExploreEventsPage() {
 
   const [recommendedEvents, setRecommendedEvents] = useState([]);
   const [loadingRecommendations, setLoadingRecommendations] = useState(true);
+
+  // Trạng thái đăng ký hiện có của sinh viên, theo event_id.
+  // Lưu cả "WAITLISTED" chứ không chỉ true/false: đã vào danh sách chờ KHÁC
+  // với đã có chỗ chính thức, và thẻ phải nói đúng điều đó.
+  const [registrationByEventId, setRegistrationByEventId] = useState(
+    () => new Map(),
+  );
+
+  useEffect(() => {
+    let isMounted = true;
+
+    getMyEvents()
+      .then((items) => {
+        if (!isMounted) return;
+        const entries = (items || [])
+          .map((item) => [
+            item.event_id || item.events?.event_id,
+            String(item.registration_status || "REGISTERED").toUpperCase(),
+          ])
+          .filter(([eventId, status]) => eventId && status !== "CANCELLED");
+        setRegistrationByEventId(new Map(entries));
+      })
+      // Trang Khám phá xem được khi chưa đăng nhập — lỗi 401 ở đây là bình thường.
+      .catch(() => {});
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const handleRegistered = useCallback((eventId, result) => {
+    setRegistrationByEventId((previous) =>
+      new Map(previous).set(
+        eventId,
+        result?.is_waitlisted ? "WAITLISTED" : "REGISTERED",
+      ),
+    );
+  }, []);
 
   // Gợi ý cá nhân hoá (lịch sử đăng ký/lưu + AI xếp hạng) — độc lập với bộ lọc bên dưới
   useEffect(() => {
@@ -117,13 +157,16 @@ export default function ExploreEventsPage() {
                 <EventCard
                   key={event.event_id}
                   eventId={event.event_id}
+                  event={event}
                   image={event.banner_url}
-                  badgeText="Gợi ý"
                   title={event.title}
-                  faculty={event.category_name || "Đơn vị tổ chức"}
-                  date={`${event.start_time || ""}`}
                   location={event.location}
                   reason={event.reason}
+                  registered={registrationByEventId.has(event.event_id)}
+                  waitlisted={
+                    registrationByEventId.get(event.event_id) === "WAITLISTED"
+                  }
+                  onRegistered={handleRegistered}
                   isFeatured
                 />
               ))
@@ -162,20 +205,18 @@ export default function ExploreEventsPage() {
                 <EventCard
                   key={event.event_id || event.id}
                   eventId={event.event_id || event.id}
-                  image={
-                    event.banner_url ||
-                    "https://picsum.photos/seed/default/600/400"
-                  }
+                  event={event}
+                  image={event.banner_url}
                   title={event.title}
-                  faculty={event.department_name || "Đơn vị tổ chức"}
-                  date={`${event.start_time || ""}`}
                   location={event.location}
-                  badgeText={
-                    event.registered_count > 0
-                      ? `${event.registered_count} đã đăng ký`
-                      : "Mới"
+                  registered={registrationByEventId.has(
+                    event.event_id || event.id,
+                  )}
+                  waitlisted={
+                    registrationByEventId.get(event.event_id || event.id) ===
+                    "WAITLISTED"
                   }
-                  {...event}
+                  onRegistered={handleRegistered}
                 />
               ))
             ) : (
@@ -191,29 +232,11 @@ export default function ExploreEventsPage() {
             )}
           </div>
 
-          {totalPages > 1 && (
-            <div className="mt-8 flex justify-center items-center gap-4">
-              <button
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg disabled:opacity-50 cursor-pointer"
-              >
-                Trang trước
-              </button>
-              <span className="text-sm text-gray-500 font-medium">
-                Trang {currentPage} / {totalPages}
-              </span>
-              <button
-                onClick={() =>
-                  setCurrentPage((p) => Math.min(totalPages, p + 1))
-                }
-                disabled={currentPage === totalPages}
-                className="px-4 py-2 text-sm font-medium text-white bg-[#7C3AED] rounded-lg disabled:opacity-50 cursor-pointer"
-              >
-                Trang sau
-              </button>
-            </div>
-          )}
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={setCurrentPage}
+          />
         </section>
         <div className="h-20" />
       </main>

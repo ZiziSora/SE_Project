@@ -26,7 +26,7 @@ DB_APPROVAL_STATUS_VALUES = {"PENDING", "APPROVED", "REJECTED", None}
 
 
 def _now():
-    return event_service._now_naive_utc()
+    return event_service._now_naive_local()
 
 
 def _full_payload():

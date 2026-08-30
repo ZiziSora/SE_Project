@@ -1,9 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Search } from "lucide-react";
 
 import ParticipantEventCard from "../components/Participants/ParticipantEventCard.jsx";
 import OrganizerHeader from "../components/common/OrganizerHeader.jsx";
 import { participantsApi } from "../api/participantApi.js";
+import {
+  PARTICIPANT_EVENT_FILTERS,
+  getParticipantEventGroup,
+} from "../utils/participantUtils.js";
 
 /** Trang chọn sự kiện trước khi vào quản lý người tham gia. */
 export default function ParticipantEventsPage() {
@@ -11,6 +15,7 @@ export default function ParticipantEventsPage() {
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [activeGroup, setActiveGroup] = useState("ALL");
 
   useEffect(() => {
     let cancelled = false;
@@ -36,6 +41,32 @@ export default function ParticipantEventsPage() {
       clearTimeout(timer);
     };
   }, [search]);
+
+  // Chỉ giữ sự kiện đã công khai: bản nháp / chờ duyệt lần đầu chưa có ai đăng
+  // ký, sự kiện đã huỷ thì không còn gì để quản lý.
+  const groupedEvents = useMemo(
+    () =>
+      events
+        .map((event) => ({ event, group: getParticipantEventGroup(event) }))
+        .filter((item) => item.group !== null),
+    [events],
+  );
+
+  const visibleEvents = useMemo(
+    () =>
+      activeGroup === "ALL"
+        ? groupedEvents
+        : groupedEvents.filter((item) => item.group.key === activeGroup),
+    [groupedEvents, activeGroup],
+  );
+
+  const countByGroup = useMemo(() => {
+    const counts = { ALL: groupedEvents.length };
+    for (const item of groupedEvents) {
+      counts[item.group.key] = (counts[item.group.key] || 0) + 1;
+    }
+    return counts;
+  }, [groupedEvents]);
 
   return (
     <div className="min-h-screen w-full bg-background">
@@ -68,19 +99,59 @@ export default function ParticipantEventsPage() {
           </div>
         </div>
 
+        {!loading && !error && groupedEvents.length > 0 && (
+          <div
+            className="mt-6 flex flex-wrap gap-2"
+            role="group"
+            aria-label="Lọc sự kiện theo trạng thái"
+          >
+            {PARTICIPANT_EVENT_FILTERS.map((filter) => {
+              const count = countByGroup[filter.key] || 0;
+              const isActive = activeGroup === filter.key;
+
+              return (
+                <button
+                  key={filter.key}
+                  type="button"
+                  onClick={() => setActiveGroup(filter.key)}
+                  aria-pressed={isActive}
+                  className={`rounded-full border px-3.5 py-1.5 text-sm font-semibold transition-colors ${
+                    isActive
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-border bg-card text-muted-foreground hover:bg-secondary hover:text-foreground"
+                  }`}
+                >
+                  {filter.label}
+                  <span
+                    className={`ml-1.5 text-xs font-bold ${
+                      isActive ? "text-primary-foreground/80" : "text-foreground/50"
+                    }`}
+                  >
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         <div className="mt-8">
           {loading ? (
             <p className="text-sm text-muted-foreground">Đang tải danh sách sự kiện...</p>
           ) : error ? (
             <p className="text-sm text-destructive">{error}</p>
-          ) : events.length === 0 ? (
+          ) : visibleEvents.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               Không tìm thấy sự kiện nào phù hợp.
             </p>
           ) : (
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              {events.map((event) => (
-                <ParticipantEventCard key={event.event_id} event={event} />
+              {visibleEvents.map(({ event, group }) => (
+                <ParticipantEventCard
+                  key={event.event_id}
+                  event={event}
+                  group={group}
+                />
               ))}
             </div>
           )}

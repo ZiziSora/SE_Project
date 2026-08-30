@@ -174,7 +174,7 @@ export default function OrganizerCheckinPage() {
             className="flex items-center gap-2 text-xs font-bold text-gray-500 hover:text-purple-700 transition"
           >
             <ArrowLeft className="w-4 h-4" />
-            Quay lại quản lý sự kiện
+            Quay lại quản lý người tham gia
           </button>
 
           <button

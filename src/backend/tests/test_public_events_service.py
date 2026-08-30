@@ -1,17 +1,21 @@
 """Regression tests for the public event discovery and detail queries."""
 
+from datetime import datetime, timedelta
 from unittest.mock import MagicMock, call, patch
+
+from app.core.app_time import now_naive_local
 
 from app.services import event_service
 from app.services.event_services import get_filtered_events_service
 
 
 EVENT_ID = "11111111-1111-1111-1111-111111111111"
+OTHER_EVENT_ID = "22222222-2222-2222-2222-222222222222"
 
 
 def _query_client(rows):
     query = MagicMock()
-    for method in ("select", "eq", "ilike", "in_", "limit"):
+    for method in ("select", "eq", "ilike", "in_", "limit", "gt", "gte", "lte", "order"):
         getattr(query, method).return_value = query
     query.execute.return_value = MagicMock(data=rows)
 
@@ -33,6 +37,66 @@ def test_explore_list_only_queries_approved_published_events(mock_supabase):
         call("event_status", "PUBLISHED"),
         call("approval_status", "APPROVED"),
     ]
+
+
+@patch("app.services.event_services.supabase")
+def test_explore_list_only_queries_events_starting_in_the_future(mock_supabase):
+    """Trang Khám phá là nơi ĐĂNG KÝ, nên sự kiện đã bắt đầu / đã kết thúc
+    không được hiện ra nữa."""
+    _client, query = _query_client([])
+    mock_supabase.table.return_value = query
+
+    get_filtered_events_service()
+
+    assert query.gt.call_count == 1
+    column, threshold = query.gt.call_args.args
+    assert column == "start_time"
+    assert datetime.fromisoformat(threshold) <= now_naive_local()
+
+
+@patch("app.services.event_services.supabase")
+def test_explore_list_drops_events_past_their_registration_deadline(mock_supabase):
+    """Hết hạn đăng ký = đóng đăng ký, dù sự kiện vẫn chưa diễn ra."""
+    now = now_naive_local()
+    open_event = {
+        "event_id": EVENT_ID,
+        "title": "Còn hạn đăng ký",
+        "organizer_id": None,
+        "category_id": None,
+        "registration_deadline": (now + timedelta(days=3)).isoformat(),
+    }
+    closed_event = {
+        "event_id": OTHER_EVENT_ID,
+        "title": "Đã hết hạn đăng ký",
+        "organizer_id": None,
+        "category_id": None,
+        "registration_deadline": (now - timedelta(days=1)).isoformat(),
+    }
+    _client, query = _query_client([open_event, closed_event])
+    mock_supabase.table.return_value = query
+
+    result = get_filtered_events_service()
+
+    assert [e["event_id"] for e in result["events"]] == [EVENT_ID]
+    assert result["total_items"] == 1
+
+
+@patch("app.services.event_services.supabase")
+def test_explore_list_keeps_events_without_a_registration_deadline(mock_supabase):
+    """registration_deadline = NULL nghĩa là không đặt hạn, không phải hết hạn."""
+    event = {
+        "event_id": EVENT_ID,
+        "title": "Không đặt hạn đăng ký",
+        "organizer_id": None,
+        "category_id": None,
+        "registration_deadline": None,
+    }
+    _client, query = _query_client([event])
+    mock_supabase.table.return_value = query
+
+    result = get_filtered_events_service()
+
+    assert [e["event_id"] for e in result["events"]] == [EVENT_ID]
 
 
 @patch("app.services.event_service._category_map", return_value={})

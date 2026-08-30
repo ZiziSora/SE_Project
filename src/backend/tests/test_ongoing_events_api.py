@@ -49,7 +49,7 @@ def test_list_ongoing_events_filters_public_events_by_current_time(
     mock_get_supabase,
     _mock_categories,
 ):
-    now = event_service._now_naive_utc()
+    now = event_service._now_naive_local()
     row = {
         "event_id": EVENT_ID,
         "category_id": 1,

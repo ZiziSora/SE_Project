@@ -1,6 +1,21 @@
 import { useState } from "react";
-import { AlertTriangle, CheckCircle2, Clock, MapPin, QrCode } from "lucide-react";
+import {
+  AlertTriangle,
+  CalendarDays,
+  CheckCircle2,
+  Clock,
+  MapPin,
+  QrCode,
+  Users,
+} from "lucide-react";
 import QRCodeModal from "./checkin/QRCodeModal.jsx";
+import {
+  formatCapacity,
+  formatEventDay,
+  formatEventTimeRange,
+  resolveCategoryName,
+  resolveOrganizerName,
+} from "../utils/eventFormat.js";
 
 const DEFAULT_IMAGE =
   "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=600&auto=format&fit=crop&q=80";
@@ -15,8 +30,9 @@ export default function RegistrationEventCard({
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
 
   const event = item.events || {};
-  const { month, day, time } = formatEventDate(event.start_time, event.end_time);
-  const categoryName = event.event_categories?.name || "Hội thảo Học thuật";
+  const { month, day } = formatEventDate(event.start_time, event.end_time);
+  const categoryName = resolveCategoryName(event) || "Sự kiện";
+  const organizerName = resolveOrganizerName(event) || "Đơn vị tổ chức";
   const banner = event.banner_url || DEFAULT_IMAGE;
   const effectiveStatus = getEffectiveStatus(item);
 
@@ -41,6 +57,10 @@ export default function RegistrationEventCard({
                 imageEvent.currentTarget.src = DEFAULT_IMAGE;
               }}
             />
+            <span className="absolute top-3 left-3 flex items-center gap-1 bg-[#6D28D9] text-white text-[11px] font-semibold px-2.5 py-1 rounded-full shadow-md">
+              <Users className="h-3 w-3" aria-hidden="true" />
+              {formatCapacity(event.registered_count, event.capacity)}
+            </span>
             <div className="absolute top-3 right-3 bg-white/95 backdrop-blur-md px-2.5 py-1 rounded-lg text-center shadow-sm border border-gray-100">
               <span className="block text-[10px] font-bold text-red-500 uppercase tracking-wider">
                 {month}
@@ -88,10 +108,24 @@ export default function RegistrationEventCard({
               {event.title || "Tên sự kiện chưa cập nhật"}
             </h3>
 
+            <p className="mt-1 text-xs font-medium text-gray-400 truncate">
+              {organizerName}
+            </p>
+
+            {/* Ngày một dòng, giờ một dòng — cùng cách trình bày với thẻ ở
+                trang Khám phá, và không dòng nào bị cắt cụt trên thẻ hẹp. */}
             <div className="mt-4 space-y-1.5 text-xs text-gray-500 font-medium">
               <div className="flex items-center gap-2">
+                <CalendarDays className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                <span className="truncate">
+                  {formatEventDay(event.start_time) || "Ngày chưa xác định"}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
                 <Clock className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                <span className="truncate">{time}</span>
+                <span className="truncate">
+                  {formatEventTimeRange(event.start_time, event.end_time)}
+                </span>
               </div>
               <div className="flex items-center gap-2">
                 <MapPin className="w-3.5 h-3.5 text-gray-400 shrink-0" />
@@ -107,7 +141,7 @@ export default function RegistrationEventCard({
           {isAttended ? (
             <button
               onClick={() => setIsQrModalOpen(true)}
-              className="w-full text-xs font-semibold py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 transition bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 cursor-pointer"
+              className="w-full text-sm font-semibold py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 transition bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 cursor-pointer"
             >
               <CheckCircle2 className="w-4 h-4 text-emerald-600" />
               Xem Vé QR (Đã điểm danh)
@@ -116,7 +150,7 @@ export default function RegistrationEventCard({
             <>
               <button
                 onClick={() => setIsQrModalOpen(true)}
-                className="w-full text-xs font-semibold py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 transition bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 cursor-pointer"
+                className="w-full text-sm font-semibold py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 transition bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 cursor-pointer"
               >
                 <Clock className="w-4 h-4 text-amber-600" />
                 Danh sách chờ (Xem vé)
@@ -126,7 +160,7 @@ export default function RegistrationEventCard({
                 <button
                   onClick={() => onSelectCancel(item)}
                   title="Hủy đăng ký"
-                  className="px-3 py-2.5 border border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 rounded-xl transition text-xs font-semibold flex items-center gap-1 shrink-0 active:scale-[0.98]"
+                  className="px-3 py-2.5 border border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 rounded-xl transition text-sm font-semibold flex items-center gap-1 shrink-0 active:scale-[0.98]"
                 >
                   Hủy
                 </button>
@@ -134,7 +168,7 @@ export default function RegistrationEventCard({
                 <button
                   disabled
                   title="Thời hạn hủy đăng ký đã hết (phải trước 5 ngày khi sự kiện diễn ra)"
-                  className="px-3 py-2.5 border border-gray-200 text-gray-400 bg-gray-100 rounded-xl transition text-xs font-semibold flex items-center gap-1 shrink-0 cursor-not-allowed whitespace-nowrap"
+                  className="px-3 py-2.5 border border-gray-200 text-gray-400 bg-gray-100 rounded-xl transition text-sm font-semibold flex items-center gap-1 shrink-0 cursor-not-allowed whitespace-nowrap"
                 >
                   Hết hạn hủy
                 </button>
@@ -143,7 +177,7 @@ export default function RegistrationEventCard({
           ) : isAbsent ? (
             <button
               disabled
-              className="w-full text-xs font-semibold py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 transition bg-amber-50 text-amber-800 border border-amber-200 cursor-default"
+              className="w-full text-sm font-semibold py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 transition bg-amber-50 text-amber-800 border border-amber-200 cursor-default"
             >
               <AlertTriangle className="w-4 h-4 text-amber-600" />
               Vắng mặt (Chưa điểm danh)
@@ -151,7 +185,7 @@ export default function RegistrationEventCard({
           ) : isCancelled ? (
             <button
               disabled
-              className="w-full text-xs font-semibold py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 transition bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200"
+              className="w-full text-sm font-semibold py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 transition bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200"
             >
               <QrCode className="w-4 h-4" />
               Đã hủy đăng ký
@@ -160,7 +194,7 @@ export default function RegistrationEventCard({
             <>
               <button
                 onClick={() => setIsQrModalOpen(true)}
-                className="w-full text-xs font-semibold py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 transition shadow-sm bg-[#6D28D9] hover:bg-[#7E22CE] text-white active:scale-[0.99] cursor-pointer"
+                className="w-full text-sm font-semibold py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 transition shadow-sm bg-[#6D28D9] hover:bg-[#7E22CE] text-white active:scale-[0.99] cursor-pointer"
               >
                 <QrCode className="w-4 h-4" />
                 Xem QR Check-in
@@ -170,7 +204,7 @@ export default function RegistrationEventCard({
                 <button
                   onClick={() => onSelectCancel(item)}
                   title="Hủy đăng ký (yêu cầu trước 5 ngày)"
-                  className="px-3 py-2.5 border border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 rounded-xl transition text-xs font-semibold flex items-center gap-1 shrink-0 active:scale-[0.98]"
+                  className="px-3 py-2.5 border border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 rounded-xl transition text-sm font-semibold flex items-center gap-1 shrink-0 active:scale-[0.98]"
                 >
                   Hủy
                 </button>
@@ -178,7 +212,7 @@ export default function RegistrationEventCard({
                 <button
                   disabled
                   title="Thời hạn hủy đăng ký đã hết (phải trước 5 ngày khi sự kiện diễn ra)"
-                  className="px-3 py-2.5 border border-gray-200 text-gray-400 bg-gray-100 rounded-xl transition text-xs font-semibold flex items-center gap-1 shrink-0 cursor-not-allowed whitespace-nowrap"
+                  className="px-3 py-2.5 border border-gray-200 text-gray-400 bg-gray-100 rounded-xl transition text-sm font-semibold flex items-center gap-1 shrink-0 cursor-not-allowed whitespace-nowrap"
                 >
                   Hết hạn hủy
                 </button>

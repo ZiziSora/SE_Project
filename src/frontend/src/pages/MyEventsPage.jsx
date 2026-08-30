@@ -11,6 +11,10 @@ import {
   cancelRegistration,
   getMyEvents,
 } from "../api/registrationApi.js";
+import {
+  formatDateBadge,
+  formatEventSchedule,
+} from "../utils/eventFormat.js";
 
 export default function MyEventsPage() {
   const [activeTab, setActiveTab] = useState("Sắp diễn ra");
@@ -105,34 +109,17 @@ export default function MyEventsPage() {
     }
   };
 
+  // Dùng chung bộ định dạng với trang Khám phá (utils/eventFormat.js) để một
+  // sự kiện hiển thị y hệt nhau ở mọi trang.
   const formatEventDate = (startTimeStr, endTimeStr) => {
     if (!startTimeStr) {
       return { month: "THG --", day: "--", time: "Chưa cập nhật" };
     }
 
-    const startDate = new Date(startTimeStr);
-    const endDate = endTimeStr ? new Date(endTimeStr) : null;
-
-    const monthNames = [
-      "THG 1", "THG 2", "THG 3", "THG 4", "THG 5", "THG 6",
-      "THG 7", "THG 8", "THG 9", "THG 10", "THG 11", "THG 12"
-    ];
-
-    const month = monthNames[startDate.getMonth()];
-    const day = String(startDate.getDate()).padStart(2, "0");
-
-    const formatTime = (d) =>
-      d.toLocaleTimeString("en-US", {
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: true,
-      });
-
-    const time = endDate
-      ? `${formatTime(startDate)} - ${formatTime(endDate)}`
-      : formatTime(startDate);
-
-    return { month, day, time };
+    return {
+      ...formatDateBadge(startTimeStr),
+      time: formatEventSchedule(startTimeStr, endTimeStr),
+    };
   };
 
   const getEffectiveStatus = (item) => {
@@ -156,21 +143,6 @@ export default function MyEventsPage() {
     }
 
     return "REGISTERED";
-  };
-
-  const formatSavedEventDate = (startTimeStr) => {
-    if (!startTimeStr) return "Thời gian chưa được cập nhật";
-
-    const date = new Date(startTimeStr);
-    if (Number.isNaN(date.getTime())) return "Thời gian chưa được cập nhật";
-
-    return date.toLocaleString("vi-VN", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
   };
 
   const filteredRegistrations = registrations.filter((item) => {
@@ -249,12 +221,13 @@ export default function MyEventsPage() {
                       <EventCard
                         key={item.event_id}
                         eventId={event.event_id}
+                        event={event}
                         image={event.banner_url}
-                        badgeText="Đã lưu"
                         title={event.title}
-                        faculty={event.organizer?.name || "Sự kiện đã lưu"}
-                        date={formatSavedEventDate(event.start_time)}
                         location={event.location}
+                        /* Sự kiện đã lưu: mở trang chi tiết để đăng ký,
+                           vì ở đây chưa biết sự kiện còn mở đăng ký hay không. */
+                        canRegister={false}
                       />
                     );
                   })
