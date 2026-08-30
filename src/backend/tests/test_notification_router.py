@@ -77,3 +77,37 @@ def test_mark_read_uses_current_user(mock_mark_read):
 
     assert response.status_code == 200
     mock_mark_read.assert_called_once_with(NOTIFICATION_ID, USER_ID)
+
+
+@patch("app.routers.notifications.notification_service.delete_notification")
+def test_delete_notification_uses_current_user(mock_delete):
+    mock_delete.return_value = {"deleted_count": 1}
+
+    response = _client().delete(
+        f"/api/notifications/{NOTIFICATION_ID}"
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"deleted_count": 1}
+    mock_delete.assert_called_once_with(NOTIFICATION_ID, USER_ID)
+
+
+@patch("app.routers.notifications.notification_service.delete_notifications")
+def test_delete_many_notifications_uses_current_user(mock_delete_many):
+    second_notification_id = "66666666-6666-6666-6666-666666666666"
+    mock_delete_many.return_value = {"deleted_count": 2}
+
+    response = _client().request(
+        "DELETE",
+        "/api/notifications",
+        json={
+            "notification_ids": [NOTIFICATION_ID, second_notification_id],
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"deleted_count": 2}
+    mock_delete_many.assert_called_once_with(
+        [NOTIFICATION_ID, second_notification_id],
+        USER_ID,
+    )

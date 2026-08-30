@@ -3,6 +3,8 @@ from supabase_auth.types import User
 
 from app.core.security import require_current_user
 from app.schemas.notification import (
+    NotificationDeleteManyIn,
+    NotificationDeleteOut,
     NotificationListOut,
     NotificationOut,
     NotificationSyncOut,
@@ -44,6 +46,17 @@ def sync_pending_reviews(
     return {"created_count": created_count}
 
 
+@router.delete("", response_model=NotificationDeleteOut)
+def delete_notifications(
+    payload: NotificationDeleteManyIn,
+    current_user: User = Depends(require_current_user),
+):
+    return notification_service.delete_notifications(
+        [str(item) for item in payload.notification_ids],
+        str(current_user.id),
+    )
+
+
 @router.get("/{notification_id}", response_model=NotificationOut)
 def get_notification(
     notification_id: str,
@@ -61,6 +74,17 @@ def mark_notification_read(
     current_user: User = Depends(require_current_user),
 ):
     return notification_service.mark_notification_read(
+        notification_id,
+        str(current_user.id),
+    )
+
+
+@router.delete("/{notification_id}", response_model=NotificationDeleteOut)
+def delete_notification(
+    notification_id: str,
+    current_user: User = Depends(require_current_user),
+):
+    return notification_service.delete_notification(
         notification_id,
         str(current_user.id),
     )

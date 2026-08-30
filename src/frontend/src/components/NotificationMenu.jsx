@@ -6,11 +6,16 @@ import {
   LoaderCircle,
   MapPin,
   ShieldCheck,
+  Square,
+  SquareCheckBig,
+  Trash2,
   Users,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
+import { toast } from "react-toastify";
 
 import { notificationApi } from "../api/notificationApi.js";
+import NotificationDeleteDialog from "./NotificationDeleteDialog.jsx";
 
 
 const TYPE_LABELS = {
@@ -56,6 +61,10 @@ export default function NotificationMenu({ role, tone = "purple" }) {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [selectedNotification, setSelectedNotification] = useState(null);
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [isSelectionMode, setIsSelectionMode] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [pendingDelete, setPendingDelete] = useState(null);
   const [error, setError] = useState("");
   const isNeutral = tone === "neutral";
   const isOrganizerRequestNotification =
@@ -101,16 +110,24 @@ export default function NotificationMenu({ role, tone = "purple" }) {
     if (!isOpen) return undefined;
 
     const handlePointerDown = (event) => {
+      if (pendingDelete) return;
+
       if (!menuRef.current?.contains(event.target)) {
         setIsOpen(false);
         setSelectedNotification(null);
+        setSelectedIds(new Set());
+        setIsSelectionMode(false);
       }
     };
 
     const handleKeyDown = (event) => {
+      if (pendingDelete) return;
+
       if (event.key === "Escape") {
         setIsOpen(false);
         setSelectedNotification(null);
+        setSelectedIds(new Set());
+        setIsSelectionMode(false);
         triggerRef.current?.focus();
       }
     };
@@ -122,18 +139,17 @@ export default function NotificationMenu({ role, tone = "purple" }) {
       document.removeEventListener("pointerdown", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [isOpen]);
+  }, [isOpen, pendingDelete]);
 
   const fetchNotifications = async () => {
     setIsLoading(true);
     setError("");
 
     try {
-      if (role === "admin") {
-        await notificationApi.syncPendingReviews();
-      }
       const data = await notificationApi.list({ page: 1, pageSize: 20 });
       setNotifications(data.items || []);
+      setSelectedIds(new Set());
+      setIsSelectionMode(false);
       try {
         const unreadData = await notificationApi.unreadCount();
         setUnreadCount(unreadData.unread_count || 0);
@@ -157,6 +173,8 @@ export default function NotificationMenu({ role, tone = "purple" }) {
     const nextOpen = !isOpen;
     setIsOpen(nextOpen);
     setSelectedNotification(null);
+    setSelectedIds(new Set());
+    setIsSelectionMode(false);
 
     if (nextOpen) {
       fetchNotifications();
@@ -191,6 +209,93 @@ export default function NotificationMenu({ role, tone = "purple" }) {
     } finally {
       setIsLoadingDetail(false);
     }
+  };
+
+  const removeDeletedNotifications = (notificationIds) => {
+    const deletedIds = new Set(notificationIds);
+    const deletedUnreadCount = notifications.filter(
+      (notification) =>
+        deletedIds.has(notification.notification_id) && !notification.is_read,
+    ).length;
+
+    setNotifications((items) =>
+      items.filter((item) => !deletedIds.has(item.notification_id)),
+    );
+    setUnreadCount((count) => Math.max(0, count - deletedUnreadCount));
+  };
+
+  const handleDeleteNotification = async (notification) => {
+    setPendingDelete({
+      notificationIds: [notification.notification_id],
+      notification,
+    });
+  };
+
+  const confirmDelete = async () => {
+    if (!pendingDelete) return;
+
+    const { notificationIds, notification } = pendingDelete;
+
+    setIsDeleting(true);
+    setError("");
+    try {
+      if (notificationIds.length === 1) {
+        await notificationApi.deleteOne(notificationIds[0]);
+      } else {
+        await notificationApi.deleteMany(notificationIds);
+      }
+      removeDeletedNotifications(notificationIds);
+      if (
+        notification &&
+        selectedNotification?.notification_id === notification.notification_id
+      ) {
+        setSelectedNotification(null);
+      }
+      setSelectedIds(new Set());
+      setIsSelectionMode(false);
+      toast.success(
+        notificationIds.length === 1
+          ? "Đã xóa thông báo."
+          : `Đã xóa ${notificationIds.length} thông báo.`,
+      );
+      return true;
+    } catch {
+      setError(
+        notificationIds.length === 1
+          ? "Không thể xóa thông báo. Vui lòng thử lại."
+          : "Không thể xóa các thông báo đã chọn. Vui lòng thử lại.",
+      );
+      toast.error("Xóa thông báo thất bại. Vui lòng thử lại.");
+      return false;
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
+  const toggleNotificationSelection = (notificationId) => {
+    setSelectedIds((currentIds) => {
+      const nextIds = new Set(currentIds);
+      if (nextIds.has(notificationId)) {
+        nextIds.delete(notificationId);
+      } else {
+        nextIds.add(notificationId);
+      }
+      return nextIds;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    setSelectedIds((currentIds) =>
+      currentIds.size === notifications.length
+        ? new Set()
+        : new Set(notifications.map((item) => item.notification_id)),
+    );
+  };
+
+  const handleDeleteSelected = async () => {
+    const notificationIds = [...selectedIds];
+    if (notificationIds.length === 0) return;
+    setPendingDelete({ notificationIds, notification: null });
   };
 
   const triggerClassName = isNeutral
@@ -253,6 +358,18 @@ export default function NotificationMenu({ role, tone = "purple" }) {
                     {unreadCount} chưa đọc
                   </span>
                 )}
+                {notifications.length > 0 && !isLoading && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsSelectionMode((isSelecting) => !isSelecting);
+                      setSelectedIds(new Set());
+                    }}
+                    className="cursor-pointer rounded-lg px-2 py-1 text-xs font-semibold text-purple-700 hover:bg-purple-50"
+                  >
+                    {isSelectionMode ? "Hủy" : "Chọn"}
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -287,41 +404,61 @@ export default function NotificationMenu({ role, tone = "purple" }) {
                 <CalendarDays className="size-4" aria-hidden="true" />
                 {formatCreatedAt(selectedNotification.created_at)}
               </div>
-              {(selectedNotification.event_id ||
-                isOrganizerRequestNotification) && (
-                <Link
-                  to={
-                    isOrganizerRequestNotification
-                      ? "/admin/organizer-requests"
+              <div className="flex flex-wrap items-center gap-2">
+                {(selectedNotification.event_id ||
+                  isOrganizerRequestNotification) && (
+                  <Link
+                    to={
+                      isOrganizerRequestNotification
+                        ? "/admin/organizer-requests"
+                        : isNewRegistrationNotification
+                          ? `/organizer/participants/${selectedNotification.event_id}`
+                          : isOrganizerEventReviewNotification
+                            ? `/organizer/events/${selectedNotification.event_id}`
+                            : role === "admin"
+                              ? `/admin/events/${selectedNotification.event_id}`
+                              : `/events/${selectedNotification.event_id}`
+                    }
+                    onClick={() => setIsOpen(false)}
+                    className="inline-flex items-center gap-2 rounded-lg bg-purple-700 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-purple-800"
+                  >
+                    {isOrganizerRequestNotification ? (
+                      <ShieldCheck className="size-4" aria-hidden="true" />
+                    ) : isNewRegistrationNotification ? (
+                      <Users className="size-4" aria-hidden="true" />
+                    ) : (
+                      <MapPin className="size-4" aria-hidden="true" />
+                    )}
+                    {isOrganizerRequestNotification
+                      ? "Mở trang xét duyệt Ban tổ chức"
                       : isNewRegistrationNotification
-                        ? `/organizer/participants/${selectedNotification.event_id}`
+                        ? "Xem người tham gia"
                         : isOrganizerEventReviewNotification
-                          ? `/organizer/events/${selectedNotification.event_id}`
-                      : role === "admin"
-                        ? `/admin/events/${selectedNotification.event_id}`
-                        : `/events/${selectedNotification.event_id}`
+                          ? "Xem sự kiện"
+                          : role === "admin"
+                            ? "Mở trang xét duyệt"
+                            : "Xem chi tiết sự kiện"}
+                  </Link>
+                )}
+                <button
+                  type="button"
+                  onClick={() =>
+                    handleDeleteNotification(selectedNotification)
                   }
-                  onClick={() => setIsOpen(false)}
-                  className="inline-flex items-center gap-2 rounded-lg bg-purple-700 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-purple-800"
+                  disabled={isDeleting}
+                  className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-red-200 px-4 py-2.5 text-sm font-semibold text-red-700 transition-colors hover:bg-red-50 disabled:cursor-wait disabled:opacity-60"
                 >
-                  {isOrganizerRequestNotification ? (
-                    <ShieldCheck className="size-4" aria-hidden="true" />
-                  ) : isNewRegistrationNotification ? (
-                    <Users className="size-4" aria-hidden="true" />
+                  {isDeleting ? (
+                    <LoaderCircle
+                      className="size-4 animate-spin"
+                      aria-hidden="true"
+                    />
                   ) : (
-                    <MapPin className="size-4" aria-hidden="true" />
+                    <Trash2 className="size-4" aria-hidden="true" />
                   )}
-                  {isOrganizerRequestNotification
-                    ? "Mở trang xét duyệt Ban tổ chức"
-                    : isNewRegistrationNotification
-                      ? "Xem người tham gia"
-                      : isOrganizerEventReviewNotification
-                        ? "Xem sự kiện"
-                    : role === "admin"
-                      ? "Mở trang xét duyệt"
-                      : "Xem chi tiết sự kiện"}
-                </Link>
-              )}
+                  Xóa thông báo
+                </button>
+              </div>
             </div>
           ) : notifications.length === 0 ? (
             <div className="grid min-h-48 place-items-center px-6 text-center">
@@ -336,40 +473,131 @@ export default function NotificationMenu({ role, tone = "purple" }) {
               </div>
             </div>
           ) : (
-            <div className="max-h-[26rem] overflow-y-auto p-2">
-              {notifications.map((notification) => (
-                <button
-                  key={notification.notification_id}
-                  type="button"
-                  onClick={() => handleSelectNotification(notification)}
-                  className={`mb-1 flex w-full cursor-pointer gap-3 rounded-xl px-3 py-3 text-left transition-colors last:mb-0 ${
-                    notification.is_read
-                      ? "hover:bg-gray-50"
-                      : "bg-purple-50/80 hover:bg-purple-100/80"
-                  }`}
-                >
-                  <span
-                    className={`mt-1.5 size-2 shrink-0 rounded-full ${
-                      notification.is_read ? "bg-gray-300" : "bg-purple-600"
-                    }`}
-                    aria-hidden="true"
-                  />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-semibold text-gray-900">
-                      {notification.title}
-                    </span>
-                    <span className="mt-1 line-clamp-2 block text-xs leading-5 text-gray-600">
-                      {notification.content}
-                    </span>
-                    <span className="mt-1.5 block text-[11px] text-gray-400">
-                      {formatCreatedAt(notification.created_at)}
-                    </span>
-                  </span>
-                </button>
-              ))}
+            <div>
+              <div className="max-h-[26rem] overflow-y-auto p-2">
+                {notifications.map((notification) => {
+                  const isSelected = selectedIds.has(
+                    notification.notification_id,
+                  );
+
+                  return (
+                    <div
+                      key={notification.notification_id}
+                      className="relative mb-1 last:mb-0"
+                    >
+                      <button
+                        type="button"
+                        onClick={() =>
+                          isSelectionMode
+                            ? toggleNotificationSelection(
+                                notification.notification_id,
+                              )
+                            : handleSelectNotification(notification)
+                        }
+                        aria-pressed={
+                          isSelectionMode ? isSelected : undefined
+                        }
+                        className={`flex w-full cursor-pointer gap-3 rounded-xl px-3 py-3 text-left transition-colors ${
+                          isSelectionMode ? "pr-3" : "pr-12"
+                        } ${
+                          isSelected
+                            ? "bg-purple-100 ring-1 ring-purple-300"
+                            : notification.is_read
+                              ? "hover:bg-gray-50"
+                              : "bg-purple-50/80 hover:bg-purple-100/80"
+                        }`}
+                      >
+                        {isSelectionMode ? (
+                          isSelected ? (
+                            <SquareCheckBig
+                              className="mt-0.5 size-5 shrink-0 text-purple-700"
+                              aria-hidden="true"
+                            />
+                          ) : (
+                            <Square
+                              className="mt-0.5 size-5 shrink-0 text-gray-400"
+                              aria-hidden="true"
+                            />
+                          )
+                        ) : (
+                          <span
+                            className={`mt-1.5 size-2 shrink-0 rounded-full ${
+                              notification.is_read
+                                ? "bg-gray-300"
+                                : "bg-purple-600"
+                            }`}
+                            aria-hidden="true"
+                          />
+                        )}
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-semibold text-gray-900">
+                            {notification.title}
+                          </span>
+                          <span className="mt-1 line-clamp-2 block text-xs leading-5 text-gray-600">
+                            {notification.content}
+                          </span>
+                          <span className="mt-1.5 block text-[11px] text-gray-400">
+                            {formatCreatedAt(notification.created_at)}
+                          </span>
+                        </span>
+                      </button>
+                      {!isSelectionMode && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleDeleteNotification(notification)
+                          }
+                          disabled={isDeleting}
+                          aria-label={`Xóa thông báo ${notification.title}`}
+                          className="absolute right-2 top-1/2 grid size-8 -translate-y-1/2 cursor-pointer place-items-center rounded-lg text-gray-400 transition-colors hover:bg-red-50 hover:text-red-700 disabled:cursor-wait disabled:opacity-50"
+                        >
+                          <Trash2 className="size-4" aria-hidden="true" />
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              {isSelectionMode && (
+                <div className="flex items-center justify-between gap-3 border-t border-gray-100 bg-gray-50 px-4 py-3">
+                  <button
+                    type="button"
+                    onClick={toggleSelectAll}
+                    className="cursor-pointer text-xs font-semibold text-purple-700 hover:text-purple-900"
+                  >
+                    {selectedIds.size === notifications.length
+                      ? "Bỏ chọn tất cả"
+                      : "Chọn tất cả"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDeleteSelected}
+                    disabled={selectedIds.size === 0 || isDeleting}
+                    className="inline-flex cursor-pointer items-center gap-2 rounded-lg bg-red-600 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {isDeleting ? (
+                      <LoaderCircle
+                        className="size-4 animate-spin"
+                        aria-hidden="true"
+                      />
+                    ) : (
+                      <Trash2 className="size-4" aria-hidden="true" />
+                    )}
+                    Xóa đã chọn ({selectedIds.size})
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </section>
+      )}
+      {pendingDelete && (
+        <NotificationDeleteDialog
+          count={pendingDelete.notificationIds.length}
+          isDeleting={isDeleting}
+          onCancel={() => setPendingDelete(null)}
+          onConfirm={confirmDelete}
+        />
       )}
     </div>
   );

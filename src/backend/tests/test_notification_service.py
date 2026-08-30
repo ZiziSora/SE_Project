@@ -31,6 +31,7 @@ def _chain(data=None, count=None):
         "maybe_single",
         "update",
         "insert",
+        "delete",
         "in_",
     ):
         getattr(query, method).return_value = query
@@ -103,6 +104,61 @@ def test_mark_notification_read_updates_only_the_owner_row(mock_get_supabase):
     query.update.assert_called_once_with({"is_read": True})
     query.eq.assert_any_call("noti_id", NOTIFICATION_ID)
     query.eq.assert_any_call("user_id", USER_ID)
+
+
+@patch("app.services.notification_service.get_supabase")
+def test_delete_notification_deletes_only_the_owner_row(mock_get_supabase):
+    query = _chain(data=[{"noti_id": NOTIFICATION_ID}])
+    mock_get_supabase.return_value.table.return_value = query
+
+    result = notification_service.delete_notification(
+        NOTIFICATION_ID,
+        USER_ID,
+    )
+
+    assert result == {"deleted_count": 1}
+    query.delete.assert_called_once_with()
+    query.eq.assert_any_call("noti_id", NOTIFICATION_ID)
+    query.eq.assert_any_call("user_id", USER_ID)
+
+
+@patch("app.services.notification_service.get_supabase")
+def test_delete_notification_rejects_an_unowned_row(mock_get_supabase):
+    query = _chain(data=[])
+    mock_get_supabase.return_value.table.return_value = query
+
+    with pytest.raises(HTTPException) as exc_info:
+        notification_service.delete_notification(
+            NOTIFICATION_ID,
+            OTHER_USER_ID,
+        )
+
+    assert exc_info.value.status_code == 404
+
+
+@patch("app.services.notification_service.get_supabase")
+def test_delete_notifications_deletes_owned_rows_in_one_query(mock_get_supabase):
+    second_notification_id = "66666666-6666-6666-6666-666666666666"
+    query = _chain(
+        data=[
+            {"noti_id": NOTIFICATION_ID},
+            {"noti_id": second_notification_id},
+        ]
+    )
+    mock_get_supabase.return_value.table.return_value = query
+
+    result = notification_service.delete_notifications(
+        [NOTIFICATION_ID, second_notification_id, NOTIFICATION_ID],
+        USER_ID,
+    )
+
+    assert result == {"deleted_count": 2}
+    query.delete.assert_called_once_with()
+    query.eq.assert_called_once_with("user_id", USER_ID)
+    query.in_.assert_called_once_with(
+        "noti_id",
+        [NOTIFICATION_ID, second_notification_id],
+    )
 
 
 @patch("app.services.notification_service.get_supabase")

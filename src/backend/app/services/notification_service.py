@@ -124,6 +124,43 @@ def mark_notification_read(
     return _normalize_notification(rows[0])
 
 
+def delete_notification(
+    notification_id: str,
+    user_id: str,
+) -> dict[str, int]:
+    response = _run(
+        get_supabase()
+        .table(TABLE_NOTIFICATIONS)
+        .delete()
+        .eq("noti_id", notification_id)
+        .eq("user_id", user_id)
+    )
+    if not (response.data or []):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Không tìm thấy thông báo.",
+        )
+    return {"deleted_count": 1}
+
+
+def delete_notifications(
+    notification_ids: list[str],
+    user_id: str,
+) -> dict[str, int]:
+    unique_ids = list(dict.fromkeys(str(item) for item in notification_ids))
+    if not unique_ids:
+        return {"deleted_count": 0}
+
+    response = _run(
+        get_supabase()
+        .table(TABLE_NOTIFICATIONS)
+        .delete()
+        .eq("user_id", user_id)
+        .in_("noti_id", unique_ids)
+    )
+    return {"deleted_count": len(response.data or [])}
+
+
 def create_notification(
     *,
     user_id: str,

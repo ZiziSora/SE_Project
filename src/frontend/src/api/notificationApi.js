@@ -35,4 +35,20 @@ export const notificationApi = {
     );
     return response.data;
   },
+
+  async deleteOne(notificationId) {
+    const response = await api.delete(
+      `/api/notifications/${notificationId}`,
+    );
+    return response.data;
+  },
+
+  async deleteMany(notificationIds) {
+    const response = await api.delete("/api/notifications", {
+      data: {
+        notification_ids: notificationIds,
+      },
+    });
+    return response.data;
+  },
 };
