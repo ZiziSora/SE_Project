@@ -3,7 +3,7 @@
 import random
 import string
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from typing import Optional
 from uuid import UUID
 
@@ -11,6 +11,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import func
 from sqlalchemy.orm import Session, joinedload
 
+from app.core.app_time import APP_TZ, now_local
 from app.models.checkin_qr import EventCheckinQR
 from app.models.enum import RegistrationStatus, UserRole
 from app.models.event import Event
@@ -26,12 +27,18 @@ from app.schemas.checkin import (
 )
 
 
-def _ensure_utc(dt: Optional[datetime]) -> Optional[datetime]:
+def _ensure_local(dt: Optional[datetime]) -> Optional[datetime]:
+    """Quy về múi giờ ứng dụng (giờ VN).
+
+    Cột thời gian trong DB là `timestamp` không timezone và giá trị là giờ VN
+    (xem `app.core.app_time`), nên giá trị naive được gắn APP_TZ chứ không phải
+    UTC — gắn UTC sẽ làm mọi mốc lệch 7 tiếng.
+    """
     if dt is None:
         return None
     if dt.tzinfo is None:
-        return dt.replace(tzinfo=timezone.utc)
-    return dt.astimezone(timezone.utc)
+        return dt.replace(tzinfo=APP_TZ)
+    return dt.astimezone(APP_TZ)
 
 
 def _format_registration_status(status_val: object | None) -> str:
@@ -85,17 +92,17 @@ def get_or_create_qr_code(db: Session, registration_id: UUID) -> EventCheckinQR:
             detail="Không tìm thấy thông tin đăng ký.",
         )
 
-    now = datetime.now(timezone.utc)
+    now = now_local()
     qr_token = f"QR-{uuid.uuid4().hex}"
     manual_code = _generate_manual_code(db)
 
     # Determine expiration: event end_time + 2 hours buffer, or 7 days from now
     event = registration.event
     if event and event.end_time:
-        end_dt = _ensure_utc(event.end_time)
+        end_dt = _ensure_local(event.end_time)
         expired_at = end_dt + timedelta(hours=2)
     elif event and event.start_time:
-        start_dt = _ensure_utc(event.start_time)
+        start_dt = _ensure_local(event.start_time)
         expired_at = start_dt + timedelta(hours=24)
     else:
         expired_at = now + timedelta(days=7)
@@ -203,9 +210,9 @@ def process_checkin(
         user = registration.user
 
         # Verification: Expiration check for QR/manual token
-        now = datetime.now(timezone.utc)
+        now = now_local()
         if qr_record.expired_at:
-            exp_dt = _ensure_utc(qr_record.expired_at)
+            exp_dt = _ensure_local(qr_record.expired_at)
             if exp_dt and now > exp_dt:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
@@ -297,7 +304,7 @@ def process_checkin(
             detail="Không thể khóa bản ghi đăng ký để check-in.",
         )
 
-    checkin_time = datetime.now(timezone.utc)
+    checkin_time = now_local()
     locked_reg.registration_status = RegistrationStatus.CHECKED_IN
     locked_reg.checked_in_at = checkin_time
     db.commit()
@@ -385,7 +392,7 @@ def get_event_checkin_stats(
             student_code=r.user.student_code if r.user else None,
             registration_status=_format_registration_status(r.registration_status),
             checked_in_at=r.checked_in_at,
-            created_at=r.created_at or datetime.now(timezone.utc),  # <-- Fallback ở đây
+            created_at=r.created_at or now_local(),  # <-- Fallback ở đây
         )
         for r in registrations
     ]
@@ -516,7 +523,7 @@ def manual_checkin_participant(
             detail="Không thể khóa bản ghi đăng ký để điểm danh.",
         )
 
-    checkin_time = datetime.now(timezone.utc)
+    checkin_time = now_local()
     locked_reg.registration_status = RegistrationStatus.CHECKED_IN
     locked_reg.checked_in_at = checkin_time
     db.commit()

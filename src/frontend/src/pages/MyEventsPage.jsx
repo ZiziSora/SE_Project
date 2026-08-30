@@ -11,6 +11,10 @@ import {
   cancelRegistration,
   getMyEvents,
 } from "../api/registrationApi.js";
+import {
+  formatDateBadge,
+  formatEventSchedule,
+} from "../utils/eventFormat.js";
 
 export default function MyEventsPage() {
   const [activeTab, setActiveTab] = useState("Sắp diễn ra");
@@ -23,14 +27,15 @@ export default function MyEventsPage() {
   const [isCanceling, setIsCanceling] = useState(false);
   const [toast, setToast] = useState(null);
 
+  /** Sự kiện đã lưu nhưng hết hạn đăng ký (hoặc đã bắt đầu) thì không còn đăng
+   *  ký được nữa, giữ lại trong tab "Đã lưu" chỉ gây hiểu nhầm. */
   const isEventExpired = (event) => {
     if (!event) return true;
-    const now = new Date().getTime();
-    const deadlineStr = event.registration_deadline || event.start_time;
-    if (!deadlineStr) return false;
-    const cutoffTime = new Date(deadlineStr).getTime();
+    const cutoff = event.registration_deadline || event.start_time;
+    if (!cutoff) return false;
+    const cutoffTime = new Date(cutoff).getTime();
     if (Number.isNaN(cutoffTime)) return false;
-    return cutoffTime < now;
+    return cutoffTime < Date.now();
   };
 
   const fetchMyEvents = async () => {
@@ -43,10 +48,11 @@ export default function MyEventsPage() {
         publicEventApi.listSavedEvents(),
       ]);
       setRegistrations(registrationData || []);
-      const validSaved = (savedEventData || []).filter(
-        (item) => item.events && !isEventExpired(item.events)
+      setSavedEvents(
+        (savedEventData || []).filter(
+          (item) => item.events && !isEventExpired(item.events),
+        ),
       );
-      setSavedEvents(validSaved);
     } catch (err) {
       console.error("Lỗi khi tải danh sách sự kiện:", err);
       setError("Không thể tải danh sách sự kiện. Vui lòng thử lại sau.");
@@ -58,11 +64,10 @@ export default function MyEventsPage() {
   const handleUnsaveEvent = async (eventId) => {
     try {
       await publicEventApi.unsaveEvent(eventId);
-      setSavedEvents((prev) => prev.filter((item) => item.event_id !== eventId));
-      setToast({
-        type: "success",
-        message: "Đã bỏ lưu sự kiện thành công.",
-      });
+      setSavedEvents((previous) =>
+        previous.filter((item) => item.event_id !== eventId),
+      );
+      setToast({ type: "success", message: "Đã bỏ lưu sự kiện thành công." });
       setTimeout(() => setToast(null), 3000);
     } catch (err) {
       console.error("Lỗi khi bỏ lưu sự kiện:", err);
@@ -141,36 +146,17 @@ export default function MyEventsPage() {
     }
   };
 
+  // Dùng chung bộ định dạng với trang Khám phá (utils/eventFormat.js) để một
+  // sự kiện hiển thị y hệt nhau ở mọi trang.
   const formatEventDate = (startTimeStr, endTimeStr) => {
     if (!startTimeStr) {
-      return { fullDateTime: "Thời gian chưa cập nhật", month: "THG --", day: "--", time: "Chưa cập nhật" };
+      return { month: "THG --", day: "--", time: "Chưa cập nhật" };
     }
 
-    const startDate = new Date(startTimeStr);
-    if (Number.isNaN(startDate.getTime())) {
-      return { fullDateTime: "Thời gian chưa cập nhật", month: "THG --", day: "--", time: "Chưa cập nhật" };
-    }
-
-    const endDate = endTimeStr ? new Date(endTimeStr) : null;
-
-    const day = String(startDate.getDate()).padStart(2, "0");
-    const month = startDate.getMonth() + 1;
-    const year = startDate.getFullYear();
-
-    const formatTime = (d) =>
-      d.toLocaleTimeString("en-US", {
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: true,
-      });
-
-    const timeStr = endDate && !Number.isNaN(endDate.getTime())
-      ? `${formatTime(startDate)} - ${formatTime(endDate)}`
-      : formatTime(startDate);
-
-    const fullDateTime = `${timeStr}, ${day} Tháng ${month}, ${year}`;
-
-    return { fullDateTime, month: `THG ${month}`, day, time: timeStr };
+    return {
+      ...formatDateBadge(startTimeStr),
+      time: formatEventSchedule(startTimeStr, endTimeStr),
+    };
   };
 
   const getEffectiveStatus = (item) => {
@@ -196,12 +182,6 @@ export default function MyEventsPage() {
     return "REGISTERED";
   };
 
-  const formatSavedEventDate = (startTimeStr, endTimeStr) => {
-    if (!startTimeStr) return "Thời gian chưa được cập nhật";
-    const { fullDateTime } = formatEventDate(startTimeStr, endTimeStr);
-    return fullDateTime;
-  };
-
   const filteredRegistrations = registrations.filter((item) => {
     const status = getEffectiveStatus(item);
     if (activeTab === "Sắp diễn ra") return status === "REGISTERED" || status === "WAITLISTED";
@@ -210,9 +190,8 @@ export default function MyEventsPage() {
     if (activeTab === "Đã hủy") return status === "CANCELLED";
     return true;
   });
-
   const visibleSavedEvents = savedEvents.filter(
-    (item) => item.events && !isEventExpired(item.events)
+    (item) => item.events && !isEventExpired(item.events),
   );
 
   const isSavedTab = activeTab === "Đã lưu";
@@ -283,12 +262,12 @@ export default function MyEventsPage() {
                       <EventCard
                         key={item.event_id}
                         eventId={event.event_id}
+                        event={event}
                         image={event.banner_url}
-                        badgeText="Đã lưu"
                         title={event.title}
-                        faculty={event.organizer?.name || "Sự kiện đã lưu"}
-                        date={formatSavedEventDate(event.start_time, event.end_time)}
                         location={event.location}
+                        /* Sự kiện đã lưu: mở trang chi tiết để đăng ký, vì ở
+                           đây chưa biết sự kiện còn mở đăng ký hay không. */
                         showRegisterButton={false}
                         onUnsave={handleUnsaveEvent}
                       />

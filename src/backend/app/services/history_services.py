@@ -141,7 +141,10 @@ def _registration_status_name(value: object | None) -> str | None:
     return status_name
 
 
-def _build_event_response(event: Event | None) -> HistoryEventResponse | None:
+def _build_event_response(
+    event: Event | None,
+    registered_count: int = 0,
+) -> HistoryEventResponse | None:
     if event is None:
         return None
 
@@ -151,6 +154,11 @@ def _build_event_response(event: Event | None) -> HistoryEventResponse | None:
             category_id=event.category.category_id,
             name=event.category.name,
         )
+
+    organizer = getattr(event, "organizer", None)
+    organizer_name = None
+    if organizer is not None:
+        organizer_name = organizer.full_name or organizer.department_name
 
     return HistoryEventResponse(
         event_id=event.event_id,
@@ -164,7 +172,37 @@ def _build_event_response(event: Event | None) -> HistoryEventResponse | None:
         event_status=_enum_name(event.event_status),
         banner_url=event.banner_url,
         event_categories=category,
+        organizer_name=organizer_name,
+        registered_count=registered_count,
     )
+
+
+def _registered_counts(db: Session, event_ids: list[UUID]) -> dict[UUID, int]:
+    """Số người đang giữ chỗ theo từng sự kiện.
+
+    Đăng ký đã huỷ và người trong danh sách chờ KHÔNG được tính — phải khớp với
+    event_services.get_filtered_events_service, event_service._registration_counts
+    và registration_service, nếu không thì cùng một sự kiện lại hiện hai con số
+    khác nhau ở hai trang.
+    """
+    if not event_ids:
+        return {}
+
+    rows = (
+        db.query(EventRegistration.event_id, EventRegistration.registration_status)
+        .filter(EventRegistration.event_id.in_(event_ids))
+        .all()
+    )
+
+    counts: dict[UUID, int] = {}
+    for event_id, registration_status in rows:
+        if _registration_status_name(registration_status) in (
+            "CANCELLED",
+            "WAITLISTED",
+        ):
+            continue
+        counts[event_id] = counts.get(event_id, 0) + 1
+    return counts
 
 
 def get_event_history_service(
@@ -176,10 +214,16 @@ def get_event_history_service(
         db.query(EventRegistration)
         .options(
             joinedload(EventRegistration.event).joinedload(Event.category),
+            joinedload(EventRegistration.event).joinedload(Event.organizer),
         )
         .filter(EventRegistration.user_id == current_user.user_id)
         .order_by(EventRegistration.created_at.desc())
         .all()
+    )
+
+    counts = _registered_counts(
+        db,
+        [r.event_id for r in registrations if r.event_id is not None],
     )
 
     return [
@@ -191,7 +235,10 @@ def get_event_history_service(
                 registration.registration_status,
             ),
             created_at=registration.created_at,
-            events=_build_event_response(registration.event),
+            events=_build_event_response(
+                registration.event,
+                counts.get(registration.event_id, 0),
+            ),
         )
         for registration in registrations
     ]

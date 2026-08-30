@@ -14,11 +14,11 @@ from __future__ import annotations
 
 import logging
 import os
-from datetime import datetime, timezone
 from typing import Any, Optional
 
 from pydantic import BaseModel
 
+from app.core.app_time import now_naive_local
 from app.core.supabase_client import get_supabase
 from app.schemas.recommendation import RecommendedEventOut, RecommendationsOut
 
@@ -43,7 +43,8 @@ DEFAULT_GEMINI_MODEL = "gemini-3.5-flash-lite"
 
 
 def _now_iso() -> str:
-    return datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
+    # Mốc so sánh phải là giờ VN — cột thời gian trong DB lưu giờ VN naive
+    return now_naive_local().isoformat()
 
 
 def _category_map() -> dict[int, str]:

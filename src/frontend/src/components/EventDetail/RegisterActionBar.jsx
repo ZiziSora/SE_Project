@@ -2,6 +2,7 @@ import {
   AlertCircle,
   CheckCircle2,
   ChevronRight,
+  Clock,
   Info,
   Loader2,
   LogIn,
@@ -13,6 +14,7 @@ export function RegisterActionBar({
   maxCapacity = null,
   count = 0,
   registered = false,
+  waitlisted = false,
   registerLoading = false,
   dataLoading = false,
   onRegister,
@@ -21,6 +23,8 @@ export function RegisterActionBar({
   floating = false,
 }) {
   const hasCapacityLimit = Number.isFinite(maxCapacity);
+  // Chặn trên ở sức chứa: người trong danh sách chờ không chiếm chỗ chính thức,
+  // nên con số hiển thị không bao giờ được vượt sức chứa ("4/3 đã đăng ký").
   const displayCount = hasCapacityLimit ? Math.min(count, maxCapacity) : count;
   const isFull = hasCapacityLimit && count >= maxCapacity;
   const capacityLabel = dataLoading
@@ -28,10 +32,14 @@ export function RegisterActionBar({
     : hasCapacityLimit
       ? `${displayCount}/${maxCapacity} đã đăng ký`
       : `${displayCount} tham gia`;
+  // Đứng trong danh sách chờ KHÁC với đã có chỗ chính thức — nói "Bạn đã đăng
+  // ký" cho người đang chờ là sai, họ sẽ tưởng mình chắc suất tham dự.
   const actionLabel = dataLoading
     ? capacityLabel
     : registered
-      ? "Bạn đã đăng ký"
+      ? waitlisted
+        ? "Bạn đang trong danh sách chờ"
+        : "Bạn đã đăng ký"
       : isFull
         ? "Tham gia danh sách chờ"
         : `Đăng ký ngay · ${capacityLabel}`;
@@ -68,7 +76,9 @@ export function RegisterActionBar({
             : "flex min-h-11 items-center justify-center gap-2 rounded-full px-6 text-sm font-semibold shadow-sm"
         } transition-all duration-300 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-violet-700 ${
           registered
-            ? "cursor-not-allowed border-emerald-200 bg-emerald-100 text-emerald-800"
+            ? waitlisted
+              ? "cursor-not-allowed border-amber-200 bg-amber-100 text-amber-900"
+              : "cursor-not-allowed border-emerald-200 bg-emerald-100 text-emerald-800"
             : isFull
               ? "border-amber-600 bg-amber-600 text-white hover:-translate-y-1 hover:scale-105 hover:bg-amber-700 active:translate-y-0 active:scale-95"
               : registerLoading
@@ -92,7 +102,16 @@ export function RegisterActionBar({
             "Đăng ký ngay"
           )
         ) : registered ? (
-          floating ? (
+          waitlisted ? (
+            floating ? (
+              <Clock className="size-5" />
+            ) : (
+              <>
+                <Clock className="size-4" />
+                Đang trong danh sách chờ
+              </>
+            )
+          ) : floating ? (
             <CheckCircle2 className="size-5" />
           ) : (
             <>

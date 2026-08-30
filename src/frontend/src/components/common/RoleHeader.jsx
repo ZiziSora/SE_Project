@@ -18,6 +18,9 @@ import { getMyProfile } from "../../api/profileApi.js";
 import { logoutCurrentSession } from "../../utils/logoutSession.js";
 import NotificationMenu from "../../components/NotificationMenu.jsx";
 
+// Trang điểm danh (bao gồm modal quét QR) của một sự kiện.
+const CHECKIN_ROUTE_PATTERN = /^\/organizer\/events\/[^/]+\/checkin\/?$/;
+
 const ROLE_CONFIG = {
   student: {
     label: "Sinh viên",
@@ -51,11 +54,15 @@ const ROLE_CONFIG = {
           "/organizer/create-event",
           "/organizer/edit-event",
         ],
+        // Trang điểm danh / quét QR nằm dưới /organizer/events/:id/checkin
+        // nhưng thuộc nghiệp vụ "Quản lý người tham gia" — loại nó ra khỏi Dashboard.
+        exclude: [CHECKIN_ROUTE_PATTERN],
       },
       {
         label: "Quản lý người tham gia",
         to: "/organizer/participants",
         match: ["/organizer/participants", "/organizer/check-in"],
+        pattern: [CHECKIN_ROUTE_PATTERN],
       },
     ],
   },
@@ -85,6 +92,8 @@ const ROLE_CONFIG = {
 };
 
 function routeMatches(pathname, item) {
+  if (item.exclude?.some((regex) => regex.test(pathname))) return false;
+  if (item.pattern?.some((regex) => regex.test(pathname))) return true;
   if (item.exactMatch?.includes(pathname)) return true;
 
   return item.match.some((prefix) =>

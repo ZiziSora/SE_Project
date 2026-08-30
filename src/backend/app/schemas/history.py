@@ -22,6 +22,10 @@ class HistoryEventResponse(BaseModel):
     event_status: str | None = None
     banner_url: str | None = None
     event_categories: HistoryCategoryResponse | None = None
+    # Cùng bộ thông tin mà thẻ sự kiện ở trang Khám phá hiển thị, để một sự
+    # kiện trông giống nhau ở mọi trang (tên đơn vị tổ chức + số chỗ đã đăng ký).
+    organizer_name: str | None = None
+    registered_count: int = 0
 
 
 class HistoryResponse(BaseModel):
