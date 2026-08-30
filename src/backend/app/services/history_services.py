@@ -180,9 +180,10 @@ def _build_event_response(
 def _registered_counts(db: Session, event_ids: list[UUID]) -> dict[UUID, int]:
     """Số người đang giữ chỗ theo từng sự kiện.
 
-    Đăng ký đã huỷ KHÔNG được tính — phải khớp với cách đếm ở
-    event_services.get_filtered_events_service và registration_service, nếu
-    không thì cùng một sự kiện lại hiện hai con số khác nhau ở hai trang.
+    Đăng ký đã huỷ và người trong danh sách chờ KHÔNG được tính — phải khớp với
+    event_services.get_filtered_events_service, event_service._registration_counts
+    và registration_service, nếu không thì cùng một sự kiện lại hiện hai con số
+    khác nhau ở hai trang.
     """
     if not event_ids:
         return {}
@@ -195,7 +196,10 @@ def _registered_counts(db: Session, event_ids: list[UUID]) -> dict[UUID, int]:
 
     counts: dict[UUID, int] = {}
     for event_id, registration_status in rows:
-        if _registration_status_name(registration_status) == "CANCELLED":
+        if _registration_status_name(registration_status) in (
+            "CANCELLED",
+            "WAITLISTED",
+        ):
             continue
         counts[event_id] = counts.get(event_id, 0) + 1
     return counts

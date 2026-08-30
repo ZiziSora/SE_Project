@@ -47,7 +47,8 @@ export default function EventCard({
     capacity,
     registered: registeredProp = false,
     waitlisted: waitlistedProp = false,
-    canRegister = true,
+    showRegisterButton: allowRegister = true,
+    onUnsave,
     onRegistered,
 }) {
     const isOrganizer = role === "organizer";
@@ -67,7 +68,7 @@ export default function EventCard({
     const [submitting, setSubmitting] = useState(false);
 
     const full = isEventFull(count, resolvedCapacity);
-    const showRegisterButton = !isOrganizer && canRegister;
+    const showRegisterButton = !isOrganizer && allowRegister;
 
     const handleRegister = async () => {
         if (submitting || registered) return;
@@ -223,6 +224,19 @@ export default function EventCard({
                     >
                         Xem thông tin
                     </Link>
+
+                    {onUnsave && (
+                        <button
+                            type="button"
+                            onClick={(clickEvent) => {
+                                clickEvent.preventDefault();
+                                onUnsave(eventId);
+                            }}
+                            className="flex-1 basis-0 min-w-0 min-h-[2.75rem] px-2 inline-flex items-center justify-center text-center text-[11px] font-semibold leading-tight rounded-lg text-red-600 border border-red-200 hover:bg-red-50 hover:border-red-300 transition active:scale-[0.98] cursor-pointer"
+                        >
+                            Bỏ lưu
+                        </button>
+                    )}
 
                     {showRegisterButton && (
                         <button

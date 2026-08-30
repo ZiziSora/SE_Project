@@ -27,6 +27,17 @@ export default function MyEventsPage() {
   const [isCanceling, setIsCanceling] = useState(false);
   const [toast, setToast] = useState(null);
 
+  /** Sự kiện đã lưu nhưng hết hạn đăng ký (hoặc đã bắt đầu) thì không còn đăng
+   *  ký được nữa, giữ lại trong tab "Đã lưu" chỉ gây hiểu nhầm. */
+  const isEventExpired = (event) => {
+    if (!event) return true;
+    const cutoff = event.registration_deadline || event.start_time;
+    if (!cutoff) return false;
+    const cutoffTime = new Date(cutoff).getTime();
+    if (Number.isNaN(cutoffTime)) return false;
+    return cutoffTime < Date.now();
+  };
+
   const fetchMyEvents = async () => {
     try {
       setLoading(true);
@@ -37,7 +48,11 @@ export default function MyEventsPage() {
         publicEventApi.listSavedEvents(),
       ]);
       setRegistrations(registrationData || []);
-      setSavedEvents(savedEventData || []);
+      setSavedEvents(
+        (savedEventData || []).filter(
+          (item) => item.events && !isEventExpired(item.events),
+        ),
+      );
     } catch (err) {
       console.error("Lỗi khi tải danh sách sự kiện:", err);
       setError("Không thể tải danh sách sự kiện. Vui lòng thử lại sau.");
@@ -46,10 +61,32 @@ export default function MyEventsPage() {
     }
   };
 
+  const handleUnsaveEvent = async (eventId) => {
+    try {
+      await publicEventApi.unsaveEvent(eventId);
+      setSavedEvents((previous) =>
+        previous.filter((item) => item.event_id !== eventId),
+      );
+      setToast({ type: "success", message: "Đã bỏ lưu sự kiện thành công." });
+      setTimeout(() => setToast(null), 3000);
+    } catch (err) {
+      console.error("Lỗi khi bỏ lưu sự kiện:", err);
+      setToast({
+        type: "error",
+        message:
+          err.response?.data?.detail ||
+          err.message ||
+          "Không thể bỏ lưu sự kiện. Vui lòng thử lại sau.",
+      });
+      setTimeout(() => setToast(null), 4000);
+    }
+  };
+
   useEffect(() => {
     // Tải danh sách lần đầu là chủ đích của effect khi trang được mount.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchMyEvents();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const canCancelRegistration = (startTimeStr) => {
@@ -153,9 +190,13 @@ export default function MyEventsPage() {
     if (activeTab === "Đã hủy") return status === "CANCELLED";
     return true;
   });
+  const visibleSavedEvents = savedEvents.filter(
+    (item) => item.events && !isEventExpired(item.events),
+  );
+
   const isSavedTab = activeTab === "Đã lưu";
   const visibleItemCount = isSavedTab
-    ? savedEvents.length
+    ? visibleSavedEvents.length
     : filteredRegistrations.length;
 
   return (
@@ -174,7 +215,7 @@ export default function MyEventsPage() {
             activeTab={activeTab}
             setActiveTab={setActiveTab}
             registrations={registrations}
-            savedEvents={savedEvents}
+            savedEvents={visibleSavedEvents}
             getEffectiveStatus={getEffectiveStatus}
           />
 
@@ -213,7 +254,7 @@ export default function MyEventsPage() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
               {isSavedTab
-                ? savedEvents.map((item) => {
+                ? visibleSavedEvents.map((item) => {
                     const event = item.events;
                     if (!event) return null;
 
@@ -225,9 +266,10 @@ export default function MyEventsPage() {
                         image={event.banner_url}
                         title={event.title}
                         location={event.location}
-                        /* Sự kiện đã lưu: mở trang chi tiết để đăng ký,
-                           vì ở đây chưa biết sự kiện còn mở đăng ký hay không. */
-                        canRegister={false}
+                        /* Sự kiện đã lưu: mở trang chi tiết để đăng ký, vì ở
+                           đây chưa biết sự kiện còn mở đăng ký hay không. */
+                        showRegisterButton={false}
+                        onUnsave={handleUnsaveEvent}
                       />
                     );
                   })

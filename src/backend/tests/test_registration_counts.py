@@ -44,12 +44,13 @@ def test_registration_counts_query_the_event_registrations_table(
 
 
 @patch("app.services.event_service.get_supabase")
-def test_registration_counts_ignore_cancelled_registrations(mock_get_supabase):
+def test_registration_counts_ignore_cancelled_and_waitlisted_registrations(mock_get_supabase):
     client, _query = _counts_client(
         [
             {"event_id": EVENT_ID, "registration_status": "REGISTERED"},
             {"event_id": EVENT_ID, "registration_status": "CHECKED_IN"},
             {"event_id": EVENT_ID, "registration_status": "CANCELLED"},
+            {"event_id": EVENT_ID, "registration_status": "WAITLISTED"},
             {"event_id": EVENT_ID, "registration_status": None},
         ]
     )
@@ -57,7 +58,7 @@ def test_registration_counts_ignore_cancelled_registrations(mock_get_supabase):
 
     counts = event_service._registration_counts([EVENT_ID])
 
-    # 2 đăng ký còn hiệu lực + 1 dòng thiếu trạng thái (dữ liệu cũ) = 3
+    # 2 đăng ký còn hiệu lực + 1 dòng thiếu trạng thái (dữ liệu cũ) = 3 (CANCELLED và WAITLISTED bị loại)
     assert counts == {EVENT_ID: 3}
 
 

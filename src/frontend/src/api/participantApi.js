@@ -48,8 +48,11 @@ export const participantsApi = {
   async summary(eventId) {
     const response = await api.get(`/api/checkin/events/${eventId}/stats`);
     const data = response.data;
-    const total = data.total_registered || 0;
-    const checkedIn = data.total_checked_in || 0;
+    const participants = (data.participants || []).filter(
+      (item) => item.registration_status !== "WAITLISTED" && item.registration_status !== "WAITLIST"
+    );
+    const total = participants.length;
+    const checkedIn = participants.filter((item) => item.registration_status === "CHECKED_IN").length;
     return {
       total,
       checked_in: checkedIn,
@@ -62,7 +65,9 @@ export const participantsApi = {
   async list(eventId, { status, search, page = 1, pageSize = 8 } = {}) {
     const response = await api.get(`/api/checkin/events/${eventId}/stats`);
     const data = response.data;
-    const participants = data.participants || [];
+    const participants = (data.participants || []).filter(
+      (item) => item.registration_status !== "WAITLISTED" && item.registration_status !== "WAITLIST"
+    );
 
     // Filter by status
     const filtered = participants.filter((item) => {

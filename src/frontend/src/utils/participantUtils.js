@@ -131,7 +131,8 @@ export function formatNumber(value) {
 
 /** "300 / 300 Người đăng ký" — hỗ trợ nhiều định dạng field từ backend. */
 export function formatRegisteredCount(event) {
-  const count = event?.registered_count ?? event?.total_registered ?? event?.participant_count ?? 0;
+  const rawCount = event?.registered_count ?? event?.total_registered ?? event?.participant_count ?? 0;
+  const count = event?.capacity ? Math.min(rawCount, event.capacity) : rawCount;
   const registered = formatNumber(count);
   if (!event?.capacity) return `${registered} Người đăng ký`;
   return `${registered} / ${formatNumber(event.capacity)} Người đăng ký`;
@@ -139,10 +140,11 @@ export function formatRegisteredCount(event) {
 
 /** Phần trăm lấp đầy cho thanh tiến trình trên thẻ sự kiện (0 - 100). */
 export function getProgressPercent(event) {
-  const registered = Number(
+  const rawCount = Number(
     event?.registered_count ?? event?.total_registered ?? event?.participant_count ?? 0
   );
   const capacity = Number(event?.capacity ?? 0);
+  const registered = capacity ? Math.min(rawCount, capacity) : rawCount;
   if (!capacity) return registered > 0 ? 100 : 0;
   return Math.min(100, Math.round((registered / capacity) * 100));
 }

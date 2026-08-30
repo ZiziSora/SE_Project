@@ -138,7 +138,9 @@ export default function OrganizerCheckinPage() {
     }
   };
 
-  const participants = statsData?.participants || [];
+  const participants = (statsData?.participants || []).filter(
+    (item) => item.registration_status !== "WAITLISTED" && item.registration_status !== "WAITLIST"
+  );
 
   const filteredParticipants = participants.filter((item) => {
     const isCheckedIn = item.registration_status === "CHECKED_IN";
@@ -155,7 +157,7 @@ export default function OrganizerCheckinPage() {
     return nameMatch || emailMatch || codeMatch;
   });
 
-  const totalRegistered = statsData?.total_registered || 0;
+  const totalRegistered = participants.length;
   const totalCheckedIn = statsData?.total_checked_in || 0;
   const percentage =
     totalRegistered > 0

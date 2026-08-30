@@ -129,7 +129,9 @@ export function formatDateTime(value) {
 
 
 export function formatRegistered(event) {
-  return `${event.registered_count}/${event.capacity ?? "∞"}`;
+  const rawCount = event.registered_count ?? 0;
+  const count = event.capacity ? Math.min(rawCount, event.capacity) : rawCount;
+  return `${count}/${event.capacity ?? "∞"}`;
 }
 /**
  * Lấy thông báo lỗi dễ đọc từ lỗi axios.

@@ -84,7 +84,7 @@ export default function RegistrationEventCard({
               )}
               {isWaitlisted && (
                 <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1">
-                  <Clock className="w-3 h-3 text-amber-600" /> Danh sách chờ
+                  <Clock className="w-3 h-3 text-amber-600" /> Trong danh sách chờ
                 </span>
               )}
               {isAttended && (
@@ -149,11 +149,12 @@ export default function RegistrationEventCard({
           ) : isWaitlisted ? (
             <>
               <button
-                onClick={() => setIsQrModalOpen(true)}
-                className="w-full text-sm font-semibold py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 transition bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 cursor-pointer"
+                disabled
+                title="Bạn đang ở trong danh sách chờ. Vé và mã QR chỉ khả dụng khi bạn được xác nhận tham gia chính thức."
+                className="w-full text-sm font-semibold py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 transition bg-amber-50 text-amber-800 border border-amber-200 cursor-default opacity-90"
               >
                 <Clock className="w-4 h-4 text-amber-600" />
-                Danh sách chờ (Xem vé)
+                Trong danh sách chờ
               </button>
 
               {canCancel ? (

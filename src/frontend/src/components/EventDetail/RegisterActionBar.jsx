@@ -23,12 +23,15 @@ export function RegisterActionBar({
   floating = false,
 }) {
   const hasCapacityLimit = Number.isFinite(maxCapacity);
+  // Chặn trên ở sức chứa: người trong danh sách chờ không chiếm chỗ chính thức,
+  // nên con số hiển thị không bao giờ được vượt sức chứa ("4/3 đã đăng ký").
+  const displayCount = hasCapacityLimit ? Math.min(count, maxCapacity) : count;
   const isFull = hasCapacityLimit && count >= maxCapacity;
   const capacityLabel = dataLoading
     ? "Đang tải thông tin đăng ký"
     : hasCapacityLimit
-      ? `${count}/${maxCapacity} đã đăng ký`
-      : `${count} tham gia`;
+      ? `${displayCount}/${maxCapacity} đã đăng ký`
+      : `${displayCount} tham gia`;
   // Đứng trong danh sách chờ KHÁC với đã có chỗ chính thức — nói "Bạn đã đăng
   // ký" cho người đang chờ là sai, họ sẽ tưởng mình chắc suất tham dự.
   const actionLabel = dataLoading

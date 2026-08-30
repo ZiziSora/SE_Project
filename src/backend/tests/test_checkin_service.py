@@ -1,6 +1,6 @@
 import uuid
 from datetime import datetime, timedelta, timezone
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi import HTTPException
@@ -12,6 +12,7 @@ from app.models.registration import EventRegistration
 from app.models.user import User
 from app.services.checkin_service import (
     get_or_create_qr_code,
+    get_user_event_qr,
     process_checkin,
 )
 
@@ -253,4 +254,39 @@ def test_process_checkin_already_checked_in(
 
     assert exc_info.value.status_code == 409
     assert "đã được check-in trước đó" in exc_info.value.detail
+
+
+def test_get_user_event_qr_waitlisted_forbidden(mock_db, sample_student, sample_registration):
+    sample_registration.registration_status = RegistrationStatus.WAITLISTED
+    mock_db.query.return_value.options.return_value.filter.return_value.first.return_value = (
+        sample_registration
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        get_user_event_qr(
+            db=mock_db,
+            current_user=sample_student,
+            event_id=sample_registration.event_id,
+        )
+
+    assert exc_info.value.status_code == 403
+    assert "danh sách chờ" in exc_info.value.detail
+
+
+def test_get_user_event_qr_success(mock_db, sample_student, sample_registration, sample_qr):
+    sample_registration.registration_status = RegistrationStatus.REGISTERED
+    mock_db.query.return_value.options.return_value.filter.return_value.first.return_value = (
+        sample_registration
+    )
+
+    with patch("app.services.checkin_service.get_or_create_qr_code", return_value=sample_qr):
+        res = get_user_event_qr(
+            db=mock_db,
+            current_user=sample_student,
+            event_id=sample_registration.event_id,
+        )
+
+    assert res.registration_id == sample_registration.registration_id
+    assert res.qr_token == sample_qr.qr_token
+
 

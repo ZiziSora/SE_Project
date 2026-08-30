@@ -48,9 +48,8 @@ def _empty_page(page: int, limit: int) -> Dict[str, Any]:
 
 def get_filtered_events_service(
     search_term: Optional[str] = None,
-    faculty: Optional[str] = None,
     category: Optional[str] = None,
-    sort_by: str = 'Mới nhất',
+    sort_by: str = 'Sắp diễn ra',
     page: int = 1,
     limit: int = 10
 ) -> Dict[str, Any]:
@@ -102,7 +101,9 @@ def get_filtered_events_service(
     if not events:
         return _empty_page(page, limit)
 
-    # Step 4: faculty filter + tên đơn vị tổ chức hiển thị trên thẻ sự kiện
+    # Step 4: tên đơn vị tổ chức hiển thị trên thẻ sự kiện.
+    # Bộ lọc theo Khoa đã bỏ khỏi FilterBar, nhưng vẫn phải tra bảng users vì
+    # thẻ sự kiện hiển thị tên đơn vị tổ chức dưới tiêu đề.
     organizer_ids = list({e.get('organizer_id') for e in events if e.get('organizer_id')})
     id_to_dept: Dict[str, Optional[str]] = {}
     id_to_name: Dict[str, Optional[str]] = {}
@@ -117,17 +118,6 @@ def get_filtered_events_service(
         for u in users:
             id_to_dept[u['user_id']] = u.get('department_name')
             id_to_name[u['user_id']] = u.get('full_name')
-
-    if faculty and faculty != 'Tất cả' and organizer_ids:
-        normalized_faculty = faculty.strip().lower()
-        events = [
-            e for e in events
-            if (id_to_dept.get(e.get('organizer_id')) or '').strip().lower()
-            == normalized_faculty
-        ]
-
-    if not events:
-        return _empty_page(page, limit)
 
     # Step 4b: tên danh mục để thẻ sự kiện hiển thị tag (Học thuật, Việc làm...)
     category_ids = list({e.get('category_id') for e in events if e.get('category_id')})
@@ -154,9 +144,16 @@ def get_filtered_events_service(
         )
         for r in regs:
             eid = r.get('event_id')
-            # Đăng ký đã huỷ không chiếm chỗ — phải khớp với cách đếm ở
-            # event_service._registration_counts và registration_service.
-            if str(r.get('registration_status') or '').upper() == 'CANCELLED':
+            # Đăng ký đã huỷ VÀ người trong danh sách chờ đều không chiếm chỗ
+            # chính thức — phải khớp với event_service._registration_counts,
+            # registration_service và history_services._registered_counts, nếu
+            # không thì cùng một sự kiện hiện hai con số khác nhau (từng gây ra
+            # cảnh "4/3 đã đăng ký").
+            if str(r.get('registration_status') or '').upper() in (
+                'CANCELLED',
+                'WAITLISTED',
+                'WAITLIST',
+            ):
                 continue
             if eid:
                 registered_counts[eid] = registered_counts.get(eid, 0) + 1
@@ -170,11 +167,13 @@ def get_filtered_events_service(
 
     # Step 6: sorting
     if sort_by == 'Nổi nhất':
+        # Nhiều người đăng ký nhất lên đầu
         events.sort(key=lambda x: x.get('registered_count', 0), reverse=True)
-    elif sort_by == 'Sắp diễn ra':
-        events.sort(key=lambda x: x.get('start_time') or '')
-    else:
+    elif sort_by == 'Mới nhất':
         events.sort(key=lambda x: x.get('created_at') or '', reverse=True)
+    else:
+        # Mặc định 'Sắp diễn ra': gần nhất lên đầu, thiếu giờ bắt đầu xếp cuối
+        events.sort(key=lambda x: _parse_db_datetime(x.get('start_time')) or datetime.max)
 
     # Step 7: Pagination
     total_events = len(events)

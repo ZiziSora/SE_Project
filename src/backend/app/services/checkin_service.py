@@ -149,6 +149,11 @@ def get_user_event_qr(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Bạn đã hủy đăng ký tham gia sự kiện này.",
         )
+    if status_str in ("WAITLISTED", "WAITLIST"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Bạn đang ở danh sách chờ, chưa thể xem vé hoặc mã QR check-in.",
+        )
 
     qr_record = get_or_create_qr_code(db, registration.registration_id)
 
@@ -358,10 +363,18 @@ def get_event_checkin_stats(
         .filter(
             EventRegistration.event_id == event_id,
             EventRegistration.registration_status != RegistrationStatus.CANCELLED,
+            EventRegistration.registration_status != RegistrationStatus.WAITLISTED,
         )
         .order_by(EventRegistration.created_at.desc())
         .all()
     )
+
+    registrations = [
+        r
+        for r in registrations
+        if _format_registration_status(r.registration_status)
+        not in ("CANCELLED", "WAITLISTED", "WAITLIST")
+    ]
 
     total_registered = len(registrations)
     total_checked_in = sum(
