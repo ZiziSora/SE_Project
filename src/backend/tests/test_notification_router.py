@@ -29,6 +29,19 @@ def test_notification_list_requires_authentication():
     assert response.status_code == 401
 
 
+@patch(
+    "app.routers.notifications.notification_service.sync_pending_event_reviews_for_admin"
+)
+def test_sync_pending_reviews_uses_current_admin_id(mock_sync):
+    mock_sync.return_value = 3
+
+    response = _client().post("/api/notifications/sync-pending-reviews")
+
+    assert response.status_code == 200
+    assert response.json() == {"created_count": 3}
+    mock_sync.assert_called_once_with(USER_ID)
+
+
 @patch("app.routers.notifications.notification_service.list_notifications")
 def test_notification_list_uses_current_user(mock_list):
     mock_list.return_value = {

@@ -18,6 +18,7 @@ from app.schemas.auth import (
     ForgotPasswordRequest,
     ForgotPasswordResponse
 )
+from app.services import notification_service
 from sqlalchemy.orm import Session
 from dataclasses import dataclass
 from app.core.config import SUPABASE_SERVICE_ROLE_KEY
@@ -552,6 +553,16 @@ def signup_organizer(data: OrganizerSignUpRequest, db: Session):
                 )
                 db.add(attachment)
         db.commit()
+
+        try:
+            notification_service.notify_admins_organizer_request_pending(
+                organizer_name=data.full_name,
+            )
+        except Exception:
+            logger.exception(
+                "Không thể tạo thông báo cho yêu cầu Ban tổ chức %s.",
+                request.request_id,
+            )
 
         return {
             "message": (

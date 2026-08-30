@@ -228,7 +228,7 @@ export default function RoleHeader({ role, avatarUrl: providedAvatarUrl }) {
             </Link>
           )}
 
-          <NotificationMenu tone="neutral" />
+          <NotificationMenu role={role} tone="neutral" />
 
           <div ref={accountMenuRef} className="relative">
             <button

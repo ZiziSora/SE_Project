@@ -1,4 +1,5 @@
 from collections import defaultdict
+import logging
 from math import ceil
 from pathlib import PurePosixPath
 from urllib.parse import unquote, urlparse
@@ -9,11 +10,15 @@ from sqlalchemy import func, or_
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from app.models.enum import OrganizerRequestStatus, UserStatus
+from app.models.enum import NotificationType, OrganizerRequestStatus, UserStatus
 from app.models.organization_type import OrganizationType
 from app.models.organizer_request import OrganizerRequest
 from app.models.organizer_request_attachment import OrganizerRequestAttachment
 from app.models.user import User
+from app.services import notification_service
+
+
+logger = logging.getLogger(__name__)
 
 
 def _request_query(db: Session):
@@ -239,5 +244,34 @@ def review_organizer_request(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Không thể cập nhật kết quả xét duyệt.",
         ) from error
+
+    notification_type = (
+        NotificationType.ORGANIZER_REQUEST_APPROVED
+        if decision == OrganizerRequestStatus.APPROVED
+        else NotificationType.ORGANIZER_REQUEST_REJECTED
+    )
+    notification_title = (
+        "Yêu cầu Ban tổ chức đã được duyệt"
+        if decision == OrganizerRequestStatus.APPROVED
+        else "Yêu cầu Ban tổ chức đã bị từ chối"
+    )
+    notification_content = (
+        "Tài khoản của bạn đã được cấp quyền Ban tổ chức."
+        if decision == OrganizerRequestStatus.APPROVED
+        else "Hồ sơ đăng ký Ban tổ chức của bạn chưa được chấp nhận."
+    )
+    try:
+        notification_service.create_notification(
+            user_id=str(user.user_id),
+            event_id=None,
+            notification_type=notification_type,
+            title=notification_title,
+            content=notification_content,
+        )
+    except Exception:
+        logger.exception(
+            "Không thể tạo thông báo kết quả duyệt Ban tổ chức %s.",
+            request.request_id,
+        )
 
     return get_organizer_request(db=db, request_id=request_id)

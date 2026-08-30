@@ -5,14 +5,12 @@ import {
   CalendarDays,
   LoaderCircle,
   MapPin,
+  ShieldCheck,
+  Users,
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 
 import { notificationApi } from "../api/notificationApi.js";
-import {
-  getNotificationSampleDetail,
-  getNotificationSampleList,
-} from "../data/notificationSampleData.js";
 
 
 const TYPE_LABELS = {
@@ -23,6 +21,13 @@ const TYPE_LABELS = {
   EVENT_REMINDER: "Nhắc lịch",
   EVENT_LOCATION_CHANGED: "Đổi địa điểm",
   EVENT_TIME_CHANGED: "Đổi thời gian",
+  NEW_EVENT: "Sự kiện mới cần duyệt",
+  NEW_ORGANIZER_REQUEST: "Yêu cầu Ban tổ chức mới",
+  NEW_EVENT_REGISTRATION: "Người tham gia mới",
+  ORGANIZER_REQUEST_APPROVED: "Yêu cầu Ban tổ chức được duyệt",
+  ORGANIZER_REQUEST_REJECTED: "Yêu cầu Ban tổ chức bị từ chối",
+  EVENT_APPROVED: "Sự kiện được duyệt",
+  EVENT_REJECTED: "Sự kiện bị từ chối",
   WAITLIST_JOINED: "Danh sách chờ",
   WAITLIST_PROMOTED: "Đã có chỗ tham gia",
 };
@@ -41,11 +46,10 @@ function formatCreatedAt(value) {
 }
 
 
-export default function NotificationMenu({ tone = "purple" }) {
+export default function NotificationMenu({ role, tone = "purple" }) {
   const navigate = useNavigate();
   const menuRef = useRef(null);
   const triggerRef = useRef(null);
-  const sampleReadIdsRef = useRef(new Set());
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingDetail, setIsLoadingDetail] = useState(false);
@@ -53,20 +57,18 @@ export default function NotificationMenu({ tone = "purple" }) {
   const [unreadCount, setUnreadCount] = useState(0);
   const [selectedNotification, setSelectedNotification] = useState(null);
   const [error, setError] = useState("");
-  const [isUsingSampleData, setIsUsingSampleData] = useState(false);
   const isNeutral = tone === "neutral";
-
-  const showSampleNotifications = () => {
-    const items = getNotificationSampleList().map((item) =>
-      sampleReadIdsRef.current.has(item.notification_id)
-        ? { ...item, is_read: true }
-        : item,
+  const isOrganizerRequestNotification =
+    role === "admin" &&
+    selectedNotification?.type === "NEW_ORGANIZER_REQUEST";
+  const isNewRegistrationNotification =
+    role === "organizer" &&
+    selectedNotification?.type === "NEW_EVENT_REGISTRATION";
+  const isOrganizerEventReviewNotification =
+    role === "organizer" &&
+    ["EVENT_APPROVED", "EVENT_REJECTED"].includes(
+      selectedNotification?.type,
     );
-
-    setNotifications(items);
-    setUnreadCount(items.filter((item) => !item.is_read).length);
-    setIsUsingSampleData(true);
-  };
 
   useEffect(() => {
     if (!localStorage.getItem("access_token")) return undefined;
@@ -127,21 +129,20 @@ export default function NotificationMenu({ tone = "purple" }) {
     setError("");
 
     try {
+      if (role === "admin") {
+        await notificationApi.syncPendingReviews();
+      }
       const data = await notificationApi.list({ page: 1, pageSize: 20 });
-      const items = data.items || [];
-
-      if (items.length === 0 && import.meta.env.DEV) {
-        showSampleNotifications();
-      } else {
-        setNotifications(items);
-        setIsUsingSampleData(false);
+      setNotifications(data.items || []);
+      try {
+        const unreadData = await notificationApi.unreadCount();
+        setUnreadCount(unreadData.unread_count || 0);
+      } catch {
+        // Danh sách vẫn hiển thị khi chỉ API đếm badge bị lỗi.
       }
     } catch {
-      if (import.meta.env.DEV) {
-        showSampleNotifications();
-      } else {
-        setError("Không thể tải thông báo. Vui lòng thử lại.");
-      }
+      setNotifications([]);
+      setError("Không thể tải thông báo. Vui lòng thử lại.");
     } finally {
       setIsLoading(false);
     }
@@ -167,36 +168,6 @@ export default function NotificationMenu({ tone = "purple" }) {
     setError("");
 
     try {
-      if (notification.is_sample) {
-        const sampleDetail = getNotificationSampleDetail(
-          notification.notification_id,
-        );
-
-        if (!sampleDetail) {
-          throw new Error("Không tìm thấy dữ liệu mẫu.");
-        }
-
-        const displayedNotification = {
-          ...sampleDetail,
-          is_read: true,
-        };
-
-        if (!notification.is_read) {
-          sampleReadIdsRef.current.add(notification.notification_id);
-          setUnreadCount((count) => Math.max(0, count - 1));
-          setNotifications((items) =>
-            items.map((item) =>
-              item.notification_id === notification.notification_id
-                ? { ...item, is_read: true }
-                : item,
-            ),
-          );
-        }
-
-        setSelectedNotification(displayedNotification);
-        return;
-      }
-
       const detail = await notificationApi.get(notification.notification_id);
       let displayedNotification = detail;
 
@@ -277,11 +248,6 @@ export default function NotificationMenu({ tone = "purple" }) {
             </div>
             {!selectedNotification && (
               <div className="flex items-center gap-2">
-                {isUsingSampleData && (
-                  <span className="rounded-full bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700">
-                    Dữ liệu mẫu
-                  </span>
-                )}
                 {unreadCount > 0 && (
                   <span className="rounded-full bg-purple-50 px-2.5 py-1 text-xs font-semibold text-purple-700">
                     {unreadCount} chưa đọc
@@ -305,7 +271,10 @@ export default function NotificationMenu({ tone = "purple" }) {
             <div className="space-y-4 p-5">
               <div>
                 <span className="text-xs font-semibold uppercase tracking-wide text-purple-700">
-                  {TYPE_LABELS[selectedNotification.type] || "Thông báo sự kiện"}
+                  {isOrganizerRequestNotification
+                    ? "Yêu cầu Ban tổ chức mới"
+                    : TYPE_LABELS[selectedNotification.type] ||
+                      "Thông báo sự kiện"}
                 </span>
                 <h3 className="mt-1.5 text-lg font-bold leading-snug text-gray-900">
                   {selectedNotification.title}
@@ -318,14 +287,39 @@ export default function NotificationMenu({ tone = "purple" }) {
                 <CalendarDays className="size-4" aria-hidden="true" />
                 {formatCreatedAt(selectedNotification.created_at)}
               </div>
-              {selectedNotification.event_id && (
+              {(selectedNotification.event_id ||
+                isOrganizerRequestNotification) && (
                 <Link
-                  to={`/events/${selectedNotification.event_id}`}
+                  to={
+                    isOrganizerRequestNotification
+                      ? "/admin/organizer-requests"
+                      : isNewRegistrationNotification
+                        ? `/organizer/participants/${selectedNotification.event_id}`
+                        : isOrganizerEventReviewNotification
+                          ? `/organizer/events/${selectedNotification.event_id}`
+                      : role === "admin"
+                        ? `/admin/events/${selectedNotification.event_id}`
+                        : `/events/${selectedNotification.event_id}`
+                  }
                   onClick={() => setIsOpen(false)}
                   className="inline-flex items-center gap-2 rounded-lg bg-purple-700 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-purple-800"
                 >
-                  <MapPin className="size-4" aria-hidden="true" />
-                  Xem chi tiết sự kiện
+                  {isOrganizerRequestNotification ? (
+                    <ShieldCheck className="size-4" aria-hidden="true" />
+                  ) : isNewRegistrationNotification ? (
+                    <Users className="size-4" aria-hidden="true" />
+                  ) : (
+                    <MapPin className="size-4" aria-hidden="true" />
+                  )}
+                  {isOrganizerRequestNotification
+                    ? "Mở trang xét duyệt Ban tổ chức"
+                    : isNewRegistrationNotification
+                      ? "Xem người tham gia"
+                      : isOrganizerEventReviewNotification
+                        ? "Xem sự kiện"
+                    : role === "admin"
+                      ? "Mở trang xét duyệt"
+                      : "Xem chi tiết sự kiện"}
                 </Link>
               )}
             </div>

@@ -17,6 +17,13 @@ export const notificationApi = {
     return response.data;
   },
 
+  async syncPendingReviews() {
+    const response = await api.post(
+      "/api/notifications/sync-pending-reviews",
+    );
+    return response.data;
+  },
+
   async get(notificationId) {
     const response = await api.get(`/api/notifications/${notificationId}`);
     return response.data;

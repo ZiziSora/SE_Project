@@ -131,6 +131,9 @@ def register_for_event(
         current_user.id,
         event.title,
         registration_status=target_status,
+        event_organizer_id=(
+            event.organizer.organizer_id if event.organizer else None
+        ),
     )
     if not was_already_registered and not is_full:
         count += 1
