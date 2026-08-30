@@ -5,10 +5,18 @@ import {
   Building2,
   CalendarDays,
   Clock,
+  Loader2,
   MapPin,
   Sparkles,
   Users,
 } from "lucide-react";
+import { toast } from "react-toastify";
+
+import { publicEventApi } from "../api/eventApi.js";
+import {
+  resolveCategoryName,
+  resolveOrganizerName,
+} from "../utils/eventFormat.js";
 
 /* ─── Helpers ──────────────────────────────────────────────── */
 
@@ -169,10 +177,38 @@ export default function EventCard({
   reason,
   role,
   canRegister = role !== "organizer",
+  showRegisterButton: allowRegister = true,
   isRegistrationOpen = true,
   showOrganizer = true,
+  event = {},
+  registered: registeredProp = false,
+  waitlisted: waitlistedProp = false,
+  onUnsave,
+  onRegistered,
 }) {
   const [imageFailed, setImageFailed] = useState(false);
+  const [countOverride, setCountOverride] = useState(null);
+  const [registrationOverride, setRegistrationOverride] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const count =
+    countOverride ?? (Number(registeredCount ?? event.registered_count) || 0);
+  const registeredFromProps =
+    registeredProp ||
+      hasRegisteredState(
+        registrationStatus ?? registrationStatusFromApi,
+        isRegistered ?? isRegisteredFromApi,
+      );
+  const registered =
+    registrationOverride?.registered ?? registeredFromProps;
+  const waitlisted = registrationOverride?.waitlisted ?? waitlistedProp;
+
+  const resolvedDate = date ?? event.start_time;
+  const resolvedLocation = location ?? event.location;
+  const resolvedCategory = category ?? resolveCategoryName(event);
+  const resolvedFaculty = faculty ?? resolveOrganizerName(event);
+  const resolvedCapacity = capacity ?? event.capacity;
+  const resolvedDeadline =
+    registrationDeadline ?? event.registration_deadline;
   const resolvedVariant = isFeatured ? "recommended-featured" : variant;
   const isRecommended = resolvedVariant.startsWith("recommended");
   const isFeaturedRecommendation =
@@ -182,26 +218,81 @@ export default function EventCard({
   const displayTitle = title || "Tên sự kiện chưa cập nhật";
 
   const registrationSignal = getRegistrationSignal(
-    capacity,
-    registeredCount,
-    registrationDeadline,
+    resolvedCapacity,
+    count,
+    resolvedDeadline,
   );
-  const showRegistrationButton = canRegister && isRegistrationOpen;
+  const showRegistrationButton =
+    role !== "organizer" &&
+    canRegister &&
+    allowRegister &&
+    isRegistrationOpen &&
+    registrationSignal?.kind !== "closed";
   const highlightSignal = getHighlightSignal(
     isRecommended,
     registrationSignal,
     registrationStatus ?? registrationStatusFromApi,
-    isRegistered ?? isRegisteredFromApi,
+    registered,
   );
   const hasCapacityData =
-    capacity !== undefined && capacity !== null && capacity !== "";
+    resolvedCapacity !== undefined &&
+    resolvedCapacity !== null &&
+    resolvedCapacity !== "";
   const showCapacity = Boolean(
     !isCompactRecommendation && (registrationSignal || hasCapacityData),
   );
-  const capacityPercent = getCapacityPercent(capacity, registeredCount);
+  const capacityPercent = getCapacityPercent(resolvedCapacity, count);
 
   const hasImage = image && !imageFailed;
-  const catColors = CATEGORY_COLORS[category] || DEFAULT_GRADIENT;
+  const catColors = CATEGORY_COLORS[resolvedCategory] || DEFAULT_GRADIENT;
+
+  const handleRegister = async () => {
+    if (submitting || registered) return;
+
+    setSubmitting(true);
+    try {
+      const result = await publicEventApi.registerForEvent(eventId);
+      const nextCount = Number(result.count);
+
+      if (Number.isFinite(nextCount)) setCountOverride(nextCount);
+      setRegistrationOverride({
+        registered: true,
+        waitlisted: Boolean(result.is_waitlisted),
+      });
+
+      if (result.already_registered) {
+        toast.info("Bạn đã đăng ký sự kiện này từ trước.");
+      } else if (result.is_waitlisted) {
+        toast.warning(
+          "Sự kiện đã hết chỗ. Bạn đã được thêm vào danh sách chờ.",
+        );
+      } else {
+        toast.success("Đăng ký thành công! Bạn đã giữ được chỗ.");
+      }
+
+      onRegistered?.(eventId, result);
+    } catch (error) {
+      const status = error.response?.status;
+      if (status === 401 || status === 403) {
+        toast.warning("Vui lòng đăng nhập để đăng ký tham gia sự kiện.");
+      } else {
+        toast.error(
+          error.response?.data?.detail ||
+            "Đăng ký thất bại. Vui lòng thử lại sau.",
+        );
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const registerLabel = registered
+    ? waitlisted
+      ? "Đang chờ"
+      : "Đã đăng ký"
+    : registrationSignal?.kind === "full"
+      ? "Vào danh sách chờ"
+      : "Đăng ký ngay";
 
   /* Article wrapper */
   const articleClasses = [
@@ -263,9 +354,9 @@ export default function EventCard({
               strokeWidth={1.4}
               className="text-white/80"
             />
-            {category && (
+            {resolvedCategory && (
               <span className="text-xs font-semibold text-white/70">
-                {category}
+                {resolvedCategory}
               </span>
             )}
           </span>
@@ -280,9 +371,9 @@ export default function EventCard({
         )}
 
         {/* Category badge — bottom-left */}
-        {category && (
+        {resolvedCategory && (
           <span className="event-card-badge absolute bottom-3 left-3 max-w-[70%] truncate rounded-lg px-2.5 py-1.5 text-xs font-semibold backdrop-blur-[3px]">
-            {category}
+            {resolvedCategory}
           </span>
         )}
 
@@ -303,7 +394,7 @@ export default function EventCard({
 
       {/* ── Content area ── */}
       <div className={contentClasses}>
-        {!category && badgeText && (
+        {!resolvedCategory && badgeText && (
           <p className="mb-2 text-xs font-medium uppercase tracking-wider text-slate-500">
             {badgeText}
           </p>
@@ -364,7 +455,7 @@ export default function EventCard({
               strokeWidth={2}
               aria-hidden="true"
             />
-            <span className="font-medium">{formatEventDate(date)}</span>
+            <span className="font-medium">{formatEventDate(resolvedDate)}</span>
           </p>
 
           {/* Location */}
@@ -375,11 +466,13 @@ export default function EventCard({
               strokeWidth={2}
               aria-hidden="true"
             />
-            <span className="line-clamp-1">{location || "Địa điểm chưa cập nhật"}</span>
+            <span className="line-clamp-1">
+              {resolvedLocation || "Địa điểm chưa cập nhật"}
+            </span>
           </p>
 
           {/* Organizer */}
-          {showOrganizer && faculty && (
+          {showOrganizer && resolvedFaculty && (
             <p className="flex items-center gap-2 text-slate-500">
               <Building2
                 className="shrink-0 text-slate-400"
@@ -387,7 +480,7 @@ export default function EventCard({
                 strokeWidth={2}
                 aria-hidden="true"
               />
-              <span className="line-clamp-1">{faculty}</span>
+              <span className="line-clamp-1">{resolvedFaculty}</span>
             </p>
           )}
 
@@ -413,7 +506,7 @@ export default function EventCard({
                   }`}
                 >
                   {registrationSignal?.label ||
-                    getCapacityLabel(capacity, registeredCount)}
+                    getCapacityLabel(resolvedCapacity, count)}
                 </span>
               </p>
 
@@ -466,16 +559,45 @@ export default function EventCard({
                 />
               </Link>
 
-              <Link
-                to={`/events/${eventId}`}
-                className={`event-register-action ml-auto inline-flex items-center justify-center gap-1.5 rounded-xl bg-violet-700 font-semibold text-white shadow-sm shadow-violet-300/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-600 focus-visible:ring-offset-2 ${
+              <button
+                type="button"
+                onClick={handleRegister}
+                disabled={registered || submitting}
+                className={`event-register-action ml-auto inline-flex items-center justify-center gap-1.5 rounded-xl font-semibold shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-600 focus-visible:ring-offset-2 disabled:cursor-default ${
+                  registered
+                    ? waitlisted
+                      ? "border border-amber-200 bg-amber-50 text-amber-800"
+                      : "border border-emerald-200 bg-emerald-50 text-emerald-700"
+                    : registrationSignal?.kind === "full"
+                      ? "bg-amber-600 text-white hover:bg-amber-700"
+                      : "bg-violet-700 text-white shadow-violet-300/40 hover:bg-violet-800"
+                } ${
                   isCompactRecommendation
                     ? "min-h-9 px-3 text-xs"
                     : "min-h-10 px-4 text-sm"
                 }`}
               >
-                Đăng ký ngay
+                {submitting && (
+                  <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                )}
+                {submitting ? "Đang xử lý" : registerLabel}
+              </button>
+            </div>
+          ) : onUnsave ? (
+            <div className="flex items-center gap-2">
+              <Link
+                to={`/events/${eventId}`}
+                className="event-detail-action inline-flex min-h-10 flex-1 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-slate-700 transition-all hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-600 focus-visible:ring-offset-2"
+              >
+                Xem chi tiết
               </Link>
+              <button
+                type="button"
+                onClick={() => onUnsave(eventId)}
+                className="inline-flex min-h-10 flex-1 items-center justify-center rounded-xl border border-red-200 bg-white px-3 text-sm font-semibold text-red-600 transition-all hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
+              >
+                Bỏ lưu
+              </button>
             </div>
           ) : (
             /* Single "Xem chi tiết" — full width pill */

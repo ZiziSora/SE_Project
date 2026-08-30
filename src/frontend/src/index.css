@@ -15,11 +15,19 @@ body {
   text-rendering: optimizeLegibility;
 }
 
-button,
-input,
-select,
-textarea {
-  font: inherit;
+/* Ô nhập và nút thừa hưởng font của trang thay vì font mặc định của trình duyệt.
+   BẮT BUỘC nằm trong @layer base: CSS không-layer luôn thắng CSS có layer, nên
+   nếu để rule này ở ngoài thì `font: inherit` sẽ nuốt luôn mọi utility cỡ chữ
+   của Tailwind (`text-xs`, `text-[11px]`...) đặt trên <button>. Hậu quả đã gặp:
+   nút "Đã đăng ký" trong thẻ sự kiện to hơn hẳn link "Xem thông tin" bên cạnh
+   dù cả hai cùng khai báo text-[11px]. */
+@layer base {
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
 }
 
 /* Con trỏ bàn tay cho MỌI thứ bấm được.

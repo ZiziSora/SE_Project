@@ -21,12 +21,13 @@ import os
 import re
 import xml.etree.ElementTree as ET
 import zipfile
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any, Optional
 
 import httpx
 from pydantic import BaseModel
 
+from app.core.app_time import now_naive_local
 from app.core.supabase_client import get_supabase
 from app.schemas.chatbot import ChatEventOut, ChatMessageIn, ChatMessageOut, ChatTurn
 from app.services import recommendation_service
@@ -124,7 +125,8 @@ class _LlmChatResult(BaseModel):
 # Lớp 1 — Truy xuất dữ liệu sự kiện làm ngữ cảnh
 # --------------------------------------------------------------------------- #
 def _now_iso() -> str:
-    return datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
+    # Mốc so sánh phải là giờ VN — cột thời gian trong DB lưu giờ VN naive
+    return now_naive_local().isoformat()
 
 
 def _category_map() -> dict[int, str]:

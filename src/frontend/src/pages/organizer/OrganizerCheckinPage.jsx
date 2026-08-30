@@ -138,7 +138,9 @@ export default function OrganizerCheckinPage() {
     }
   };
 
-  const participants = statsData?.participants || [];
+  const participants = (statsData?.participants || []).filter(
+    (item) => item.registration_status !== "WAITLISTED" && item.registration_status !== "WAITLIST"
+  );
 
   const filteredParticipants = participants.filter((item) => {
     const isCheckedIn = item.registration_status === "CHECKED_IN";
@@ -155,7 +157,7 @@ export default function OrganizerCheckinPage() {
     return nameMatch || emailMatch || codeMatch;
   });
 
-  const totalRegistered = statsData?.total_registered || 0;
+  const totalRegistered = participants.length;
   const totalCheckedIn = statsData?.total_checked_in || 0;
   const percentage =
     totalRegistered > 0
@@ -174,7 +176,7 @@ export default function OrganizerCheckinPage() {
             className="flex items-center gap-2 text-xs font-bold text-gray-500 hover:text-purple-700 transition"
           >
             <ArrowLeft className="w-4 h-4" />
-            Quay lại quản lý sự kiện
+            Quay lại quản lý người tham gia
           </button>
 
           <button

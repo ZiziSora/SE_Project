@@ -142,7 +142,17 @@ def test_remove_saved_event_is_noop_when_missing(mock_find_saved, mock_get_supab
 @patch("app.services.saved_event_service.get_supabase")
 def test_list_saved_events_returns_rows_for_student(mock_get_supabase):
     rows = [
-        {"event_id": EVENT_ID, "student_id": STUDENT_ID, "saved_at": "2026-08-02T10:00:00"},
+        {
+            "event_id": EVENT_ID,
+            "student_id": STUDENT_ID,
+            "saved_at": "2026-08-02T10:00:00",
+            "events": {
+                "event_id": EVENT_ID,
+                "title": "Future Event",
+                "start_time": "2029-01-01T00:00:00+00:00",
+                "registration_deadline": "2028-12-31T23:59:59+00:00",
+            },
+        },
     ]
     supabase = MagicMock()
     execute_result = MagicMock(data=rows)
@@ -161,3 +171,57 @@ def test_list_saved_events_returns_rows_for_student(mock_get_supabase):
     supabase.table.return_value.select.return_value.eq.assert_called_once_with(
         "student_id", STUDENT_ID
     )
+
+
+@patch("app.services.saved_event_service.get_supabase")
+def test_list_saved_events_filters_out_expired_events(mock_get_supabase):
+    future_event = {
+        "event_id": "future-1",
+        "student_id": STUDENT_ID,
+        "events": {
+            "title": "Future Event",
+            "start_time": "2029-01-01T00:00:00+00:00",
+            "registration_deadline": "2028-12-31T23:59:59+00:00",
+        },
+    }
+    expired_by_deadline = {
+        "event_id": "expired-1",
+        "student_id": STUDENT_ID,
+        "events": {
+            "title": "Expired Deadline Event",
+            "start_time": "2029-01-01T00:00:00+00:00",
+            "registration_deadline": "2020-01-01T00:00:00+00:00",
+        },
+    }
+    expired_by_start_time = {
+        "event_id": "expired-2",
+        "student_id": STUDENT_ID,
+        "events": {
+            "title": "Expired Start Time Event",
+            "start_time": "2020-01-01T00:00:00+00:00",
+            "registration_deadline": None,
+        },
+    }
+    deleted_event = {
+        "event_id": "deleted-1",
+        "student_id": STUDENT_ID,
+        "events": None,
+    }
+    rows = [future_event, expired_by_deadline, expired_by_start_time, deleted_event]
+
+    supabase = MagicMock()
+    execute_result = MagicMock(data=rows)
+    (
+        supabase.table.return_value
+        .select.return_value
+        .eq.return_value
+        .order.return_value
+        .execute
+    ).return_value = execute_result
+    mock_get_supabase.return_value = supabase
+
+    result = svc.list_saved_events(STUDENT_ID)
+
+    assert len(result) == 1
+    assert result[0]["event_id"] == "future-1"
+

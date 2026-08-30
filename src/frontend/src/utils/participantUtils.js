@@ -131,7 +131,8 @@ export function formatNumber(value) {
 
 /** "300 / 300 Người đăng ký" — hỗ trợ nhiều định dạng field từ backend. */
 export function formatRegisteredCount(event) {
-  const count = event?.registered_count ?? event?.total_registered ?? event?.participant_count ?? 0;
+  const rawCount = event?.registered_count ?? event?.total_registered ?? event?.participant_count ?? 0;
+  const count = event?.capacity ? Math.min(rawCount, event.capacity) : rawCount;
   const registered = formatNumber(count);
   if (!event?.capacity) return `${registered} Người đăng ký`;
   return `${registered} / ${formatNumber(event.capacity)} Người đăng ký`;
@@ -139,10 +140,70 @@ export function formatRegisteredCount(event) {
 
 /** Phần trăm lấp đầy cho thanh tiến trình trên thẻ sự kiện (0 - 100). */
 export function getProgressPercent(event) {
-  const registered = Number(
+  const rawCount = Number(
     event?.registered_count ?? event?.total_registered ?? event?.participant_count ?? 0
   );
   const capacity = Number(event?.capacity ?? 0);
+  const registered = capacity ? Math.min(rawCount, capacity) : rawCount;
   if (!capacity) return registered > 0 ? 100 : 0;
   return Math.min(100, Math.round((registered / capacity) * 100));
+}
+
+/**
+ * Phân loại sự kiện ở trang "Quản lý người tham gia".
+ *
+ * Trang này chỉ có ý nghĩa với sự kiện ĐÃ công khai: bản nháp và sự kiện chờ
+ * duyệt lần đầu chưa có ai đăng ký, còn sự kiện đã huỷ thì không còn gì để
+ * quản lý. Nên danh sách chỉ giữ 4 nhóm dưới đây.
+ */
+export const PARTICIPANT_EVENT_GROUPS = {
+  OPEN: {
+    key: "OPEN",
+    label: "Đang mở đăng ký",
+    className: "bg-teal-100 text-teal-700",
+  },
+  PENDING_CHANGE: {
+    key: "PENDING_CHANGE",
+    label: "Chờ duyệt thay đổi",
+    className: "bg-amber-100 text-amber-700",
+  },
+  ONGOING: {
+    key: "ONGOING",
+    label: "Đang diễn ra",
+    className: "bg-blue-100 text-blue-700",
+  },
+  ENDED: {
+    key: "ENDED",
+    label: "Đã kết thúc",
+    className: "bg-slate-100 text-slate-600",
+  },
+};
+
+/** Bộ lọc hiển thị phía trên lưới thẻ sự kiện. */
+export const PARTICIPANT_EVENT_FILTERS = [
+  { key: "ALL", label: "Tất cả" },
+  PARTICIPANT_EVENT_GROUPS.OPEN,
+  PARTICIPANT_EVENT_GROUPS.PENDING_CHANGE,
+  PARTICIPANT_EVENT_GROUPS.ONGOING,
+  PARTICIPANT_EVENT_GROUPS.ENDED,
+];
+
+/**
+ * Nhóm của một sự kiện, hoặc `null` nếu sự kiện không thuộc trang này.
+ *
+ * "Đang mở đăng ký nhưng chờ duyệt thay đổi" tách riêng vì trạng thái thật vẫn
+ * là PUBLISHED (sinh viên vẫn đăng ký bản cũ) — xem PENDING_REVISION_BADGE.
+ */
+export function getParticipantEventGroup(event) {
+  const status = String(event?.event_status || "").toUpperCase();
+
+  if (status === "PUBLISHED") {
+    return event?.has_pending_revision
+      ? PARTICIPANT_EVENT_GROUPS.PENDING_CHANGE
+      : PARTICIPANT_EVENT_GROUPS.OPEN;
+  }
+  if (status === "ONGOING") return PARTICIPANT_EVENT_GROUPS.ONGOING;
+  if (status === "ENDED") return PARTICIPANT_EVENT_GROUPS.ENDED;
+
+  return null;
 }

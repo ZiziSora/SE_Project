@@ -1,6 +1,7 @@
 import OrganizerHeader from '../components/common/OrganizerHeader.jsx';
 import FilterBar from '../components/FilterBar';
 import EventCard from '../components/EventCard';
+import Pagination from '../components/Pagination.jsx';
 import { useEventFilter } from '../utils/useEventFilter';
 
 export default function OrganizerHomePage() {
@@ -25,8 +26,6 @@ export default function OrganizerHomePage() {
                 <FilterBar
                     searchTerm={filters.searchTerm}
                     setSearchTerm={setters.setSearchTerm}
-                    selectedFaculty={filters.selectedFaculty}
-                    setSelectedFaculty={setters.setSelectedFaculty}
                     selectedCategory={filters.selectedCategory}
                     setSelectedCategory={setters.setSelectedCategory}
                     sortOption={filters.sortOption}
@@ -41,14 +40,12 @@ export default function OrganizerHomePage() {
                                 <EventCard
                                     key={event.event_id || event.id}
                                     eventId={event.event_id || event.id}
+                                    /* Ban tổ chức chỉ XEM sự kiện toàn trường, không đăng ký tham gia. */
                                     role="organizer"
-                                    image={event.banner_url || 'https://picsum.photos/seed/default/600/400'}
+                                    event={event}
+                                    image={event.banner_url}
                                     title={event.title}
-                                    faculty={event.department_name || 'Đơn vị tổ chức'}
-                                    date={`${event.start_time || ''}`}
                                     location={event.location}
-                                    badgeText={event.registered_count > 0 ? `${event.registered_count} đã đăng ký` : 'Mới'}
-                                    {...event}
                                 />
                             ))
                         ) : (
@@ -59,27 +56,11 @@ export default function OrganizerHomePage() {
                         )}
                     </div>
 
-                    {totalPages > 1 && (
-                        <div className="mt-8 flex justify-center items-center gap-4">
-                            <button
-                                onClick={() => setters.setCurrentPage(p => Math.max(1, p - 1))}
-                                disabled={filters.currentPage === 1}
-                                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg disabled:opacity-50 cursor-pointer"
-                            >
-                                Trang trước
-                            </button>
-                            <span className="text-sm text-gray-500 font-medium">
-                                Trang {filters.currentPage} / {totalPages}
-                            </span>
-                            <button
-                                onClick={() => setters.setCurrentPage(p => Math.min(totalPages, p + 1))}
-                                disabled={filters.currentPage === totalPages}
-                                className="px-4 py-2 text-sm font-medium text-white bg-[#7C3AED] rounded-lg disabled:opacity-50 cursor-pointer"
-                            >
-                                Trang sau
-                            </button>
-                        </div>
-                    )}
+                    <Pagination
+                        currentPage={filters.currentPage}
+                        totalPages={totalPages}
+                        onPageChange={setters.setCurrentPage}
+                    />
                 </section>
                 <div className="h-20" />
             </main>

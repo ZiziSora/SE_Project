@@ -2,16 +2,19 @@ import { Calendar, UsersRound } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { cn } from "../../lib/utils";
-import { getStatusDisplay } from "../../utils/eventManagementUtils.js";
 import {
   formatEventDateRange,
   formatRegisteredCount,
+  getParticipantEventGroup,
   getProgressPercent,
 } from "../../utils/participantUtils.js";
 
 /** Thẻ sự kiện ở trang chọn sự kiện để quản lý người tham gia. */
-export default function ParticipantEventCard({ event }) {
-  const status = getStatusDisplay(event.event_status);
+export default function ParticipantEventCard({ event, group }) {
+  // Nhãn lấy từ nhóm phân loại của trang này chứ không từ `event_status` thô:
+  // "Đang mở đăng ký" và "Đang mở đăng ký + chờ duyệt thay đổi" cùng có
+  // event_status = PUBLISHED nhưng là hai nhóm khác nhau với Ban tổ chức.
+  const status = group ?? getParticipantEventGroup(event);
   const percent = getProgressPercent(event);
 
   return (
@@ -30,14 +33,16 @@ export default function ParticipantEventCard({ event }) {
           </div>
         )}
 
-        <span
-          className={cn(
-            "absolute right-3 top-3 rounded-md px-2.5 py-1 font-mono text-[11px] font-semibold uppercase tracking-wider shadow-sm",
-            status.className,
-          )}
-        >
-          {status.label}
-        </span>
+        {status && (
+          <span
+            className={cn(
+              "absolute right-3 top-3 rounded-md px-2.5 py-1 font-mono text-[11px] font-semibold uppercase tracking-wider shadow-sm",
+              status.className,
+            )}
+          >
+            {status.label}
+          </span>
+        )}
       </div>
 
       <div className="flex flex-1 flex-col gap-2 p-4">

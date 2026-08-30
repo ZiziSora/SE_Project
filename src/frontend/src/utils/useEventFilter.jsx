@@ -3,9 +3,8 @@ import { publicEventApi } from '../api/eventApi.js';
 
 export function useEventFilter() {
     const [searchTerm, setSearchTerm] = useState('');
-    const [selectedFaculty, setSelectedFaculty] = useState('Tất cả');
     const [selectedCategory, setSelectedCategory] = useState('Tất cả');
-    const [sortOption, setSortOption] = useState('Mới nhất');
+    const [sortOption, setSortOption] = useState('Sắp diễn ra');
     const [currentPage, setCurrentPage] = useState(1);
 
     const [events, setEvents] = useState([]);
@@ -21,7 +20,6 @@ export function useEventFilter() {
                 const data = await publicEventApi.list(
                     {
                         search_term: searchTerm,
-                        faculty: selectedFaculty === 'Tất cả' ? undefined : selectedFaculty,
                         category: selectedCategory === 'Tất cả' ? undefined : selectedCategory,
                         sort_by: sortOption,
                         page: currentPage,
@@ -29,6 +27,10 @@ export function useEventFilter() {
                     },
                     { signal: controller.signal },
                 );
+
+                // Bỏ qua phản hồi của request đã bị huỷ để danh sách không bị
+                // response cũ về muộn ghi đè (ví dụ khi xoá nhanh từ khoá tìm kiếm).
+                if (controller.signal.aborted) return;
 
                 if (data && data.events) {
                     setEvents(data.events);
@@ -38,17 +40,17 @@ export function useEventFilter() {
                 if (controller.signal.aborted) return;
                 console.error('Lỗi lọc sự kiện:', err);
             } finally {
-                setLoading(false);
+                if (!controller.signal.aborted) setLoading(false);
             }
         }
 
         fetchFilteredEvents();
         return () => controller.abort();
-    }, [searchTerm, selectedFaculty, selectedCategory, sortOption, currentPage]);
+    }, [searchTerm, selectedCategory, sortOption, currentPage]);
 
     return {
-        filters: { searchTerm, selectedFaculty, selectedCategory, sortOption, currentPage },
-        setters: { setSearchTerm, setSelectedFaculty, setSelectedCategory, setSortOption, setCurrentPage },
+        filters: { searchTerm, selectedCategory, sortOption, currentPage },
+        setters: { setSearchTerm, setSelectedCategory, setSortOption, setCurrentPage },
         events,
         totalPages,
         loading

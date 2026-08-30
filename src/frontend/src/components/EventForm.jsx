@@ -302,7 +302,8 @@ export function EventForm({ mode, eventId }) {
         setCurrentStatus(event.event_status);
         setRequiresReapproval(event.requires_reapproval);
         setCanEdit(event.can_edit);
-        setRegisteredLabel(`${event.registered_count}/${event.capacity ?? '∞'}`);
+        const displayCount = event.capacity ? Math.min(event.registered_count || 0, event.capacity) : (event.registered_count || 0);
+        setRegisteredLabel(`${displayCount}/${event.capacity ?? '∞'}`);
       } catch (err) {
         console.error('Lỗi tải sự kiện:', err);
         if (!cancelled) setLoadError(extractApiErrorMessage(err, 'Không tải được sự kiện.'));

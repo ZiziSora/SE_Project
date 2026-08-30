@@ -6,9 +6,10 @@ import {
   Sparkles,
   TrendingUp,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import { publicEventApi } from "../api/eventApi.js";
+import { getMyEvents } from "../api/registrationApi.js";
 import EventCard from "../components/EventCard.jsx";
 import FilterBar from "../components/FilterBar.jsx";
 import FloatingChatbox from "../components/FloatingChatbox.jsx";
@@ -58,6 +59,54 @@ export default function ExploreEventsPage() {
   const [loadingRecommendations, setLoadingRecommendations] = useState(
     isAuthenticatedStudent,
   );
+  const [registrationByEventId, setRegistrationByEventId] = useState(
+    () => new Map(),
+  );
+
+  useEffect(() => {
+    if (!isAuthenticatedStudent) return undefined;
+
+    let isMounted = true;
+
+    getMyEvents()
+      .then((items) => {
+        if (!isMounted) return;
+
+        const registrations = (items || [])
+          .map((item) => [
+            item.event_id || item.events?.event_id,
+            String(item.registration_status || "REGISTERED").toUpperCase(),
+          ])
+          .filter(([eventId, status]) => eventId && status !== "CANCELLED");
+
+        setRegistrationByEventId(new Map(registrations));
+      })
+      .catch(() => {});
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isAuthenticatedStudent]);
+
+  const handleRegistered = useCallback((eventId, result) => {
+    setRegistrationByEventId((current) =>
+      new Map(current).set(
+        eventId,
+        result?.is_waitlisted ? "WAITLISTED" : "REGISTERED",
+      ),
+    );
+
+    const nextCount = Number(result?.count);
+    if (!Number.isFinite(nextCount)) return;
+
+    const updateCount = (event) =>
+      getEventId(event) === eventId
+        ? { ...event, registered_count: nextCount }
+        : event;
+
+    setEvents((current) => current.map(updateCount));
+    setRecommendedEvents((current) => current.map(updateCount));
+  }, []);
 
   useEffect(() => {
     if (!isAuthenticatedStudent) return undefined;
@@ -72,7 +121,7 @@ export default function ExploreEventsPage() {
           signal: controller.signal,
         });
         if (!controller.signal.aborted) {
-          setRecommendedEvents(data?.items || []);
+          setRecommendedEvents(data?.recommendations || data?.items || []);
         }
       } catch (error) {
         if (error.name !== "CanceledError" && !controller.signal.aborted) {
@@ -178,6 +227,7 @@ export default function ExploreEventsPage() {
   const visibleRecommendedEvents = recommendedEvents.slice(0, 3);
   const getRecommendationReason = (event) =>
     event.recommendation_reason?.trim() ||
+    event.reason?.trim() ||
     "Dựa trên các chủ đề bạn quan tâm";
 
   const recommendationGridClasses =
@@ -321,6 +371,7 @@ export default function ExploreEventsPage() {
                           <EventCard
                             {...event}
                             eventId={getEventId(event)}
+                            event={event}
                             image={event.banner_url}
                             title={event.title}
                             faculty={getEventOrganizer(event)}
@@ -340,6 +391,14 @@ export default function ExploreEventsPage() {
                                 : "recommended-compact"
                             }
                             canRegister={isPublishedEvent(event)}
+                            registered={registrationByEventId.has(
+                              getEventId(event),
+                            )}
+                            waitlisted={
+                              registrationByEventId.get(getEventId(event)) ===
+                              "WAITLISTED"
+                            }
+                            onRegistered={handleRegistered}
                             role={userRole}
                             showOrganizer={false}
                           />
@@ -425,6 +484,7 @@ export default function ExploreEventsPage() {
                     key={getEventId(event)}
                     {...event}
                     eventId={getEventId(event)}
+                    event={event}
                     image={event.banner_url}
                     title={event.title}
                     faculty={getEventOrganizer(event)}
@@ -439,6 +499,12 @@ export default function ExploreEventsPage() {
                     canRegister={
                       isAuthenticatedStudent && isPublishedEvent(event)
                     }
+                    registered={registrationByEventId.has(getEventId(event))}
+                    waitlisted={
+                      registrationByEventId.get(getEventId(event)) ===
+                      "WAITLISTED"
+                    }
+                    onRegistered={handleRegistered}
                     role={userRole}
                     showOrganizer={false}
                   />

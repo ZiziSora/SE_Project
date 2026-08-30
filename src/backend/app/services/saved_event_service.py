@@ -56,6 +56,51 @@ def remove_saved_event(event_id: str, student_id: str) -> bool:
     return True
 
 
+def _parse_datetime(dt_val) -> Optional[datetime]:
+    if not dt_val:
+        return None
+    if isinstance(dt_val, datetime):
+        dt = dt_val
+    elif isinstance(dt_val, str):
+        try:
+            dt = datetime.fromisoformat(dt_val.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+    else:
+        return None
+
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
+def is_saved_event_expired(item: dict, now: Optional[datetime] = None) -> bool:
+    if not item:
+        return True
+
+    if "events" in item and item["events"] is None:
+        return True
+
+    event = item.get("events")
+    if not event or not isinstance(event, dict):
+        return False
+
+    if now is None:
+        now = datetime.now(timezone.utc)
+    elif now.tzinfo is None:
+        now = now.replace(tzinfo=timezone.utc)
+
+    reg_deadline = _parse_datetime(event.get("registration_deadline"))
+    start_time = _parse_datetime(event.get("start_time"))
+
+    if reg_deadline is not None:
+        return reg_deadline < now
+    if start_time is not None:
+        return start_time < now
+
+    return False
+
+
 def list_saved_events(student_id: str) -> list:
     supabase = get_supabase()
     response = (
@@ -65,4 +110,7 @@ def list_saved_events(student_id: str) -> list:
         .order("saved_at", desc=True)
         .execute()
     )
-    return response.data if response else []
+    raw_data = response.data if response else []
+    now = datetime.now(timezone.utc)
+    return [item for item in raw_data if not is_saved_event_expired(item, now)]
+

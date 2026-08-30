@@ -29,7 +29,7 @@ const categoryShortcuts = [
   { label: "Khởi nghiệp", value: "Khởi nghiệp" },
 ];
 
-const sorts = ["Mới nhất", "Nổi nhất"];
+const sorts = ["Sắp diễn ra", "Mới nhất", "Nổi nhất"];
 
 export default function FilterBar({
   searchTerm,
@@ -41,18 +41,23 @@ export default function FilterBar({
   sortOption,
   setSortOption,
 }) {
+  const showFacultyFilter =
+    typeof selectedFaculty === "string" &&
+    typeof setSelectedFaculty === "function";
+  const defaultSortOption = showFacultyFilter ? "Mới nhất" : "Sắp diễn ra";
+
   const resetFilters = () => {
     setSearchTerm("");
-    setSelectedFaculty("Tất cả");
+    if (showFacultyFilter) setSelectedFaculty("Tất cả");
     setSelectedCategory("Tất cả");
-    setSortOption("Mới nhất");
+    setSortOption(defaultSortOption);
   };
 
   const hasActiveFilters = Boolean(
     searchTerm.trim() ||
-      selectedFaculty !== "Tất cả" ||
+      (showFacultyFilter && selectedFaculty !== "Tất cả") ||
       selectedCategory !== "Tất cả" ||
-      sortOption !== "Mới nhất",
+      sortOption !== defaultSortOption,
   );
 
   const selectClasses =
@@ -137,8 +142,11 @@ export default function FilterBar({
             />
           </summary>
 
-          <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            <label className="block" htmlFor="filter-faculty">
+          <div
+            className={`mt-3 grid gap-3 ${showFacultyFilter ? "sm:grid-cols-2" : "sm:grid-cols-1"}`}
+          >
+            {showFacultyFilter && (
+              <label className="block" htmlFor="filter-faculty">
               <span className="mb-1.5 block text-xs font-semibold text-slate-500">
                 Khoa
               </span>
@@ -161,7 +169,8 @@ export default function FilterBar({
                   aria-hidden="true"
                 />
               </span>
-            </label>
+              </label>
+            )}
 
             <label className="block" htmlFor="filter-sort">
               <span className="mb-1.5 block text-xs font-semibold text-slate-500">
