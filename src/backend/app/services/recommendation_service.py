@@ -35,9 +35,11 @@ DB_APPROVAL_APPROVED = "APPROVED"
 
 # Số ứng viên rule-based đưa cho LLM xếp lại — đủ đa dạng nhưng không tốn prompt.
 SHORTLIST_SIZE = 12
-# gemini-2.5-flash-lite: model rẻ nhất hiện có ($0.10/$0.40 mỗi 1M token đầu
-# vào/ra) — phù hợp cho tác vụ xếp hạng + sinh 1 câu lý do, gọi mỗi lần tải trang.
-DEFAULT_GEMINI_MODEL = "gemini-2.5-flash-lite"
+# gemini-3.5-flash-lite: model rẻ, phản hồi nhanh (~1–2s), trả JSON sạch — phù
+# hợp cho tác vụ xếp hạng + sinh 1 câu lý do, gọi mỗi lần tải trang. Ghi đè bằng
+# biến môi trường GEMINI_MODEL nếu cần. (`gemini-2.5-flash-lite` cũ đã bị Google
+# gỡ, trả 404; tránh `gemini-flash-latest` vì hiện trỏ tới model "thinking" chậm.)
+DEFAULT_GEMINI_MODEL = "gemini-3.5-flash-lite"
 
 
 def _now_iso() -> str:

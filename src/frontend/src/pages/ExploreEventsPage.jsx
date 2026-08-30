@@ -7,9 +7,8 @@ import { publicEventApi } from "../api/eventApi.js";
 
 export default function ExploreEventsPage() {
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedFaculty, setSelectedFaculty] = useState("Tất cả");
   const [selectedCategory, setSelectedCategory] = useState("Tất cả");
-  const [sortOption, setSortOption] = useState("Mới nhất");
+  const [sortOption, setSortOption] = useState("Sắp diễn ra");
 
   const [events, setEvents] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
@@ -51,7 +50,6 @@ export default function ExploreEventsPage() {
         const data = await publicEventApi.list(
           {
             search_term: searchTerm,
-            faculty: selectedFaculty,
             category: selectedCategory,
             sort_by: sortOption,
             page: currentPage,
@@ -59,6 +57,11 @@ export default function ExploreEventsPage() {
           },
           { signal: controller.signal },
         );
+
+        // Bỏ qua phản hồi của request đã bị huỷ: khi gõ rồi xoá nhanh từ khoá,
+        // response cũ về muộn có thể ghi đè danh sách đầy đủ và làm kết quả bị
+        // kẹt ở trạng thái đã lọc.
+        if (controller.signal.aborted) return;
 
         if (data && data.events) {
           setEvents(data.events);
@@ -72,7 +75,7 @@ export default function ExploreEventsPage() {
 
     fetchEvents();
     return () => controller.abort();
-  }, [searchTerm, selectedFaculty, selectedCategory, sortOption, currentPage]);
+  }, [searchTerm, selectedCategory, sortOption, currentPage]);
 
   return (
     <div className="min-h-screen bg-white font-sans">
@@ -139,8 +142,6 @@ export default function ExploreEventsPage() {
         <FilterBar
           searchTerm={searchTerm}
           setSearchTerm={setSearchTerm}
-          selectedFaculty={selectedFaculty}
-          setSelectedFaculty={setSelectedFaculty}
           selectedCategory={selectedCategory}
           setSelectedCategory={setSelectedCategory}
           sortOption={sortOption}
