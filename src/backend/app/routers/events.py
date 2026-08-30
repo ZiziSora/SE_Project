@@ -28,9 +28,8 @@ router = APIRouter(prefix="/api/events", tags=["events"])
 @router.get("/")
 def get_events(
     search_term: Optional[str] = Query(None),
-    faculty: Optional[str] = Query(None),
     category: Optional[str] = Query(None),
-    sort_by: str = Query("Mới nhất"),
+    sort_by: str = Query("Sắp diễn ra"),
     page: int = Query(1, ge=1, description="Trang hiện tại (bắt đầu từ 1)"),
     limit: int = Query(
         10,
@@ -41,7 +40,6 @@ def get_events(
 ) -> Dict[str, Any]:
     return get_filtered_events_service(
         search_term=search_term,
-        faculty=faculty,
         category=category,
         sort_by=sort_by,
         page=page,

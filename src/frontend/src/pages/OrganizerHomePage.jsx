@@ -25,8 +25,6 @@ export default function OrganizerHomePage() {
                 <FilterBar
                     searchTerm={filters.searchTerm}
                     setSearchTerm={setters.setSearchTerm}
-                    selectedFaculty={filters.selectedFaculty}
-                    setSelectedFaculty={setters.setSelectedFaculty}
                     selectedCategory={filters.selectedCategory}
                     setSelectedCategory={setters.setSelectedCategory}
                     sortOption={filters.sortOption}
