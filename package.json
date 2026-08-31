@@ -1,6 +1,0 @@
-{
-  "dependencies": {
-    "html5-qrcode": "^2.3.8",
-    "react-router-dom": "^7.18.0"
-  }
-}

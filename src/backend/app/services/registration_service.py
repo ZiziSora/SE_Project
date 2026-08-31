@@ -51,6 +51,7 @@ def register_user(
     user_id: str,
     event_title: str | None = None,
     registration_status: str = "REGISTERED",
+    event_organizer_id: str | None = None,
 ) -> bool:
     """Register the user for the event.
 
@@ -105,4 +106,23 @@ def register_user(
         title=noti_title,
         content=noti_content,
     )
+    if event_organizer_id:
+        organizer_title = (
+            "Có người tham gia danh sách chờ"
+            if is_waitlist
+            else "Có người đăng ký sự kiện"
+        )
+        organizer_content = (
+            f'Sự kiện "{display_title}" vừa có một lượt tham gia '
+            "danh sách chờ mới."
+            if is_waitlist
+            else f'Sự kiện "{display_title}" vừa có một lượt đăng ký mới.'
+        )
+        notification_service.create_notification(
+            user_id=event_organizer_id,
+            event_id=event_id,
+            notification_type=NotificationType.NEW_EVENT_REGISTRATION,
+            title=organizer_title,
+            content=organizer_content,
+        )
     return False

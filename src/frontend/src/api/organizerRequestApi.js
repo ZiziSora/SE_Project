@@ -27,6 +27,7 @@ function getAvatarClass(name) {
 function mapOrganizerRequest(request) {
   return {
     id: request.request_id,
+    previousRequestId: request.previous_request_id,
     userId: request.user_id,
     name: request.full_name,
     email: request.email,
@@ -38,6 +39,7 @@ function mapOrganizerRequest(request) {
       request.department_name ||
       "Chưa cập nhật đơn vị",
     reason: request.reason || "Không có lý do đăng ký.",
+    rejectedReason: request.rejected_reason || "",
     evidence: request.attachments.map((attachment) => ({
       id: attachment.attachment_id,
       name: attachment.file_name,
@@ -76,10 +78,10 @@ export async function getOrganizerRequest(requestId) {
   return mapOrganizerRequest(response.data);
 }
 
-export async function reviewOrganizerRequest(requestId, status) {
+export async function reviewOrganizerRequest(requestId, status, reason) {
   const response = await api.patch(
     `/api/admin/organizer-requests/${requestId}/decision`,
-    { status },
+    { status, reason: reason || undefined },
   );
   return {
     message: response.data.message,

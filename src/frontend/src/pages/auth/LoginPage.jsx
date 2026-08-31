@@ -1,4 +1,4 @@
-import { GraduationCap, CheckCircle } from "lucide-react";
+import { CheckCircle, GraduationCap } from "lucide-react";
 import hcmus from "../../assets/hcmus.png";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { login } from "../../api/authApi.js";
@@ -46,8 +46,6 @@ const LoginPage = () => {
         throw new Error("Không thể khởi tạo phiên đăng nhập. Vui lòng thử lại.");
       }
 
-      toast.success("Đăng nhập thành công");
-
       localStorage.setItem(
         "access_token",
         sessionData.session.access_token,
@@ -65,11 +63,15 @@ const LoginPage = () => {
         String(result.can_manage_events),
       );
 
+      toast.success("Đăng nhập thành công");
+
       const redirectPath =
         result.role === "admin"
           ? "/admin/organizer-requests"
           : result.role === "organizer"
-            ? "/organizer"
+            ? result.can_manage_events
+              ? "/organizer"
+              : "/organizer/status"
             : "/explore";
 
       setTimeout(() => {
@@ -125,8 +127,8 @@ const LoginPage = () => {
             <div className="mx-6 md:mx-8 mb-3 flex items-start gap-2 rounded-lg bg-green-50 border border-green-200 px-4 py-3">
               <CheckCircle className="size-4 text-green-600 mt-0.5 shrink-0" />
               <p className="text-sm text-green-700 font-medium">
-                Email đã được xác nhận. Nếu đăng ký Ban tổ chức, bạn có thể đăng
-                nhập sau khi hồ sơ được quản trị viên phê duyệt.
+                Email đã được xác nhận. Bạn có thể đăng nhập ngay; quyền quản lý
+                sự kiện sẽ được mở sau khi hồ sơ Ban tổ chức được phê duyệt.
               </p>
             </div>
           )}

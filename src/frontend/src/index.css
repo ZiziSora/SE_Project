@@ -122,6 +122,7 @@ body {
 
 :root {
   color-scheme: light;
+  --surface-page: #fafafa;
   --background: oklch(0.97 0.008 275);
   --foreground: oklch(0.22 0.03 265);
   --card: oklch(1 0 0);
@@ -216,6 +217,19 @@ html {
   }
 }
 
+@keyframes resubmit-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+    transform: scale(0.72);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1.2);
+  }
+}
+
 .signup-reveal {
   opacity: 0;
   animation: signup-reveal 620ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
@@ -254,6 +268,328 @@ html {
   animation: review-dialog-in 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+/* ── Explore Hero ── */
+.explore-hero {
+  background: linear-gradient(
+    160deg,
+    #f5f3ff 0%,
+    #faf5ff 35%,
+    #fafafa 65%,
+    #f8faff 100%
+  );
+}
+
+.explore-hero-bg {
+  background:
+    radial-gradient(ellipse 80% 60% at 20% -10%, rgb(167 139 250 / 0.22) 0%, transparent 65%),
+    radial-gradient(ellipse 60% 50% at 80% 120%, rgb(196 181 253 / 0.14) 0%, transparent 60%);
+}
+
+.explore-gradient-text {
+  background: linear-gradient(135deg, #7c3aed 0%, #a855f7 50%, #6366f1 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.explore-orb {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(60px);
+  opacity: 0;
+}
+
+.explore-orb-1 {
+  width: 560px;
+  height: 380px;
+  top: -120px;
+  right: 5%;
+  background: radial-gradient(circle, rgb(167 139 250 / 0.3) 0%, transparent 70%);
+}
+
+.explore-orb-2 {
+  width: 320px;
+  height: 280px;
+  bottom: -40px;
+  left: 10%;
+  background: radial-gradient(circle, rgb(196 181 253 / 0.25) 0%, transparent 70%);
+}
+
+.explore-orb-3 {
+  width: 200px;
+  height: 200px;
+  top: 30%;
+  left: 55%;
+  background: radial-gradient(circle, rgb(99 102 241 / 0.15) 0%, transparent 70%);
+}
+
+.explore-stat-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 9999px;
+  border: 1px solid rgb(221 214 254 / 0.8);
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(8px);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: rgb(71 85 105);
+  box-shadow: 0 1px 4px rgb(76 29 149 / 0.06);
+}
+
+/* ── Pagination ── */
+.explore-page-btn {
+  transition:
+    background-color 160ms ease-out,
+    border-color 160ms ease-out,
+    color 160ms ease-out,
+    box-shadow 160ms ease-out,
+    transform 160ms ease-out;
+}
+
+.explore-page-btn:not(:disabled):hover {
+  border-color: rgb(196 181 253);
+  color: rgb(91 33 182);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgb(76 29 149 / 0.1);
+}
+
+.explore-page-btn:not(:disabled):active {
+  transform: translateY(0);
+}
+
+/* ── Event Detail Page ── */
+.event-detail-hero {
+  background: linear-gradient(
+    170deg,
+    #f5f3ff 0%,
+    #fdf4ff 30%,
+    #fafafa 70%,
+    #f8faff 100%
+  );
+  border-bottom: 1px solid rgb(226 232 240 / 0.8);
+}
+
+.event-detail-hero-bg {
+  background:
+    radial-gradient(ellipse 70% 70% at 90% -20%, rgb(167 139 250 / 0.2) 0%, transparent 60%),
+    radial-gradient(ellipse 50% 50% at 10% 120%, rgb(196 181 253 / 0.14) 0%, transparent 55%);
+}
+
+.event-detail-poster-wrap {
+  transition: box-shadow 300ms ease-out;
+}
+
+.event-detail-poster-wrap:hover {
+  box-shadow:
+    0 4px 8px rgb(0 0 0 / 0.04),
+    0 20px 48px rgb(76 29 149 / 0.1);
+}
+
+.event-discovery-card {
+  box-shadow:
+    0 1px 2px rgb(0 0 0 / 0.04),
+    0 2px 8px rgb(76 29 149 / 0.05);
+  transition:
+    transform 280ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 280ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 200ms ease-out;
+}
+
+.event-discovery-card--recommended {
+  box-shadow:
+    0 2px 4px rgb(0 0 0 / 0.04),
+    0 6px 18px rgb(76 29 149 / 0.1);
+}
+
+.event-discovery-image {
+  transition: transform 400ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* Category badge on image */
+.event-card-badge {
+  background: rgba(0, 0, 0, 0.58);
+  color: #fff;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border: 1px solid rgba(255,255,255,0.12);
+  transition: background 200ms ease-out;
+}
+
+.event-discovery-title,
+.event-detail-action,
+.event-register-action,
+.category-shortcut {
+  transition:
+    color 160ms ease-out,
+    background-color 160ms ease-out,
+    border-color 160ms ease-out,
+    box-shadow 160ms ease-out,
+    transform 160ms ease-out;
+}
+
+.event-detail-arrow {
+  transition: transform 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.explore-skeleton {
+  position: relative;
+  overflow: hidden;
+}
+
+.explore-category-rail {
+  scrollbar-color: rgb(203 213 225) transparent;
+  scrollbar-width: thin;
+}
+
+.explore-category-rail::-webkit-scrollbar {
+  height: 4px;
+}
+
+.explore-category-rail::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background-color: rgb(203 213 225);
+}
+
+.explore-skeleton::after {
+  position: absolute;
+  inset: 0;
+  content: "";
+  background: linear-gradient(
+    100deg,
+    transparent 24%,
+    rgb(124 58 237 / 0.06) 46%,
+    transparent 68%
+  );
+  transform: translateX(-100%);
+}
+
+@keyframes explore-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes explore-shimmer {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .event-discovery-card:hover {
+    border-color: rgb(167 139 250 / 0.7);
+    box-shadow:
+      0 2px 4px rgb(0 0 0 / 0.04),
+      0 12px 28px rgb(76 29 149 / 0.13);
+    transform: translateY(-4px);
+  }
+
+  .event-discovery-card--featured:hover {
+    box-shadow:
+      0 2px 4px rgb(0 0 0 / 0.04),
+      0 16px 36px rgb(76 29 149 / 0.16);
+    transform: translateY(-4px);
+  }
+
+  .event-discovery-card:hover .event-discovery-image {
+    transform: scale(1.04);
+  }
+
+  .event-discovery-card:hover .event-card-badge {
+    background: rgba(0, 0, 0, 0.72);
+  }
+
+  .event-discovery-card:hover .event-discovery-title {
+    color: rgb(91 33 182);
+  }
+
+  .event-detail-action:hover {
+    color: rgb(109 40 217);
+  }
+
+  .event-detail-action:hover .event-detail-arrow {
+    transform: translateX(4px);
+  }
+
+  .event-register-action:hover {
+    background-color: rgb(91 33 182);
+    box-shadow: 0 8px 18px rgb(109 40 217 / 0.28);
+    transform: translateY(-2px);
+  }
+
+  .category-shortcut[aria-pressed="false"]:hover {
+    border-color: rgb(221 214 254);
+    background-color: rgb(245 243 255);
+    color: rgb(91 33 182);
+  }
+}
+
+.event-register-action:active {
+  box-shadow: none;
+  transform: translateY(0) scale(0.97);
+}
+
+@media (min-width: 1024px) {
+  .explore-discovery-controls {
+    box-shadow: 0 10px 24px -22px rgb(76 29 149 / 0.38);
+  }
+}
+
+@keyframes explore-orb-float {
+  from {
+    opacity: 0;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .explore-enter {
+    opacity: 0;
+    animation: explore-enter 360ms ease-out forwards;
+  }
+
+  .explore-enter-delay-1 {
+    animation-delay: 45ms;
+  }
+
+  .explore-enter-delay-2 {
+    animation-delay: 90ms;
+  }
+
+  .explore-skeleton::after {
+    animation: explore-shimmer 1.45s ease-in-out infinite;
+  }
+
+  .explore-orb-1 {
+    animation: explore-orb-float 1.1s ease-out 100ms forwards;
+    opacity: 0;
+  }
+
+  .explore-orb-2 {
+    animation: explore-orb-float 1.1s ease-out 250ms forwards;
+    opacity: 0;
+  }
+
+  .explore-orb-3 {
+    animation: explore-orb-float 1.1s ease-out 400ms forwards;
+    opacity: 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
@@ -275,5 +611,44 @@ html {
     opacity: 1;
     animation: none;
     transform: none;
+  }
+
+  [class*="resubmit-pulse"] {
+    animation: none;
+  }
+
+  .event-discovery-card,
+  .event-discovery-image,
+  .event-discovery-title,
+  .event-detail-action,
+  .event-detail-arrow,
+  .event-register-action,
+  .event-card-badge,
+  .category-shortcut {
+    transition: none;
+  }
+
+  .event-discovery-card:hover,
+  .event-discovery-card--featured:hover,
+  .event-discovery-card:hover .event-discovery-image,
+  .event-detail-action:hover .event-detail-arrow,
+  .event-register-action:hover,
+  .event-register-action:active,
+  .category-shortcut:active {
+    transform: none;
+  }
+
+  .explore-skeleton::after {
+    display: none;
+  }
+
+  .explore-orb-1,
+  .explore-orb-2,
+  .explore-orb-3 {
+    opacity: 1;
+  }
+
+  .explore-page-btn {
+    transition: none;
   }
 }

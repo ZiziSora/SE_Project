@@ -28,7 +28,7 @@ from app.schemas.organizer_event import (
     StatsOut,
     missing_required_fields,
 )
-from app.services import notification_service
+from app.services import notification_service, profile_services
 
 # Trạng thái Organizer được phép mở form sửa.
 # ONGOING không nằm ở đây: sự kiện đã bắt đầu thì mọi thay đổi (giờ, địa điểm,
@@ -350,7 +350,10 @@ def _public_organizer_profile(sb: Any, organizer_id: Any) -> Optional[dict[str, 
     return {
         "organizer_id": str(organizer_id),
         "name": user.get("full_name"),
-        "avatar_url": user.get("avatar_url"),
+        "avatar_url": profile_services.get_avatar_url(
+            user.get("avatar_url"),
+            supabase_client=sb,
+        ),
         "department_name": user.get("department_name"),
         "organization_type": organization_type,
         "description": user.get("organization_description"),
@@ -473,7 +476,13 @@ def create_event(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Tạo sự kiện thất bại.",
         )
-    return _to_organizer_event_out(res.data[0], _category_map(), {})
+    created_event = res.data[0]
+    if target_status == EventStatus.PENDING.value:
+        notification_service.notify_admins_event_pending(
+            event_id=_row_id(created_event),
+            event_title=created_event.get("title") or data["title"],
+        )
+    return _to_organizer_event_out(created_event, _category_map(), {})
 
 
 def update_event(
@@ -586,6 +595,15 @@ def update_event(
     )
     res = _run(query)
     row = res.data[0] if res.data else merged
+
+    if (
+        final_status == EventStatus.PENDING.value
+        and current_status != EventStatus.PENDING.value
+    ):
+        notification_service.notify_admins_event_pending(
+            event_id=event_id,
+            event_title=row.get("title") or merged.get("title") or "Sự kiện",
+        )
 
     # Sự kiện đã huỷ thì bản sửa đang chờ duyệt không còn ý nghĩa
     if is_cancelling:

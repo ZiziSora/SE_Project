@@ -85,6 +85,18 @@ def require_approved_organizer(
     return user
 
 
+def require_student(
+    user: User = Depends(get_current_user),
+) -> User:
+    if user.role != UserRole.STUDENT or user.status != UserStatus.ACTIVE:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Tính năng gợi ý sự kiện chỉ dành cho sinh viên đang hoạt động.",
+        )
+
+    return user
+
+
 def require_admin(
     user: User = Depends(get_current_user),
 ) -> User:

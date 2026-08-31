@@ -136,8 +136,11 @@ def test_khu_hoi_ghi_xuong_roi_doc_len_khong_doi(ui_status):
 
 
 @patch("app.services.event_service._category_map", return_value={1: "Học thuật"})
+@patch("app.services.event_service.notification_service.notify_admins_event_pending")
 @patch("app.services.event_service.get_supabase")
-def test_gui_duyet_ghi_dung_cot_va_tra_ve_pending(mock_get_supabase, _cats):
+def test_gui_duyet_ghi_dung_cot_va_tra_ve_pending(
+    mock_get_supabase, mock_notify_admins, _cats
+):
     """Chính là thao tác gây lỗi `invalid input value for enum event_status`."""
     payload = _full_payload()
     client, chain = _fake_supabase(
@@ -159,6 +162,10 @@ def test_gui_duyet_ghi_dung_cot_va_tra_ve_pending(mock_get_supabase, _cats):
     assert sent["event_status"] == "DRAFT"       # KHÔNG được là "PENDING"
     assert sent["approval_status"] == "PENDING"
     assert result.event_status == "PENDING"      # hợp đồng API không đổi
+    mock_notify_admins.assert_called_once_with(
+        event_id=EVENT_ID,
+        event_title=payload["title"],
+    )
 
 
 @patch("app.services.event_service._category_map", return_value={})

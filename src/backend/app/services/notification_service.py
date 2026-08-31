@@ -11,12 +11,13 @@ from fastapi import HTTPException, status
 from postgrest.exceptions import APIError
 
 from app.core.supabase_client import get_supabase
-from app.models.enum import NotificationType
+from app.models.enum import NotificationType, UserRole, UserStatus
 
 
 TABLE_NOTIFICATIONS = "notifications"
 TABLE_EVENTS = "events"
 TABLE_REGISTRATIONS = "event_registrations"
+TABLE_USERS = "users"
 ACTIVE_REGISTRATION_STATUSES = ["REGISTERED", "CHECKED_IN"]
 
 
@@ -123,6 +124,43 @@ def mark_notification_read(
     return _normalize_notification(rows[0])
 
 
+def delete_notification(
+    notification_id: str,
+    user_id: str,
+) -> dict[str, int]:
+    response = _run(
+        get_supabase()
+        .table(TABLE_NOTIFICATIONS)
+        .delete()
+        .eq("noti_id", notification_id)
+        .eq("user_id", user_id)
+    )
+    if not (response.data or []):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Không tìm thấy thông báo.",
+        )
+    return {"deleted_count": 1}
+
+
+def delete_notifications(
+    notification_ids: list[str],
+    user_id: str,
+) -> dict[str, int]:
+    unique_ids = list(dict.fromkeys(str(item) for item in notification_ids))
+    if not unique_ids:
+        return {"deleted_count": 0}
+
+    response = _run(
+        get_supabase()
+        .table(TABLE_NOTIFICATIONS)
+        .delete()
+        .eq("user_id", user_id)
+        .in_("noti_id", unique_ids)
+    )
+    return {"deleted_count": len(response.data or [])}
+
+
 def create_notification(
     *,
     user_id: str,
@@ -172,6 +210,125 @@ def create_notifications(
     ]
     _run(get_supabase().table(TABLE_NOTIFICATIONS).insert(payload))
     return len(payload)
+
+
+def notify_admins_event_pending(*, event_id: str, event_title: str) -> int:
+    response = _run(
+        get_supabase()
+        .table(TABLE_USERS)
+        .select("user_id")
+        .eq("role", UserRole.ADMIN.value)
+        .eq("status", UserStatus.ACTIVE.value)
+    )
+    admin_ids = [
+        str(row["user_id"])
+        for row in (response.data or [])
+        if row.get("user_id")
+    ]
+    return create_notifications(
+        user_ids=admin_ids,
+        event_id=event_id,
+        notification_type=NotificationType.NEW_EVENT,
+        title="Sự kiện mới cần duyệt",
+        content=(
+            f"Ban tổ chức đã gửi sự kiện “{event_title}” "
+            "và đang chờ quản trị viên xét duyệt."
+        ),
+    )
+
+
+def notify_admins_organizer_request_pending(
+    *,
+    organizer_name: str,
+) -> int:
+    response = _run(
+        get_supabase()
+        .table(TABLE_USERS)
+        .select("user_id")
+        .eq("role", UserRole.ADMIN.value)
+        .eq("status", UserStatus.ACTIVE.value)
+    )
+    admin_ids = [
+        str(row["user_id"])
+        for row in (response.data or [])
+        if row.get("user_id")
+    ]
+    for admin_id in admin_ids:
+        create_notification(
+            user_id=admin_id,
+            event_id=None,
+            notification_type=NotificationType.NEW_ORGANIZER_REQUEST,
+            title="Yêu cầu Ban tổ chức mới",
+            content=(
+                f"Ban tổ chức “{organizer_name}” đã gửi hồ sơ "
+                "và đang chờ quản trị viên xét duyệt."
+            ),
+        )
+    return len(admin_ids)
+
+
+def sync_pending_event_reviews_for_admin(user_id: str) -> int:
+    admin_response = _run(
+        get_supabase()
+        .table(TABLE_USERS)
+        .select("user_id")
+        .eq("user_id", user_id)
+        .eq("role", UserRole.ADMIN.value)
+        .eq("status", UserStatus.ACTIVE.value)
+        .maybe_single()
+    )
+    if not admin_response.data:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Bạn cần có quyền quản trị viên.",
+        )
+
+    pending_response = _run(
+        get_supabase()
+        .table(TABLE_EVENTS)
+        .select("event_id, title")
+        .eq("event_status", "DRAFT")
+        .eq("approval_status", "PENDING")
+    )
+    pending_events = [
+        event for event in (pending_response.data or []) if event.get("event_id")
+    ]
+    if not pending_events:
+        return 0
+
+    event_ids = [str(event["event_id"]) for event in pending_events]
+    existing_response = _run(
+        get_supabase()
+        .table(TABLE_NOTIFICATIONS)
+        .select("event_id")
+        .eq("user_id", user_id)
+        .eq("type", NotificationType.NEW_EVENT.name)
+        .in_("event_id", event_ids)
+    )
+    notified_event_ids = {
+        str(row["event_id"])
+        for row in (existing_response.data or [])
+        if row.get("event_id")
+    }
+
+    created_count = 0
+    for event in pending_events:
+        event_id = str(event["event_id"])
+        if event_id in notified_event_ids:
+            continue
+        event_title = event.get("title") or "Sự kiện"
+        create_notification(
+            user_id=user_id,
+            event_id=event_id,
+            notification_type=NotificationType.NEW_EVENT,
+            title="Sự kiện mới cần duyệt",
+            content=(
+                f"Ban tổ chức đã gửi sự kiện “{event_title}” "
+                "và đang chờ quản trị viên xét duyệt."
+            ),
+        )
+        created_count += 1
+    return created_count
 
 
 def _registered_user_ids(event_id: str) -> list[str]:
