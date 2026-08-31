@@ -2,7 +2,7 @@ from datetime import datetime
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, EmailStr, Field, model_validator
 
 from app.models.enum import OrganizerRequestStatus
 
@@ -15,6 +15,7 @@ class OrganizerRequestAttachmentResponse(BaseModel):
 
 class OrganizerRequestResponse(BaseModel):
     request_id: UUID
+    previous_request_id: UUID | None = None
     user_id: UUID
     full_name: str
     email: EmailStr
@@ -22,6 +23,7 @@ class OrganizerRequestResponse(BaseModel):
     department_name: str | None = None
     organization_type: str | None = None
     reason: str | None = None
+    rejected_reason: str | None = None
     status: OrganizerRequestStatus
     submitted_at: datetime
     reviewed_by: UUID | None = None
@@ -48,6 +50,13 @@ class OrganizerRequestListResponse(BaseModel):
 
 class OrganizerRequestDecisionRequest(BaseModel):
     status: Literal["approved", "rejected"]
+    reason: str | None = Field(default=None, max_length=500)
+
+    @model_validator(mode="after")
+    def require_rejection_reason(self):
+        if self.status == "rejected" and not (self.reason or "").strip():
+            raise ValueError("Vui lòng nhập lý do từ chối.")
+        return self
 
 
 class OrganizerRequestDecisionResponse(BaseModel):

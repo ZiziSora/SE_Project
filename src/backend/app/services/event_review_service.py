@@ -1,3 +1,4 @@
+import logging
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -5,8 +6,12 @@ from sqlalchemy import or_
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session, joinedload
 
-from app.models.enum import ApprovalStatus, EventStatus
+from app.models.enum import ApprovalStatus, EventStatus, NotificationType
 from app.models.event import Event
+from app.services import notification_service
+
+
+logger = logging.getLogger(__name__)
 
 
 # Huỷ một sự kiện chỉ đổi cột `event_status` sang CANCELLED và GIỮ NGUYÊN
@@ -123,7 +128,14 @@ def approve_event(db: Session, event_id: UUID) -> dict:
     event = _get_pending_event_for_update(db, event_id)
     event.approval_status = ApprovalStatus.APPROVED
     event.event_status = EventStatus.PUBLISHED
-    return _commit_review(db, event)
+    result = _commit_review(db, event)
+    _notify_event_review_result(
+        event,
+        notification_type=NotificationType.EVENT_APPROVED,
+        title="Sự kiện đã được duyệt",
+        content=f'Sự kiện "{event.title or "Sự kiện"}" đã được phê duyệt và công khai.',
+    )
+    return result
 
 
 def reject_event(db: Session, event_id: UUID) -> dict:
@@ -131,4 +143,38 @@ def reject_event(db: Session, event_id: UUID) -> dict:
     event = _get_pending_event_for_update(db, event_id)
     event.approval_status = ApprovalStatus.REJECTED
     event.event_status = EventStatus.DRAFT
-    return _commit_review(db, event)
+    result = _commit_review(db, event)
+    _notify_event_review_result(
+        event,
+        notification_type=NotificationType.EVENT_REJECTED,
+        title="Sự kiện chưa được duyệt",
+        content=(
+            f'Sự kiện "{event.title or "Sự kiện"}" đã bị từ chối. '
+            "Vui lòng chỉnh sửa và gửi duyệt lại."
+        ),
+    )
+    return result
+
+
+def _notify_event_review_result(
+    event: Event,
+    *,
+    notification_type: NotificationType,
+    title: str,
+    content: str,
+) -> None:
+    if not event.organizer_id:
+        return
+    try:
+        notification_service.create_notification(
+            user_id=str(event.organizer_id),
+            event_id=str(event.event_id),
+            notification_type=notification_type,
+            title=title,
+            content=content,
+        )
+    except Exception:
+        logger.exception(
+            "Không thể tạo thông báo kết quả duyệt sự kiện %s.",
+            event.event_id,
+        )

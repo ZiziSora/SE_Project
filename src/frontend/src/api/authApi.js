@@ -20,6 +20,16 @@ export const signupOrganizer = async (data) => {
     return response.data;
 }
 
+export const getOrganizerResubmission = async () => {
+    const response = await api.get("/auth/organizer/resubmission");
+    return response.data;
+}
+
+export const resubmitOrganizer = async (data) => {
+    const response = await api.post("/auth/organizer/resubmission", data);
+    return response.data;
+}
+
 export const verifyEmail = async (accessToken) => {
     const response = await api.post(
         "/auth/verify-email",

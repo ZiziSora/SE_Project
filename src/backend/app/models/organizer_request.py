@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, ForeignKey, DateTime, func
+from sqlalchemy import Column, String, ForeignKey, DateTime, Text, func
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.dialects.postgresql import UUID
 import uuid
@@ -13,7 +13,14 @@ class OrganizerRequest(Base):
     user_id = Column(UUID(as_uuid=True),
         ForeignKey("users.user_id"),
         nullable=False,)
+    previous_request_id = Column(
+        UUID(as_uuid=True),
+        ForeignKey("organizer_requests.request_id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     reason = Column(String)
+    rejected_reason = Column(Text, nullable=True)
     status = Column(SAEnum(OrganizerRequestStatus, values_callable=lambda obj: [e.value for e in obj]), default=OrganizerRequestStatus.PENDING)
     reviewed_by = Column(UUID(as_uuid=True),
         ForeignKey("users.user_id"),
@@ -21,4 +28,3 @@ class OrganizerRequest(Base):
     create_at = Column(DateTime(timezone=True),
         server_default=func.now(),
         nullable=False)
-    

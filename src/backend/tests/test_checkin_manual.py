@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 import pytest
 from fastapi import HTTPException
 
-from app.models.enum import RegistrationStatus, UserRole
+from app.models.enum import RegistrationStatus, UserRole, UserStatus
 from app.models.event import Event
 from app.models.registration import EventRegistration
 from app.models.user import User
@@ -24,6 +24,7 @@ def sample_organizer():
         email="organizer@university.edu.vn",
         full_name="Ban Tổ Chức",
         role=UserRole.ORGANIZER,
+        status=UserStatus.ACTIVE,
     )
 
 

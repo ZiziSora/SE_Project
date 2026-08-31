@@ -45,6 +45,12 @@ class NotificationType(str, enum.Enum):
     EVENT_LOCATION_CHANGED = "event_location_changed"
     EVENT_TIME_CHANGED = "event_time_changed"
     NEW_EVENT = "new_event"
+    NEW_ORGANIZER_REQUEST = "new_organizer_request"
+    NEW_EVENT_REGISTRATION = "new_event_registration"
+    ORGANIZER_REQUEST_APPROVED = "organizer_request_approved"
+    ORGANIZER_REQUEST_REJECTED = "organizer_request_rejected"
+    EVENT_APPROVED = "event_approved"
+    EVENT_REJECTED = "event_rejected"
     WAITLIST_JOINED = "waitlist_joined"
     WAITLIST_PROMOTED = "waitlist_promoted"
 

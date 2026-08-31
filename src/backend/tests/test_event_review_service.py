@@ -1,11 +1,11 @@
 from types import SimpleNamespace
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 from uuid import UUID
 
 import pytest
 from fastapi import HTTPException
 
-from app.models.enum import ApprovalStatus, EventStatus
+from app.models.enum import ApprovalStatus, EventStatus, NotificationType
 from app.services.event_review_service import (
     approve_event,
     list_pending_events,
@@ -103,7 +103,8 @@ def test_approve_event_rejects_cancelled_event():
     db.commit.assert_not_called()
 
 
-def test_approve_event_publishes_pending_event():
+@patch("app.services.event_review_service.notification_service.create_notification")
+def test_approve_event_publishes_pending_event(mock_create_notification):
     event = SimpleNamespace(
         event_id=EVENT_ID,
         organizer_id=ORGANIZER_ID,
@@ -136,6 +137,13 @@ def test_approve_event_publishes_pending_event():
     db.commit.assert_called_once_with()
     assert result["approval_status"] == ApprovalStatus.APPROVED
     assert result["event_status"] == EventStatus.PUBLISHED
+    mock_create_notification.assert_called_once_with(
+        user_id=str(ORGANIZER_ID),
+        event_id=str(EVENT_ID),
+        notification_type=NotificationType.EVENT_APPROVED,
+        title="Sự kiện đã được duyệt",
+        content='Sự kiện "Ngày hội công nghệ" đã được phê duyệt và công khai.',
+    )
 
 
 def test_approve_event_rejects_event_already_reviewed():
@@ -155,7 +163,8 @@ def test_approve_event_rejects_event_already_reviewed():
     db.commit.assert_not_called()
 
 
-def test_reject_event_returns_event_to_draft():
+@patch("app.services.event_review_service.notification_service.create_notification")
+def test_reject_event_returns_event_to_draft(mock_create_notification):
     event = SimpleNamespace(
         event_id=EVENT_ID,
         organizer_id=ORGANIZER_ID,
@@ -187,3 +196,10 @@ def test_reject_event_returns_event_to_draft():
     db.commit.assert_called_once_with()
     assert result["approval_status"] == ApprovalStatus.REJECTED
     assert result["event_status"] == EventStatus.DRAFT
+    mock_create_notification.assert_called_once_with(
+        user_id=str(ORGANIZER_ID),
+        event_id=str(EVENT_ID),
+        notification_type=NotificationType.EVENT_REJECTED,
+        title="Sự kiện chưa được duyệt",
+        content='Sự kiện "Ngày hội công nghệ" đã bị từ chối. Vui lòng chỉnh sửa và gửi duyệt lại.',
+    )

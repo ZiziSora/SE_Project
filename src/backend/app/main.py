@@ -16,6 +16,7 @@ from app.routers import (
     notifications,
     organizer_events,
     organizer_requests,
+    recommendations,
     uploads,
 )
 from app.routers.auth_router import router as auth_router
@@ -51,6 +52,7 @@ app.include_router(event_review.router)
 app.include_router(admin_event_revisions.router)
 app.include_router(categories.router)
 app.include_router(uploads.router)
+app.include_router(recommendations.router)
 app.include_router(checkin_router)
 app.include_router(chatbot_router.router)
 

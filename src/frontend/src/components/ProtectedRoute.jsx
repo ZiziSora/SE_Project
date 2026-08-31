@@ -6,7 +6,10 @@ import { getMyProfile } from "../api/profileApi.js";
 import { supabase } from "../lib/supabase.js";
 import { clearStoredAuthentication } from "../utils/authStorage.js";
 
-export default function ProtectedRoute({ children }) {
+export default function ProtectedRoute({
+  children,
+  requireEventManagement = false,
+}) {
   const location = useLocation();
   const hasStoredToken = Boolean(localStorage.getItem("access_token"));
   const [authState, setAuthState] = useState(
@@ -14,6 +17,9 @@ export default function ProtectedRoute({ children }) {
   );
   const [errorMessage, setErrorMessage] = useState("");
   const [retryKey, setRetryKey] = useState(0);
+  const [canManageEvents, setCanManageEvents] = useState(
+    localStorage.getItem("can_manage_events") === "true",
+  );
 
   useEffect(() => {
     if (!hasStoredToken) return undefined;
@@ -56,6 +62,7 @@ export default function ProtectedRoute({ children }) {
           "can_manage_events",
           String(profile.can_manage_events),
         );
+        setCanManageEvents(Boolean(profile.can_manage_events));
         setAuthState("authenticated");
       } catch (error) {
         if (cancelled) return;
@@ -121,6 +128,10 @@ export default function ProtectedRoute({ children }) {
         </div>
       </main>
     );
+  }
+
+  if (requireEventManagement && !canManageEvents) {
+    return <Navigate to="/organizer/status" replace />;
   }
 
   return children;

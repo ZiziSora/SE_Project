@@ -70,6 +70,7 @@ def decide_request(
         request_id=request_id,
         decision=OrganizerRequestStatus(body.status),
         admin_id=current_admin.user_id,
+        decision_reason=body.reason,
     )
     return {
         "message": (

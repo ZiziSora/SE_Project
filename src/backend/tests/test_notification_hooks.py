@@ -42,3 +42,30 @@ def test_successful_registration_creates_confirmation_notification(
         title="Đăng ký sự kiện thành công",
         content='Bạn đã đăng ký thành công sự kiện "Hội thảo AI".',
     )
+
+
+@patch("app.services.registration_service.notification_service.create_notification")
+@patch("app.services.registration_service.get_supabase")
+def test_successful_registration_notifies_event_organizer(
+    mock_get_supabase,
+    mock_create_notification,
+):
+    query = _query([])
+    query.maybe_single.return_value.execute.return_value = MagicMock(data=None)
+    mock_get_supabase.return_value.table.return_value = query
+
+    registration_service.register_user(
+        EVENT_ID,
+        USER_ID,
+        "Hội thảo AI",
+        event_organizer_id=ORGANIZER_ID,
+    )
+
+    assert mock_create_notification.call_count == 2
+    mock_create_notification.assert_any_call(
+        user_id=ORGANIZER_ID,
+        event_id=EVENT_ID,
+        notification_type=NotificationType.NEW_EVENT_REGISTRATION,
+        title="Có người đăng ký sự kiện",
+        content='Sự kiện "Hội thảo AI" vừa có một lượt đăng ký mới.',
+    )

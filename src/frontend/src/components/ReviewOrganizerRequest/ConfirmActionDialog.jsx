@@ -1,4 +1,5 @@
 import { AlertTriangle, CircleCheckBig, X } from "lucide-react";
+import { useState } from "react";
 
 export default function ConfirmActionDialog({
   action,
@@ -6,6 +7,8 @@ export default function ConfirmActionDialog({
   onCancel,
   onConfirm,
 }) {
+  const [rejectionReason, setRejectionReason] = useState("");
+
   if (!action) return null;
 
   const isApproval = action.status === "approved";
@@ -59,6 +62,29 @@ export default function ConfirmActionDialog({
           Hãy xác nhận bạn đã kiểm tra đầy đủ hồ sơ minh chứng.
         </p>
 
+        {!isApproval && (
+          <div className="mt-5">
+            <label
+              htmlFor="organizer-rejection-reason"
+              className="text-sm font-semibold text-[#302839]"
+            >
+              Lý do từ chối <span className="text-[#c92d2d]">*</span>
+            </label>
+            <textarea
+              id="organizer-rejection-reason"
+              value={rejectionReason}
+              onChange={(event) => setRejectionReason(event.target.value)}
+              maxLength={500}
+              rows={4}
+              placeholder="Nêu rõ thông tin hoặc tài liệu cần bổ sung..."
+              className="mt-2 w-full resize-none rounded-xl border border-[#d8d0df] bg-white px-3.5 py-3 text-sm leading-6 text-[#302839] outline-none transition focus:border-[#8b5cf6] focus:ring-4 focus:ring-[#ede9fe]"
+            />
+            <p className="mt-1 text-right text-xs text-[#8a8192]">
+              {rejectionReason.length}/500
+            </p>
+          </div>
+        )}
+
         <div className="mt-7 grid grid-cols-2 gap-3">
           <button
             type="button"
@@ -70,8 +96,10 @@ export default function ConfirmActionDialog({
           </button>
           <button
             type="button"
-            onClick={onConfirm}
-            disabled={isSubmitting}
+            onClick={() => onConfirm(rejectionReason.trim())}
+            disabled={
+              isSubmitting || (!isApproval && !rejectionReason.trim())
+            }
             className={`h-11 rounded-xl px-4 text-sm font-semibold text-white shadow-lg transition-all duration-200 hover:-translate-y-0.5 disabled:cursor-wait disabled:opacity-65 disabled:hover:translate-y-0 ${
               isApproval
                 ? "bg-[#6d20df] shadow-[#6d20df]/20 hover:bg-[#5915bd]"

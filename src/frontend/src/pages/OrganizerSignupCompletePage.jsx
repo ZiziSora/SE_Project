@@ -122,8 +122,8 @@ const OrganizerSignupCompletePage = () => {
                 Bạn có thể đóng trang này
               </p>
               <p className="mt-1 text-xs leading-5 text-slate-500">
-                Tài khoản chỉ có thể đăng nhập sau khi được quản trị viên phê
-                duyệt. Thông tin hồ sơ đã được lưu an toàn trên hệ thống.
+                Bạn có thể đăng nhập ngay để khám phá sự kiện. Quyền quản lý chỉ
+                được mở sau khi quản trị viên phê duyệt hồ sơ.
               </p>
             </div>
           </div>
