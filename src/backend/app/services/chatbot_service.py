@@ -16,13 +16,15 @@ về một câu trả lời dự phòng lịch sự, chatbox vẫn hoạt độn
 from __future__ import annotations
 
 import io
+import ipaddress
 import logging
 import os
 import re
 import xml.etree.ElementTree as ET
 import zipfile
-from datetime import datetime
+from collections import OrderedDict
 from typing import Any, Optional
+from urllib.parse import urlparse
 
 import httpx
 from pydantic import BaseModel
@@ -44,6 +46,11 @@ CONTEXT_EVENT_LIMIT = 25
 # Số lượt hội thoại gần nhất được giữ lại để làm ngữ cảnh.
 HISTORY_TURN_LIMIT = 10
 
+# Trạng thái đăng ký KHÔNG chiếm chỗ chính thức — phải khớp với
+# registration_service và event_services.get_filtered_events_service, nếu không thì
+# cùng một sự kiện hiện hai con số "đã đăng ký" khác nhau (từng gây cảnh "4/3").
+_INACTIVE_REG_STATUSES = {"CANCELLED", "WAITLISTED", "WAITLIST"}
+
 # --- Nạp nội dung TỆP KẾ HOẠCH (events.file_url) khi câu hỏi nói về 1 sự kiện cụ thể ---
 # Ban tổ chức bắt buộc đính kèm 1 tệp kế hoạch (.pdf / .docx) cho mỗi sự kiện.
 # Khi người dùng hỏi sâu về một sự kiện, ta tải tệp đó và đưa vào ngữ cảnh để trả lời
@@ -55,9 +62,10 @@ PLAN_MAX_BYTES = 12 * 1024 * 1024
 # Tổng dung lượng PDF đính kèm 1 request (giới hạn inline-data của Gemini ~20MB).
 PLAN_PDF_TOTAL_BYTES = 14 * 1024 * 1024
 _PDF_MIME = "application/pdf"
-# Cache theo tiến trình để không tải lại tệp ở mỗi tin nhắn.
-_PLAN_CACHE: dict[str, Optional[dict[str, Any]]] = {}
-_PLAN_CACHE_MAX = 24
+# Cache LRU theo tiến trình để không tải lại tệp ở mỗi tin nhắn. Giữ ít mục vì mỗi
+# mục PDF có thể tới PLAN_MAX_BYTES; evict mục cũ nhất thay vì xoá sạch cả cache.
+_PLAN_CACHE: "OrderedDict[str, Optional[dict[str, Any]]]" = OrderedDict()
+_PLAN_CACHE_MAX = 8
 _WORD_RE = re.compile(r"\w+", re.UNICODE)
 # Hư từ tiếng Việt hay xuất hiện trong tiêu đề, không mang tính định danh sự kiện.
 _TITLE_STOPWORDS = {
@@ -95,6 +103,10 @@ SYSTEM_PROMPT = (
     "1. Nếu câu hỏi KHÔNG thuộc các nội dung trên (ví dụ: sức khoẻ, y tế, kiến thức chung, "
     "lập trình, toán học, thời sự, tư vấn cá nhân, sản phẩm/website khác...), đặt "
     '"in_scope": false và KHÔNG cố trả lời câu hỏi đó.\n'
+    "   LƯU Ý: câu hỏi chỉ NHẮC TÊN một khoa / ngành / lĩnh vực học thuật (ví dụ "
+    '"khoa Sinh", "khoa Công nghệ thông tin", "sinh viên ngành Luật", "ngành Kinh tế") '
+    "để nhờ gợi ý hoặc tìm sự kiện thì VẪN thuộc phạm vi — đó KHÔNG phải là hỏi kiến "
+    'thức của lĩnh vực đó. Những câu như vậy luôn đặt "in_scope": true.\n'
     '2. Nếu câu hỏi hợp lệ, đặt "in_scope": true và trả lời bằng tiếng Việt, ngắn gọn, thân thiện.\n'
     '3. Khi nói về sự kiện cụ thể, CHỈ dùng thông tin trong phần "DỮ LIỆU SỰ KIỆN", phần '
     '"KẾ HOẠCH CHI TIẾT SỰ KIỆN" và tệp PDF đính kèm (nếu có). Không bịa tên, thời gian, địa điểm, '
@@ -106,6 +118,11 @@ SYSTEM_PROMPT = (
     "khoa/chuyên ngành, hãy DÙNG NGAY thông tin đó để chọn sự kiện phù hợp — TUYỆT ĐỐI "
     "KHÔNG hỏi lại người dùng học khoa/ngành gì. Chỉ hỏi lại khi hoàn toàn không có "
     "HỒ SƠ NGƯỜI DÙNG.\n"
+    "   Khi người dùng nêu RÕ tên khoa/ngành ngay trong câu hỏi (ví dụ \"gợi ý sự "
+    "kiện cho sinh viên khoa Sinh\"), hãy dùng luôn tên khoa/ngành đó để chọn sự kiện "
+    "phù hợp theo chủ đề trong DỮ LIỆU SỰ KIỆN. Nếu không có sự kiện nào phù hợp, vẫn "
+    'đặt "in_scope": true và nói ngắn gọn rằng hiện chưa có sự kiện phù hợp cho '
+    "khoa/ngành đó — TUYỆT ĐỐI không trả lời bằng lý do ngoài phạm vi.\n"
     "6. Khi người dùng hỏi về hoạt động của họ (\"tôi đã đăng ký sự kiện nào\", \"tôi điểm danh "
     "chưa\", \"tôi đã lưu / đang chờ sự kiện nào\"), trả lời dựa trên phần HỒ SƠ NGƯỜI DÙNG; "
     "nếu phần đó không có mục tương ứng thì nói là hiện chưa có.\n"
@@ -142,6 +159,9 @@ def _category_map() -> dict[int, str]:
 def _fetch_context_events(limit: int = CONTEXT_EVENT_LIMIT) -> list[dict[str, Any]]:
     """Sự kiện đã duyệt, công khai, chưa kết thúc — sắp theo thời gian bắt đầu."""
     now = _now_iso()
+    # Lọc trạng thái ngay trong truy vấn (DB lưu enum CHỮ HOA — xem
+    # event_services.get_filtered_events_service) để không bị rớt sự kiện hợp lệ
+    # khi các sự kiện sớm nhất có nhiều bản chưa duyệt.
     res = (
         get_supabase()
         .table("events")
@@ -150,9 +170,11 @@ def _fetch_context_events(limit: int = CONTEXT_EVENT_LIMIT) -> list[dict[str, An
             "registration_deadline, capacity, category_id, organizer_id, "
             "event_status, approval_status, file_url"
         )
+        .eq("event_status", "PUBLISHED")
+        .eq("approval_status", "APPROVED")
         .gte("end_time", now)
         .order("start_time", desc=False)
-        .limit(limit * 3)
+        .limit(limit)
         .execute()
     )
     rows = [
@@ -183,7 +205,7 @@ def _fetch_organizers(organizer_ids: list[str]) -> dict[str, dict[str, Any]]:
 
 
 def _fetch_registration_counts(event_ids: list[str]) -> dict[str, int]:
-    """events.event_id -> số lượt đăng ký còn hiệu lực (bỏ CANCELLED).
+    """events.event_id -> số lượt đăng ký còn hiệu lực (bỏ CANCELLED, WAITLISTED).
 
     Dùng liên kết event_registrations.event_id -> events.event_id.
     """
@@ -199,7 +221,7 @@ def _fetch_registration_counts(event_ids: list[str]) -> dict[str, int]:
     )
     counts: dict[str, int] = {}
     for row in res.data or []:
-        if str(row.get("registration_status") or "").upper() == "CANCELLED":
+        if str(row.get("registration_status") or "").upper() in _INACTIVE_REG_STATUSES:
             continue
         eid = str(row.get("event_id"))
         counts[eid] = counts.get(eid, 0) + 1
@@ -282,7 +304,11 @@ def _fetch_user_activity(user_id: str) -> dict[str, list[str]]:
         status = str(row.get("registration_status") or "").upper()
         if "CANCEL" in status:
             continue
-        if "CHECK" in status:
+        if "WAITLIST" in status:
+            # Người trong danh sách chờ chưa có suất chính thức -> không tính là
+            # "đã đăng ký". Gộp chung với waiting_list bên dưới.
+            waiting.append(title)
+        elif "CHECK" in status:
             checked_in.append(title)
         else:
             registered.append(title)
@@ -305,17 +331,20 @@ def _fetch_user_activity(user_id: str) -> dict[str, list[str]]:
         .eq("student_id", user_id)
         .execute()
     )
-    waiting = [
-        (row.get("events") or {}).get("title")
-        for row in (wait_res.data or [])
-        if (row.get("events") or {}).get("title")
-    ]
+    for row in wait_res.data or []:
+        title = (row.get("events") or {}).get("title")
+        if title:
+            waiting.append(title)
+
+    def _dedupe(items: list[str]) -> list[str]:
+        seen: set[str] = set()
+        return [x for x in items if not (x in seen or seen.add(x))]
 
     return {
-        "registered": registered,
-        "checked_in": checked_in,
-        "saved": saved,
-        "waiting": waiting,
+        "registered": _dedupe(registered),
+        "checked_in": _dedupe(checked_in),
+        "saved": _dedupe(saved),
+        "waiting": _dedupe(waiting),
     }
 
 
@@ -333,7 +362,7 @@ def _build_user_profile_context(
         return None
 
     try:
-        signals = recommendation_service._fetch_student_signals(user_id)
+        signals = recommendation_service.get_student_signals(user_id)
     except Exception:  # noqa: BLE001
         logger.exception("Không tải được tín hiệu hồ sơ người dùng cho chatbox.")
         signals = {}
@@ -442,9 +471,64 @@ def _extract_docx_text(data: bytes) -> str:
     return "\n".join(paragraphs)
 
 
-def _download_plan(url: str) -> Optional[bytes]:
+def _plan_url_allowed_hosts() -> set[str]:
+    """Danh sách host được phép tải tệp kế hoạch.
+
+    Mặc định chỉ gồm host của Supabase Storage dự án (từ SUPABASE_URL). Có thể
+    thêm host cho CDN / tên miền tuỳ chỉnh qua CHAT_PLAN_EXTRA_HOSTS (phân tách
+    bằng dấu phẩy).
+    """
+    hosts: set[str] = set()
+    supa_host = urlparse(os.getenv("SUPABASE_URL") or "").hostname
+    if supa_host:
+        hosts.add(supa_host.lower())
+    for raw in (os.getenv("CHAT_PLAN_EXTRA_HOSTS") or "").split(","):
+        host = raw.strip().lower()
+        if host:
+            hosts.add(host)
+    return hosts
+
+
+def _is_safe_plan_url(url: str) -> bool:
+    """Chống SSRF: file_url do ban tổ chức nhập, chưa chắc là URL storage hợp lệ.
+
+    Chỉ chấp nhận http/https, chặn địa chỉ IP nội bộ/loopback/link-local và (khi
+    có cấu hình allowlist) chỉ cho phép đúng host của Supabase Storage dự án.
+    """
     try:
-        resp = httpx.get(url, timeout=PLAN_DOWNLOAD_TIMEOUT, follow_redirects=True)
+        parsed = urlparse(url)
+    except ValueError:
+        return False
+    if parsed.scheme not in ("http", "https"):
+        return False
+    host = (parsed.hostname or "").lower()
+    if not host:
+        return False
+    try:
+        ip = ipaddress.ip_address(host)
+    except ValueError:
+        ip = None
+    if ip is not None and (
+        ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved
+    ):
+        return False
+    allowed = _plan_url_allowed_hosts()
+    if allowed:
+        return host in allowed
+    # Thiếu SUPABASE_URL (vd môi trường dev): vẫn đã chặn IP nội bộ ở trên,
+    # chỉ từ chối khi host là một literal IP công khai.
+    return ip is None
+
+
+def _download_plan(url: str) -> Optional[bytes]:
+    if not _is_safe_plan_url(url):
+        logger.warning("Bỏ qua tệp kế hoạch có URL không được phép: %s", url)
+        return None
+    try:
+        resp = httpx.get(url, timeout=PLAN_DOWNLOAD_TIMEOUT, follow_redirects=False)
+        if resp.is_redirect:
+            logger.warning("Tệp kế hoạch trả về chuyển hướng, bỏ qua: %s", url)
+            return None
         resp.raise_for_status()
     except Exception:  # noqa: BLE001
         logger.exception("Không tải được tệp kế hoạch: %s", url)
@@ -466,6 +550,7 @@ def _load_event_plan(file_url: Optional[str]) -> Optional[dict[str, Any]]:
     if not file_url:
         return None
     if file_url in _PLAN_CACHE:
+        _PLAN_CACHE.move_to_end(file_url)
         return _PLAN_CACHE[file_url]
 
     result: Optional[dict[str, Any]] = None
@@ -483,9 +568,10 @@ def _load_event_plan(file_url: Optional[str]) -> Optional[dict[str, Any]]:
             logger.exception("Không đọc được nội dung tệp kế hoạch: %s", file_url)
             result = None
 
-    if len(_PLAN_CACHE) >= _PLAN_CACHE_MAX:
-        _PLAN_CACHE.clear()
     _PLAN_CACHE[file_url] = result
+    _PLAN_CACHE.move_to_end(file_url)
+    while len(_PLAN_CACHE) > _PLAN_CACHE_MAX:
+        _PLAN_CACHE.popitem(last=False)
     return result
 
 
@@ -535,7 +621,12 @@ def _build_contents(
 ) -> list[dict[str, Any]]:
     """Ghép lịch sử hội thoại + hồ sơ người dùng + ngữ cảnh dữ liệu cho Gemini."""
     contents: list[dict[str, Any]] = []
-    for turn in payload.history[-HISTORY_TURN_LIMIT:]:
+    history = list(payload.history[-HISTORY_TURN_LIMIT:])
+    # Gemini yêu cầu lượt đầu tiên phải là "user"; bỏ các lượt "ai" mở đầu
+    # (ví dụ lời chào của trợ lý mà frontend gửi kèm) để tránh lỗi 400.
+    while history and history[0].role != "user":
+        history.pop(0)
+    for turn in history:
         contents.append(
             {
                 "role": "user" if turn.role == "user" else "model",
@@ -543,7 +634,7 @@ def _build_contents(
             }
         )
 
-    today = datetime.now().strftime("%Y-%m-%d %H:%M")
+    today = now_naive_local().strftime("%Y-%m-%d %H:%M")
     profile_block = (
         f"HỒ SƠ NGƯỜI DÙNG (đã đăng nhập):\n{user_profile_context}\n\n"
         if user_profile_context
@@ -591,24 +682,55 @@ def _call_gemini(contents: list[dict[str, Any]]) -> Optional[_LlmChatResult]:
     # Model thứ 2 để thử lại khi model chính báo quá tải (503) hoặc 404.
     candidates = [primary] + [m for m in (FALLBACK_GEMINI_MODEL,) if m != primary]
 
+    # KHÔNG đặt max_output_tokens: các alias flash mới (vd gemini-flash-latest)
+    # bật "thinking" sẵn và tiêu gần hết hạn mức token cho phần suy luận nội bộ,
+    # khiến response.text rỗng hoặc JSON bị cắt giữa chừng (finish_reason=
+    # MAX_TOKENS) — xem cảnh báo trong ai_description_service.py. JSON cần sinh ở
+    # đây rất ngắn nên mặc định (vài nghìn token) của model là quá đủ.
     config = types.GenerateContentConfig(
         system_instruction=SYSTEM_PROMPT,
         temperature=0,
-        max_output_tokens=2048,
         response_mime_type="application/json",
         response_schema=_LlmChatResult,
     )
 
-    client = genai.Client(api_key=api_key)
+    try:
+        client = genai.Client(api_key=api_key)
+    except Exception:  # noqa: BLE001
+        logger.exception("Không khởi tạo được client google-genai cho chatbox.")
+        return None
+
     for model in candidates:
         try:
             response = client.models.generate_content(
                 model=model, contents=contents, config=config
             )
-            return _LlmChatResult.model_validate_json(response.text)
         except Exception:  # noqa: BLE001
-            logger.exception(
-                "Gọi Gemini (model=%s) cho chatbox thất bại.", model
+            logger.exception("Gọi Gemini (model=%s) cho chatbox thất bại.", model)
+            continue
+
+        raw = (response.text or "").strip()
+        finish = ""
+        cands = getattr(response, "candidates", None)
+        if cands:
+            finish = str(getattr(cands[0], "finish_reason", "") or "")
+        if not raw:
+            logger.warning(
+                "Gemini (model=%s) không trả về nội dung (finish_reason=%s) — "
+                "thử model kế tiếp.",
+                model,
+                finish or "?",
+            )
+            continue
+        try:
+            return _LlmChatResult.model_validate_json(raw)
+        except Exception:  # noqa: BLE001
+            logger.warning(
+                "Gemini (model=%s) trả JSON không hợp lệ (finish_reason=%s, "
+                "%d ký tự) — thử model kế tiếp.",
+                model,
+                finish or "?",
+                len(raw),
             )
     return None
 
