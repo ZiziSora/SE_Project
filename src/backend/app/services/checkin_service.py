@@ -50,6 +50,12 @@ def _format_registration_status(status_val: object | None) -> str:
     return val_str
 
 
+def _is_event_cancelled(event: Optional[Event]) -> bool:
+    """Kiểm tra xem sự kiện đã bị hủy hay chưa."""
+    if not event or not event.event_status:
+        return False
+    val = getattr(event.event_status, "name", str(event.event_status)).upper()
+    return val == "CANCELLED"
 def _require_active_checkin_manager(current_user: User) -> None:
     if (
         current_user.role == UserRole.ORGANIZER
@@ -152,6 +158,12 @@ def get_user_event_qr(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Bạn chưa đăng ký tham gia sự kiện này.",
+        )
+
+    if _is_event_cancelled(registration.event):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Sự kiện này đã bị hủy. Mã QR không còn hiệu lực.",
         )
 
     status_str = _format_registration_status(registration.registration_status)
@@ -267,6 +279,13 @@ def process_checkin(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Bạn không có quyền thực hiện check-in cho sự kiện này.",
             )
+
+    # Verification: Event status check (Cancelled event)
+    if _is_event_cancelled(event):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Sự kiện này đã bị hủy. Mã QR không còn hiệu lực.",
+        )
 
     # Verification: Event matching check
     if event_id is not None and registration.event_id is not None:
@@ -436,6 +455,12 @@ def manual_checkin_participant(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Không tìm thấy sự kiện.",
+        )
+
+    if _is_event_cancelled(event):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Sự kiện này đã bị hủy. Mã QR không còn hiệu lực.",
         )
 
     # Permission check: Caller must be ORGANIZER or ADMIN

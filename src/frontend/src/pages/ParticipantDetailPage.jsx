@@ -152,14 +152,16 @@ export default function ParticipantDetailPage() {
             <p className="mt-1 text-sm text-muted-foreground">Quản lý người tham gia</p>
           </header>
 
-          <button
-            type="button"
-            onClick={() => navigate(`/organizer/events/${eventId}/checkin`)}
-            className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-purple-700 hover:bg-purple-800 px-5 py-3 font-mono text-sm font-semibold uppercase tracking-wide text-white shadow-sm transition-colors"
-          >
-            <QrCode className="size-4" aria-hidden="true" />
-            Trang Điểm danh & Quét QR
-          </button>
+          {(event?.event_status || event?.status || "").toUpperCase() !== "CANCELLED" && (
+            <button
+              type="button"
+              onClick={() => navigate(`/organizer/events/${eventId}/checkin`)}
+              className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-purple-700 hover:bg-purple-800 px-5 py-3 font-mono text-sm font-semibold uppercase tracking-wide text-white shadow-sm transition-colors"
+            >
+              <QrCode className="size-4" aria-hidden="true" />
+              Trang Điểm danh & Quét QR
+            </button>
+          )}
         </div>
 
         <div className="mt-6 grid grid-cols-1 gap-5 sm:grid-cols-3">

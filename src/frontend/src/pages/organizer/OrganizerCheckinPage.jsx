@@ -223,13 +223,24 @@ export default function OrganizerCheckinPage() {
                   </p>
                 </div>
 
-                <button
-                  onClick={() => setIsScannerOpen(true)}
-                  className="px-6 py-4 bg-emerald-500 hover:bg-emerald-400 text-gray-950 font-black text-sm rounded-2xl shadow-lg transition transform active:scale-98 flex items-center justify-center gap-2.5 shrink-0 cursor-pointer"
-                >
-                  <QrCode className="w-5 h-5 text-gray-950" />
-                  Mở Trình Quét mã QR Check-in
-                </button>
+                {(statsData?.event_status || statsData?.status || "").toUpperCase() === "CANCELLED" ? (
+                  <button
+                    disabled
+                    title="Sự kiện này đã bị hủy. Không thể quét mã QR điểm danh."
+                    className="px-6 py-4 bg-red-900/60 border border-red-500/40 text-red-200 font-bold text-sm rounded-2xl shadow-lg flex items-center justify-center gap-2.5 shrink-0 cursor-not-allowed"
+                  >
+                    <AlertTriangle className="w-5 h-5 text-red-400" />
+                    Sự kiện đã bị hủy
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => setIsScannerOpen(true)}
+                    className="px-6 py-4 bg-emerald-500 hover:bg-emerald-400 text-gray-950 font-black text-sm rounded-2xl shadow-lg transition transform active:scale-98 flex items-center justify-center gap-2.5 shrink-0 cursor-pointer"
+                  >
+                    <QrCode className="w-5 h-5 text-gray-950" />
+                    Mở Trình Quét mã QR Check-in
+                  </button>
+                )}
               </div>
 
               {/* Stats Counters */}

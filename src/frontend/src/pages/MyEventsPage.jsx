@@ -163,17 +163,43 @@ export default function MyEventsPage() {
     const rawStatus = (item.registration_status || "REGISTERED").toUpperCase();
 
     if (rawStatus === "CANCELLED") return "CANCELLED";
-    if (rawStatus === "WAITLISTED" || rawStatus === "WAITLIST") return "WAITLISTED";
+
+    const event = item.events || {};
+    const now = new Date().getTime();
+
+    if (rawStatus === "WAITLISTED" || rawStatus === "WAITLIST") {
+      const fiveDaysMs = 5 * 24 * 60 * 60 * 1000;
+      const cutoffs = [];
+      if (event.start_time) {
+        const startTime = new Date(event.start_time).getTime();
+        if (!Number.isNaN(startTime)) {
+          cutoffs.push(startTime - fiveDaysMs);
+          cutoffs.push(startTime);
+        }
+      }
+      if (event.registration_deadline) {
+        const regDeadline = new Date(event.registration_deadline).getTime();
+        if (!Number.isNaN(regDeadline)) {
+          cutoffs.push(regDeadline);
+        }
+      }
+
+      if (cutoffs.length > 0) {
+        const cutoffTime = Math.min(...cutoffs);
+        if (cutoffTime < now) {
+          return "EXPIRED_WAITLIST";
+        }
+      }
+      return "WAITLISTED";
+    }
     if (rawStatus === "CHECKED_IN" || rawStatus === "ATTENDED" || rawStatus === "CHECK_IN") {
       return "ATTENDED";
     }
     if (rawStatus === "ABSENT") return "ABSENT";
 
-    const event = item.events || {};
     const endTimeStr = event.end_time || event.start_time;
     if (endTimeStr) {
       const eventTime = new Date(endTimeStr).getTime();
-      const now = new Date().getTime();
       if (now > eventTime) {
         return "ABSENT";
       }
@@ -255,34 +281,34 @@ export default function MyEventsPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
               {isSavedTab
                 ? visibleSavedEvents.map((item) => {
-                    const event = item.events;
-                    if (!event) return null;
+                  const event = item.events;
+                  if (!event) return null;
 
-                    return (
-                      <EventCard
-                        key={item.event_id}
-                        eventId={event.event_id}
-                        event={event}
-                        image={event.banner_url}
-                        title={event.title}
-                        location={event.location}
-                        /* Sự kiện đã lưu: mở trang chi tiết để đăng ký, vì ở
-                           đây chưa biết sự kiện còn mở đăng ký hay không. */
-                        showRegisterButton={false}
-                        onUnsave={handleUnsaveEvent}
-                      />
-                    );
-                  })
-                : filteredRegistrations.map((item) => (
-                    <RegistrationEventCard
-                      key={item.registration_id}
-                      item={item}
-                      getEffectiveStatus={getEffectiveStatus}
-                      canCancelRegistration={canCancelRegistration}
-                      formatEventDate={formatEventDate}
-                      onSelectCancel={setSelectedRegistration}
+                  return (
+                    <EventCard
+                      key={item.event_id}
+                      eventId={event.event_id}
+                      event={event}
+                      image={event.banner_url}
+                      title={event.title}
+                      location={event.location}
+                      /* Sự kiện đã lưu: mở trang chi tiết để đăng ký, vì ở
+                         đây chưa biết sự kiện còn mở đăng ký hay không. */
+                      showRegisterButton={false}
+                      onUnsave={handleUnsaveEvent}
                     />
-                  ))}
+                  );
+                })
+                : filteredRegistrations.map((item) => (
+                  <RegistrationEventCard
+                    key={item.registration_id}
+                    item={item}
+                    getEffectiveStatus={getEffectiveStatus}
+                    canCancelRegistration={canCancelRegistration}
+                    formatEventDate={formatEventDate}
+                    onSelectCancel={setSelectedRegistration}
+                  />
+                ))}
             </div>
           )}
         </div>

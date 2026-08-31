@@ -55,3 +55,31 @@ def test_get_event_history_with_waitlisted_status(mock_db, sample_student, sampl
     assert len(history) == 1
     assert history[0].registration_status == "WAITLISTED"
     assert history[0].registration_id == reg.registration_id
+
+
+def test_get_event_history_expired_waitlist_excluded(mock_db, sample_student):
+    expired_event = Event(
+        event_id=uuid.uuid4(),
+        title="Hội thảo đã quá hạn",
+        registration_deadline=datetime.now(timezone.utc) - timedelta(days=1),
+        start_time=datetime.now(timezone.utc) - timedelta(hours=2),
+        end_time=datetime.now(timezone.utc) + timedelta(hours=1),
+    )
+
+    reg = EventRegistration(
+        registration_id=uuid.uuid4(),
+        user_id=sample_student.user_id,
+        event_id=expired_event.event_id,
+        registration_status=RegistrationStatus.WAITLISTED,
+        created_at=datetime.now(timezone.utc) - timedelta(days=5),
+        event=expired_event,
+    )
+
+    query_mock = MagicMock()
+    query_mock.options.return_value.filter.return_value.order_by.return_value.all.return_value = [reg]
+    mock_db.query.return_value = query_mock
+
+    history = get_event_history_service(db=mock_db, current_user=sample_student)
+
+    assert len(history) == 0
+

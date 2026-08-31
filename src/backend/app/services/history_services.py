@@ -7,6 +7,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import String, cast
 from sqlalchemy.orm import Session, joinedload
 
+from app.core.app_time import now_naive_local
 from app.core.supabase_client import get_supabase
 from app.models.enum import NotificationType, RegistrationStatus
 from app.models.event import Event
@@ -205,11 +206,49 @@ def _registered_counts(db: Session, event_ids: list[UUID]) -> dict[UUID, int]:
     return counts
 
 
+def _is_expired_waitlist(registration: EventRegistration, now: datetime) -> bool:
+    """Kiểm tra xem bản ghi danh sách chờ đã hết hạn chưa.
+
+    Theo quy định, sinh viên chính thức chỉ có thể hủy đăng ký trước khi sự kiện diễn ra ít nhất 5 ngày.
+    Do đó, sau mốc `start_time - 5 ngày` (hoặc hạn đăng ký / thời gian bắt đầu), không còn ai có thể hủy
+    nên sinh viên ở danh sách chờ không còn cơ hội được đôn lên chính thức và sẽ tự động bị ẩn.
+    """
+    status_name = _registration_status_name(registration.registration_status)
+    if status_name != "WAITLISTED":
+        return False
+    event = registration.event
+    if not event:
+        return False
+
+    cutoffs: list[datetime] = []
+    if event.start_time:
+        cutoffs.append(event.start_time - timedelta(days=5))
+        cutoffs.append(event.start_time)
+    if event.registration_deadline:
+        cutoffs.append(event.registration_deadline)
+
+    if not cutoffs:
+        return False
+
+    cutoff = min(cutoffs)
+
+    if cutoff.tzinfo is not None:
+        now_cmp = now if now.tzinfo is not None else now.replace(tzinfo=timezone.utc)
+    else:
+        now_cmp = now.replace(tzinfo=None) if now.tzinfo is not None else now
+
+    return cutoff < now_cmp
+
+
 def get_event_history_service(
     db: Session,
     current_user: User,
 ) -> list[HistoryResponse]:
-    """Get every event registration belonging to the authenticated user."""
+    """Get every event registration belonging to the authenticated user.
+
+    Waitlisted registrations past their registration/cancellation deadline or
+    start time are automatically excluded.
+    """
     registrations = (
         db.query(EventRegistration)
         .options(
@@ -221,9 +260,14 @@ def get_event_history_service(
         .all()
     )
 
+    now = now_naive_local()
+    active_registrations = [
+        r for r in registrations if not _is_expired_waitlist(r, now)
+    ]
+
     counts = _registered_counts(
         db,
-        [r.event_id for r in registrations if r.event_id is not None],
+        [r.event_id for r in active_registrations if r.event_id is not None],
     )
 
     return [
@@ -240,7 +284,7 @@ def get_event_history_service(
                 counts.get(registration.event_id, 0),
             ),
         )
-        for registration in registrations
+        for registration in active_registrations
     ]
 
 
