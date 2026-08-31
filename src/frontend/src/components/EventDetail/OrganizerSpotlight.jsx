@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Building2, MapPinned, Phone, ShieldCheck } from "lucide-react";
 
 function getInitials(name) {
@@ -14,6 +15,9 @@ function getInitials(name) {
 
 export function OrganizerSpotlight({ organizer }) {
   const organizerName = organizer?.name || "Ban tổ chức sự kiện";
+  const avatarUrl = organizer?.avatar_url || "";
+  const [failedAvatarUrl, setFailedAvatarUrl] = useState("");
+  const showAvatar = avatarUrl && avatarUrl !== failedAvatarUrl;
 
   return (
     <article className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
@@ -31,14 +35,12 @@ export function OrganizerSpotlight({ organizer }) {
         {/* Avatar + Name */}
         <div className="flex items-center gap-3.5">
           <div className="grid size-14 shrink-0 place-items-center overflow-hidden rounded-2xl bg-gradient-to-br from-violet-600 to-fuchsia-500 text-base font-bold text-white shadow-sm">
-            {organizer?.avatar_url ? (
+            {showAvatar ? (
               <img
-                src={organizer.avatar_url}
+                src={avatarUrl}
                 alt={`Logo ${organizerName}`}
                 className="size-full object-cover"
-                onError={(e) => {
-                  e.target.style.display = "none";
-                }}
+                onError={() => setFailedAvatarUrl(avatarUrl)}
               />
             ) : (
               <span>{getInitials(organizerName)}</span>

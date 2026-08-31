@@ -240,7 +240,9 @@ export default function AdminEventReviewsPage() {
                   aria-hidden="true"
                 />
                 <input
-                  type="search"
+                  type="text"
+                  inputMode="search"
+                  enterKeyHint="search"
                   value={searchTerm}
                   onChange={(changeEvent) =>
                     updateSearchTerm(changeEvent.target.value)

@@ -100,6 +100,10 @@ const LIMITED_ORGANIZER_NAV_ITEMS = [
   },
 ];
 
+const GUEST_NAV_ITEMS = [
+  { label: "Khám phá", to: "/explore", match: ["/explore", "/events"] },
+];
+
 function routeMatches(pathname, item) {
   if (item.exclude?.some((regex) => regex.test(pathname))) return false;
   if (item.pattern?.some((regex) => regex.test(pathname))) return true;
@@ -123,15 +127,23 @@ export default function RoleHeader({ role, avatarUrl: providedAvatarUrl }) {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const avatarUrl = providedAvatarUrl ?? fetchedAvatarUrl;
   const displayedAvatarUrl = avatarUrl === failedAvatarUrl ? "" : avatarUrl;
+  const isAuthenticated = Boolean(localStorage.getItem("access_token"));
   const isAdmin = role === "admin";
   const isOrganizer = role === "organizer";
   const canManageEvents = localStorage.getItem("can_manage_events") === "true";
   const isLimitedOrganizer = isOrganizer && !canManageEvents;
-  const navItems = isLimitedOrganizer
-    ? LIMITED_ORGANIZER_NAV_ITEMS
-    : config.navItems;
-  const logoTo = isLimitedOrganizer ? "/explore" : config.logoTo;
+  const navItems = !isAuthenticated
+    ? GUEST_NAV_ITEMS
+    : isLimitedOrganizer
+      ? LIMITED_ORGANIZER_NAV_ITEMS
+      : config.navItems;
+  const logoTo = !isAuthenticated
+    ? "/"
+    : isLimitedOrganizer
+      ? "/explore"
+      : config.logoTo;
   const showCreateAction =
+    isAuthenticated &&
     isOrganizer &&
     canManageEvents &&
     location.pathname !== "/organizer/create-event";
@@ -142,7 +154,9 @@ export default function RoleHeader({ role, avatarUrl: providedAvatarUrl }) {
       : GraduationCap;
 
   useEffect(() => {
-    if (isAdmin || providedAvatarUrl !== undefined) return undefined;
+    if (!isAuthenticated || isAdmin || providedAvatarUrl !== undefined) {
+      return undefined;
+    }
 
     let isMounted = true;
 
@@ -157,7 +171,7 @@ export default function RoleHeader({ role, avatarUrl: providedAvatarUrl }) {
     return () => {
       isMounted = false;
     };
-  }, [isAdmin, providedAvatarUrl]);
+  }, [isAdmin, isAuthenticated, providedAvatarUrl]);
 
   useEffect(() => {
     if (!isAccountMenuOpen) return undefined;
@@ -255,9 +269,11 @@ export default function RoleHeader({ role, avatarUrl: providedAvatarUrl }) {
             </Link>
           )}
 
-          <NotificationMenu role={role} tone="neutral" />
+          {isAuthenticated ? (
+            <>
+              <NotificationMenu role={role} tone="neutral" />
 
-          <div ref={accountMenuRef} className="relative">
+              <div ref={accountMenuRef} className="relative">
             <button
               ref={accountMenuTriggerRef}
               type="button"
@@ -343,7 +359,24 @@ export default function RoleHeader({ role, avatarUrl: providedAvatarUrl }) {
                 </button>
               </div>
             )}
-          </div>
+              </div>
+            </>
+          ) : (
+            <div className="hidden items-center gap-2 sm:flex">
+              <Link
+                to="/auth/login"
+                className="inline-flex h-10 items-center justify-center rounded-xl border border-border bg-card px-4 text-sm font-semibold text-foreground transition-colors hover:border-primary/30 hover:bg-accent hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+              >
+                Đăng nhập
+              </Link>
+              <Link
+                to="/auth/signup"
+                className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-[0_8px_20px_color-mix(in_oklab,var(--primary)_20%,transparent)] transition-colors hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+              >
+                Đăng ký
+              </Link>
+            </div>
+          )}
 
           <button
             type="button"
@@ -385,6 +418,25 @@ export default function RoleHeader({ role, avatarUrl: providedAvatarUrl }) {
                 </Link>
               );
             })}
+
+            {!isAuthenticated && (
+              <div className="mt-2 grid grid-cols-2 gap-2 border-t border-border pt-3">
+                <Link
+                  to="/auth/login"
+                  onClick={handleNavigation}
+                  className="inline-flex min-h-11 items-center justify-center rounded-xl border border-border bg-card px-4 text-sm font-semibold text-foreground transition-colors hover:bg-accent hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                >
+                  Đăng nhập
+                </Link>
+                <Link
+                  to="/auth/signup"
+                  onClick={handleNavigation}
+                  className="inline-flex min-h-11 items-center justify-center rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                >
+                  Đăng ký
+                </Link>
+              </div>
+            )}
 
             {showCreateAction && (
               <Link

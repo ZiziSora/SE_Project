@@ -45,7 +45,6 @@ export default function ExploreEventsPage() {
   const isAuthenticatedAdmin = userRole === "admin";
 
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedFaculty, setSelectedFaculty] = useState("Tất cả");
   const [selectedCategory, setSelectedCategory] = useState("Tất cả");
   const [sortOption, setSortOption] = useState("Mới nhất");
   const [events, setEvents] = useState([]);
@@ -147,7 +146,6 @@ export default function ExploreEventsPage() {
         const data = await publicEventApi.list(
           {
             search_term: searchTerm,
-            faculty: selectedFaculty,
             category: selectedCategory,
             sort_by: sortOption,
             page: currentPage,
@@ -178,7 +176,6 @@ export default function ExploreEventsPage() {
     return () => controller.abort();
   }, [
     searchTerm,
-    selectedFaculty,
     selectedCategory,
     sortOption,
     currentPage,
@@ -187,11 +184,6 @@ export default function ExploreEventsPage() {
 
   const updateSearchTerm = (value) => {
     setSearchTerm(value);
-    setCurrentPage(1);
-  };
-
-  const updateFaculty = (value) => {
-    setSelectedFaculty(value);
     setCurrentPage(1);
   };
 
@@ -205,17 +197,8 @@ export default function ExploreEventsPage() {
     setCurrentPage(1);
   };
 
-  const resetFilters = () => {
-    setSearchTerm("");
-    setSelectedFaculty("Tất cả");
-    setSelectedCategory("Tất cả");
-    setSortOption("Mới nhất");
-    setCurrentPage(1);
-  };
-
   const hasActiveFilters = Boolean(
     searchTerm.trim() ||
-      selectedFaculty !== "Tất cả" ||
       selectedCategory !== "Tất cả" ||
       sortOption !== "Mới nhất",
   );
@@ -318,12 +301,11 @@ export default function ExploreEventsPage() {
               <FilterBar
                 searchTerm={searchTerm}
                 setSearchTerm={updateSearchTerm}
-                selectedFaculty={selectedFaculty}
-                setSelectedFaculty={updateFaculty}
                 selectedCategory={selectedCategory}
                 setSelectedCategory={updateCategory}
                 sortOption={sortOption}
                 setSortOption={updateSortOption}
+                defaultSortOption="Mới nhất"
               />
             </div>
           </div>
@@ -430,15 +412,6 @@ export default function ExploreEventsPage() {
                 </p>
               </div>
 
-              {hasActiveFilters && !isLoadingEvents && (
-                <button
-                  type="button"
-                  onClick={resetFilters}
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition-all hover:border-violet-300 hover:text-violet-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600"
-                >
-                  Xóa bộ lọc
-                </button>
-              )}
             </div>
 
             {isLoadingEvents ? (
@@ -525,15 +498,6 @@ export default function ExploreEventsPage() {
                 <p className="mx-auto mt-2.5 max-w-md text-sm leading-6 text-slate-500">
                   Hãy thử từ khóa khác hoặc điều chỉnh bộ lọc để xem thêm sự kiện.
                 </p>
-                {hasActiveFilters && (
-                  <button
-                    type="button"
-                    onClick={resetFilters}
-                    className="mt-6 inline-flex h-11 items-center justify-center rounded-xl border border-slate-300 bg-white px-6 text-sm font-semibold text-slate-800 shadow-sm transition-all hover:border-violet-300 hover:text-violet-800 hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-violet-600 active:translate-y-0"
-                  >
-                    Xóa bộ lọc
-                  </button>
-                )}
               </div>
             )}
 

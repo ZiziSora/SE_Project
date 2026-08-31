@@ -1,6 +1,7 @@
 import logging
 import re
 from io import BytesIO
+from typing import Any
 from uuid import uuid4
 
 from fastapi import HTTPException, UploadFile, status
@@ -135,13 +136,22 @@ def upload_avatar_service(
     finally:
         file.file.close()
 
-def get_avatar_url(avatar_path: str | None) -> str | None:
+def get_avatar_url(
+    avatar_path: str | None,
+    *,
+    supabase_client: Any = None,
+) -> str | None:
     if not avatar_path:
         return None
 
-    return get_supabase().storage.from_(AVATAR_BUCKET).get_public_url(
-        avatar_path
-    )
+    normalized_path = avatar_path.strip()
+    if not normalized_path:
+        return None
+    if normalized_path.startswith(("http://", "https://")):
+        return normalized_path
+
+    client = supabase_client or get_supabase()
+    return client.storage.from_(AVATAR_BUCKET).get_public_url(normalized_path)
 
 
 def update_profile_service(

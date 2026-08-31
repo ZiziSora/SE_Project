@@ -168,6 +168,10 @@ def test_public_event_detail_includes_organizer_profile(
 ):
     organizer_id = "22222222-2222-2222-2222-222222222222"
     organization_type_id = "33333333-3333-3333-3333-333333333333"
+    avatar_path = f"{organizer_id}/logo.png"
+    avatar_public_url = (
+        "https://example.supabase.co/storage/v1/object/public/avatars/logo.png"
+    )
     event_query = _query_client(
         [
             {
@@ -184,7 +188,7 @@ def test_public_event_detail_includes_organizer_profile(
             {
                 "user_id": organizer_id,
                 "full_name": "Câu lạc bộ Công nghệ",
-                "avatar_url": "https://example.com/logo.png",
+                "avatar_url": avatar_path,
                 "department_name": "Khoa Công nghệ thông tin",
                 "organization_type_id": organization_type_id,
                 "organization_description": "Kết nối sinh viên yêu công nghệ.",
@@ -199,6 +203,9 @@ def test_public_event_detail_includes_organizer_profile(
 
     client = MagicMock()
     client.table.side_effect = [event_query, user_query, organization_type_query]
+    client.storage.from_.return_value.get_public_url.return_value = (
+        avatar_public_url
+    )
     mock_get_supabase.return_value = client
 
     result = event_service.get_event_by_id(EVENT_ID)
@@ -207,6 +214,7 @@ def test_public_event_detail_includes_organizer_profile(
     assert result.organizer is not None
     assert result.organizer.organizer_id == organizer_id
     assert result.organizer.name == "Câu lạc bộ Công nghệ"
+    assert result.organizer.avatar_url == avatar_public_url
     assert result.organizer.organization_type == "Câu lạc bộ sinh viên"
     assert result.organizer.department_name == "Khoa Công nghệ thông tin"
     assert result.organizer.contact_phone == "0901234567"

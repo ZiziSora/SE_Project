@@ -5,20 +5,6 @@ import {
   SlidersHorizontal,
 } from "lucide-react";
 
-const faculties = [
-  "Tất cả",
-  "Toán - Tin học",
-  "Công nghệ Thông tin",
-  "Vật lý - Vật lý kỹ thuật",
-  "Hóa học",
-  "Sinh học - Công nghệ Sinh học",
-  "Môi trường",
-  "Địa chất",
-  "Khoa học và Công nghệ Vật liệu",
-  "Điện tử - Viễn thông",
-  "Khoa học Liên ngành",
-];
-
 const categoryShortcuts = [
   { label: "Tất cả", value: "Tất cả" },
   { label: "Học thuật", value: "Học thuật" },
@@ -34,28 +20,20 @@ const sorts = ["Sắp diễn ra", "Mới nhất", "Nổi nhất"];
 export default function FilterBar({
   searchTerm,
   setSearchTerm,
-  selectedFaculty,
-  setSelectedFaculty,
   selectedCategory,
   setSelectedCategory,
   sortOption,
   setSortOption,
+  defaultSortOption = "Sắp diễn ra",
 }) {
-  const showFacultyFilter =
-    typeof selectedFaculty === "string" &&
-    typeof setSelectedFaculty === "function";
-  const defaultSortOption = showFacultyFilter ? "Mới nhất" : "Sắp diễn ra";
-
   const resetFilters = () => {
     setSearchTerm("");
-    if (showFacultyFilter) setSelectedFaculty("Tất cả");
     setSelectedCategory("Tất cả");
     setSortOption(defaultSortOption);
   };
 
   const hasActiveFilters = Boolean(
     searchTerm.trim() ||
-      (showFacultyFilter && selectedFaculty !== "Tất cả") ||
       selectedCategory !== "Tất cả" ||
       sortOption !== defaultSortOption,
   );
@@ -142,36 +120,7 @@ export default function FilterBar({
             />
           </summary>
 
-          <div
-            className={`mt-3 grid gap-3 ${showFacultyFilter ? "sm:grid-cols-2" : "sm:grid-cols-1"}`}
-          >
-            {showFacultyFilter && (
-              <label className="block" htmlFor="filter-faculty">
-              <span className="mb-1.5 block text-xs font-semibold text-slate-500">
-                Khoa
-              </span>
-              <span className="relative block">
-                <select
-                  id="filter-faculty"
-                  value={selectedFaculty}
-                  onChange={(event) => setSelectedFaculty(event.target.value)}
-                  className={selectClasses}
-                >
-                  {faculties.map((faculty) => (
-                    <option key={faculty} value={faculty}>
-                      {faculty === "Tất cả" ? "Tất cả khoa" : faculty}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown
-                  className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-slate-400"
-                  strokeWidth={1.8}
-                  aria-hidden="true"
-                />
-              </span>
-              </label>
-            )}
-
+          <div className="mt-3 grid gap-3 sm:grid-cols-1">
             <label className="block" htmlFor="filter-sort">
               <span className="mb-1.5 block text-xs font-semibold text-slate-500">
                 Sắp xếp

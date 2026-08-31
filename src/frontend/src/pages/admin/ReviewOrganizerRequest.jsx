@@ -215,7 +215,9 @@ export default function ReviewOrganizerRequest() {
                 aria-hidden="true"
               />
               <input
-                type="search"
+                type="text"
+                inputMode="search"
+                enterKeyHint="search"
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
                 maxLength={200}
