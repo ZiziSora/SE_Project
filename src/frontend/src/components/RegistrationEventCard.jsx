@@ -36,11 +36,12 @@ export default function RegistrationEventCard({
   const banner = event.banner_url || DEFAULT_IMAGE;
   const effectiveStatus = getEffectiveStatus(item);
 
-  const isCancelled = effectiveStatus === "CANCELLED";
+  const isEventCancelled = (event.event_status || event.status || "").toUpperCase() === "CANCELLED";
+  const isCancelled = effectiveStatus === "CANCELLED" || isEventCancelled;
   const isWaitlisted = effectiveStatus === "WAITLISTED";
   const isAttended = effectiveStatus === "ATTENDED";
   const isAbsent = effectiveStatus === "ABSENT";
-  const isUpcoming = effectiveStatus === "REGISTERED";
+  const isUpcoming = effectiveStatus === "REGISTERED" && !isEventCancelled;
   const canCancel = canCancelRegistration(event.start_time);
 
   return (
@@ -77,11 +78,15 @@ export default function RegistrationEventCard({
                 {categoryName}
               </span>
 
-              {isCancelled && (
+              {isEventCancelled ? (
+                <span className="bg-red-100 text-red-700 text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1">
+                  <AlertTriangle className="w-3 h-3 text-red-600" /> Sự kiện đã bị hủy
+                </span>
+              ) : isCancelled ? (
                 <span className="bg-red-100 text-red-700 text-[10px] font-bold px-2 py-0.5 rounded-md">
                   Đã hủy đăng ký
                 </span>
-              )}
+              ) : null}
               {isWaitlisted && (
                 <span className="bg-amber-100 text-amber-800 text-[10px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1">
                   <Clock className="w-3 h-3 text-amber-600" /> Trong danh sách chờ
@@ -138,7 +143,15 @@ export default function RegistrationEventCard({
         </div>
 
         <div className="p-5 pt-0 flex items-center gap-2">
-          {isAttended ? (
+          {isEventCancelled ? (
+            <button
+              disabled
+              className="w-full text-sm font-semibold py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 transition bg-red-50 text-red-600 border border-red-200 cursor-not-allowed"
+            >
+              <AlertTriangle className="w-4 h-4 text-red-500" />
+              Sự kiện đã bị hủy
+            </button>
+          ) : isAttended ? (
             <button
               onClick={() => setIsQrModalOpen(true)}
               className="w-full text-sm font-semibold py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 transition bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 cursor-pointer"
@@ -188,7 +201,6 @@ export default function RegistrationEventCard({
               disabled
               className="w-full text-sm font-semibold py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 transition bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200"
             >
-              <QrCode className="w-4 h-4" />
               Đã hủy đăng ký
             </button>
           ) : (

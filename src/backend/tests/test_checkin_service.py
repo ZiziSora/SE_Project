@@ -6,7 +6,7 @@ import pytest
 from fastapi import HTTPException
 
 from app.models.checkin_qr import EventCheckinQR
-from app.models.enum import RegistrationStatus, UserRole
+from app.models.enum import EventStatus, RegistrationStatus, UserRole
 from app.models.event import Event
 from app.models.registration import EventRegistration
 from app.models.user import User
@@ -288,5 +288,43 @@ def test_get_user_event_qr_success(mock_db, sample_student, sample_registration,
 
     assert res.registration_id == sample_registration.registration_id
     assert res.qr_token == sample_qr.qr_token
+
+
+def test_process_checkin_cancelled_event_rejected(
+    mock_db, sample_organizer, sample_registration, sample_qr
+):
+    sample_registration.event.event_status = EventStatus.CANCELLED
+    mock_db.query.return_value.options.return_value.filter.return_value.first.return_value = (
+        sample_qr
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        process_checkin(
+            db=mock_db,
+            code="QR-abc123def456",
+            current_user=sample_organizer,
+            event_id=sample_registration.event_id,
+        )
+
+    assert exc_info.value.status_code == 400
+    assert "đã bị hủy" in exc_info.value.detail
+
+
+def test_get_user_event_qr_cancelled_event_rejected(mock_db, sample_student, sample_registration):
+    sample_registration.event.event_status = EventStatus.CANCELLED
+    mock_db.query.return_value.options.return_value.filter.return_value.first.return_value = (
+        sample_registration
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        get_user_event_qr(
+            db=mock_db,
+            current_user=sample_student,
+            event_id=sample_registration.event_id,
+        )
+
+    assert exc_info.value.status_code == 400
+    assert "đã bị hủy" in exc_info.value.detail
+
 
 
