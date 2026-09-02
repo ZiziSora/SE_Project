@@ -32,6 +32,9 @@ import {
   formatAdminReviewDate,
   formatAdminReviewTime,
 } from "../../utils/adminEventReviewUtils.js";
+import {
+  recordAdminReviewDecision,
+} from "../../utils/adminReviewSessionStats.js";
 
 export default function AdminEventReviewDetailPage() {
   const { eventId } = useParams();
@@ -88,6 +91,7 @@ export default function AdminEventReviewDetailPage() {
       setEvents((currentEvents) =>
         currentEvents.filter((eventItem) => eventItem.id !== event.id),
       );
+      recordAdminReviewDecision(decisionAction);
       toast.success(result.message);
       setDecisionAction(null);
     } catch (error) {
