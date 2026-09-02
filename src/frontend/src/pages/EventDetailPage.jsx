@@ -27,6 +27,7 @@ import {
   formatVietnameseDate,
   formatVietnameseTime,
 } from "../utils/eventDetailUtils.js";
+import { isWaitlistOpen } from "../utils/eventFormat.js";
 
 /* =========================================================
    EventDetailPage Component (Dynamic Page based on route /events/:eventId)
@@ -384,6 +385,9 @@ export function EventDetailPage() {
     : [];
 
   const maxCapacity = event?.capacity ?? null;
+  // Sau mốc "trước ngày diễn ra 5 ngày" không ai huỷ đăng ký được nữa, nên
+  // sự kiện đã đầy thì danh sách chờ cũng đóng luôn (backend chặn bằng 409).
+  const waitlistOpen = isWaitlistOpen(event?.start_time);
   // Sự kiện đã huỷ vẫn mở được trang chi tiết (link trong thông báo huỷ trỏ về
   // đây), nhưng không được mời đăng ký nữa.
   const isCancelled =
@@ -519,6 +523,7 @@ export function EventDetailPage() {
                           dataLoading={dataLoading}
                           onRegister={handleRegister}
                           waitlisted={waitlisted}
+                          waitlistOpen={waitlistOpen}
                           feedback={feedback}
                           user={user}
                           floating={isRegistrationFloating}

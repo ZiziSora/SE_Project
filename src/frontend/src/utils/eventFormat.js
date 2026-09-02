@@ -142,3 +142,21 @@ export function resolveOrganizerName(event = {}) {
     null
   );
 }
+
+/** Sinh viên chỉ huỷ được đăng ký khi sự kiện còn cách ít nhất 5 ngày. */
+export const CANCELLATION_WINDOW_DAYS = 5;
+
+/**
+ * Danh sách chờ còn ý nghĩa hay không.
+ *
+ * Qua mốc `start_time - 5 ngày` thì người đã có chỗ không huỷ được nữa, nên
+ * không còn ai nhả chỗ cho danh sách chờ. Lúc đó mời sinh viên xếp hàng là
+ * hứa suông — backend cũng chặn bằng 409 (`POST /events/{id}/register`).
+ */
+export function isWaitlistOpen(startTime) {
+  const start = toDate(startTime);
+  if (!start) return true;
+  const cutoff =
+    start.getTime() - CANCELLATION_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+  return Date.now() < cutoff;
+}

@@ -12,7 +12,12 @@ from fastapi import HTTPException, status
 from postgrest.exceptions import APIError
 
 from app.core.app_time import APP_TZ, now_naive_local
-from app.core.config import TABLE_CATEGORIES, TABLE_EVENTS, TABLE_REGISTRATIONS
+from app.core.config import (
+    TABLE_CATEGORIES,
+    TABLE_EVENT_REVISIONS,
+    TABLE_EVENTS,
+    TABLE_REGISTRATIONS,
+)
 from app.core.supabase_client import get_supabase
 from app.models.enum import NotificationType
 from app.schemas.category import CategoryOut
@@ -28,7 +33,28 @@ from app.schemas.organizer_event import (
     StatsOut,
     missing_required_fields,
 )
-from app.services import notification_service, profile_services
+from app.services import (
+    notification_service,
+    profile_services,
+    registration_service,
+)
+
+# Các bảng con trỏ về `events.event_id`. Khoá ngoại của chúng trong DB chưa có
+# ON DELETE CASCADE, nên xoá thẳng `events` sẽ bị Postgres chặn — phải tự dọn
+# theo đúng thứ tự phụ thuộc. Ràng buộc khoá ngoại được chỉnh trực tiếp trên
+# Supabase (dự án không giữ file SQL / migration nào cho việc này); bước dọn
+# dưới đây vẫn chạy đúng dù DB đã đổi sang CASCADE hay chưa.
+TABLE_SAVED_EVENTS = "saved_events"
+TABLE_WAITING_LIST = "waiting_list"
+TABLE_CHECKIN_QR = "event_checkin_qr"
+TABLE_NOTIFICATIONS = "notifications"
+
+EVENT_CHILD_TABLES = (
+    TABLE_REGISTRATIONS,
+    TABLE_SAVED_EVENTS,
+    TABLE_WAITING_LIST,
+    TABLE_EVENT_REVISIONS,
+)
 
 # Trạng thái Organizer được phép mở form sửa.
 # ONGOING không nằm ở đây: sự kiện đã bắt đầu thì mọi thay đổi (giờ, địa điểm,
@@ -502,13 +528,9 @@ def update_event(
     target_status = (
         payload.event_status.value if payload.event_status is not None else None
     )
-    location_changed = (
-        "location" in data and data["location"] != current.get("location")
-    )
-    time_changed = any(
-        field in data and data[field] != current.get(field)
-        for field in ("start_time", "end_time")
-    )
+    # (Đổi địa điểm / thời gian của sự kiện ĐANG CÔNG KHAI không đi qua đây mà
+    # qua `event_revisions`; thông báo cho sinh viên gửi lúc Admin duyệt bản sửa
+    # — xem `event_revision_service._notify_revision_approved`.)
     is_newly_cancelled = (
         target_status == EventStatus.CANCELLED.value
         and current_status != EventStatus.CANCELLED.value
@@ -596,6 +618,10 @@ def update_event(
     res = _run(query)
     row = res.data[0] if res.data else merged
 
+    # Sức chứa vừa nới rộng thì ghế mới phải được lấp ngay bằng người đang xếp
+    # hàng chờ — để trống trong khi danh sách chờ còn người là vô nghĩa.
+    _promote_waitlist_if_capacity_raised(event_id, current, row, merged)
+
     if (
         final_status == EventStatus.PENDING.value
         and current_status != EventStatus.PENDING.value
@@ -677,6 +703,8 @@ def delete_event(event_id: str, organizer_id: str) -> None:
             detail="Sự kiện đang diễn ra nên không thể xoá.",
         )
 
+    _purge_event_children(event_id)
+
     _run(
         get_supabase()
         .table(TABLE_EVENTS)
@@ -684,6 +712,52 @@ def delete_event(event_id: str, organizer_id: str) -> None:
         .eq("event_id", event_id)
         .eq("organizer_id", organizer_id)
     )
+
+
+def _purge_event_children(event_id: str) -> None:
+    """Dọn dữ liệu tham chiếu tới sự kiện trước khi xoá bản ghi `events`.
+
+    Không có bước này, Postgres chặn lệnh xoá với lỗi
+    `violates foreign key constraint ...` — hay gặp nhất với sự kiện đã huỷ,
+    vì lúc huỷ hệ thống vừa ghi một loạt thông báo trỏ về nó.
+
+    Thông báo thì KHÔNG xoá: sinh viên vẫn cần đọc lại tin "sự kiện đã huỷ"
+    trong hộp thư. Chỉ gỡ liên kết `event_id` (cột cho phép NULL) — giao diện
+    tự ẩn nút "Xem sự kiện" khi thiếu trường này.
+    """
+    supabase = get_supabase()
+
+    # QR điểm danh treo trên registration chứ không trên event, phải xoá trước
+    # khi xoá event_registrations.
+    registration_ids = [
+        row["registration_id"]
+        for row in (
+            _run(
+                supabase.table(TABLE_REGISTRATIONS)
+                .select("registration_id")
+                .eq("event_id", event_id)
+            ).data
+            or []
+        )
+        if row.get("registration_id")
+    ]
+    for chunk in _chunked(registration_ids, 100):
+        _run_optional(
+            supabase.table(TABLE_CHECKIN_QR).delete().in_("registration_id", chunk)
+        )
+
+    for table in EVENT_CHILD_TABLES:
+        _run_optional(supabase.table(table).delete().eq("event_id", event_id))
+
+    _run_optional(
+        supabase.table(TABLE_NOTIFICATIONS)
+        .update({"event_id": None})
+        .eq("event_id", event_id)
+    )
+
+
+def _chunked(items: list[Any], size: int) -> list[list[Any]]:
+    return [items[index : index + size] for index in range(0, len(items), size)]
 
 
 def cancel_pending_revision(
@@ -734,6 +808,23 @@ def _run(query):
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"Không kết nối được Supabase: {exc}",
         ) from exc
+
+
+def _run_optional(query):
+    """Như `_run` nhưng bỏ qua khi bảng chưa tồn tại trong DB.
+
+    Một vài bảng phụ (`waiting_list`, `event_revisions`...) được tạo tay trên
+    Supabase nên có thể vắng mặt ở môi trường dev — thiếu bảng thì cũng không
+    có dữ liệu nào chặn việc xoá.
+    """
+    try:
+        return _run(query)
+    except HTTPException as exc:
+        detail = str(exc.detail)
+        if "does not exist" in detail or "schema cache" in detail:
+            logger.warning("Bỏ qua bảng chưa có khi dọn dữ liệu sự kiện: %s", detail)
+            return None
+        raise
 
 
 def _find_raw(
@@ -939,6 +1030,49 @@ def _validate_capacity_against_registrations(
             detail=(
                 f"Sức chứa mới ({capacity}) nhỏ hơn số người đã đăng ký ({registered})."
             ),
+        )
+
+
+def _int_or_none(value: Any) -> Optional[int]:
+    if value in (None, ""):
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _promote_waitlist_if_capacity_raised(
+    event_id: str,
+    before: dict[str, Any],
+    after: dict[str, Any],
+    merged: dict[str, Any],
+) -> None:
+    """Sức chứa tăng → đôn danh sách chờ lên cho đầy chỗ mới.
+
+    Chỉ TĂNG mới đôn: hạ sức chứa đã bị `_validate_capacity_against_registrations`
+    chặn từ trước, còn giữ nguyên thì không có ghế nào mở thêm. Bỏ giới hạn
+    (số → None) cũng tính là tăng.
+
+    Lỗi ở đây không được làm hỏng việc lưu sự kiện — sự kiện đã ghi xong rồi.
+    """
+    old_capacity = _int_or_none(before.get("capacity"))
+    new_capacity = _int_or_none(after.get("capacity", merged.get("capacity")))
+    if old_capacity is None:
+        return
+    if new_capacity is not None and new_capacity <= old_capacity:
+        return
+
+    try:
+        registration_service.promote_waitlisted(
+            event_id,
+            new_capacity,
+            event_title=after.get("title") or merged.get("title"),
+        )
+    except Exception:  # noqa: BLE001
+        logger.exception(
+            "Không đôn được danh sách chờ sau khi tăng sức chứa sự kiện %s.",
+            event_id,
         )
 
 

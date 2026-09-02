@@ -18,6 +18,7 @@ Tầng này là nơi DUY NHẤT đụng tới bảng `event_revisions`.
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timedelta, timezone
 from typing import Any, Optional
 
@@ -30,7 +31,11 @@ from app.core.config import (
     TABLE_EVENTS,
 )
 from app.core.supabase_client import get_supabase
+from app.models.enum import NotificationType
 from app.schemas.event_revision import EventRevisionOut, FieldChange
+from app.services import notification_service, registration_service
+
+logger = logging.getLogger(__name__)
 
 # Các trường được phép nằm trong một yêu cầu chỉnh sửa, kèm nhãn tiếng Việt.
 # Thứ tự ở đây cũng là thứ tự hiển thị trong bảng so sánh của Admin.
@@ -67,8 +72,8 @@ def get_pending_revision(event_id: str) -> Optional[dict[str, Any]]:
     """Yêu cầu chỉnh sửa đang chờ duyệt của một sự kiện (nếu có).
 
     Đường ĐỌC nên khoan dung: nếu bảng `event_revisions` chưa được tạo (chưa
-    chạy `backend/sql/2026_08_19_event_revisions.sql`) thì coi như chưa có yêu
-    cầu nào, để phần còn lại của hệ thống vẫn chạy bình thường. Đường GHI
+    tạo trực tiếp trên Supabase) thì coi như chưa có yêu cầu nào, để phần
+    còn lại của hệ thống vẫn chạy bình thường. Đường GHI
     (`submit_revision`) thì ngược lại — phải báo lỗi rõ ràng.
     """
     if not event_id:
@@ -241,7 +246,45 @@ def approve_revision(revision_id: str) -> EventRevisionOut:
     )
 
     row = _finish_review(revision_id, APPROVED)
-    return to_out(row, _category_map(), current_event=before)
+    out = to_out(row, _category_map(), current_event=before)
+    _notify_revision_approved(revision, before)
+    _promote_waitlist_if_capacity_raised(revision, before)
+    return out
+
+
+def _promote_waitlist_if_capacity_raised(
+    revision: dict[str, Any],
+    before: Optional[dict[str, Any]],
+) -> None:
+    """Bản sửa vừa duyệt làm tăng sức chứa → lấp ghế mới bằng danh sách chờ.
+
+    Đây là đường duy nhất sức chứa của một sự kiện ĐANG CÔNG KHAI thay đổi, mà
+    cũng chỉ sự kiện công khai mới có người xếp hàng chờ — nên bỏ sót chỗ này
+    là danh sách chờ đứng im dù Ban tổ chức đã mở thêm chỗ.
+
+    Không được làm hỏng việc duyệt: bản sửa đã áp dụng xong, lỗi chỉ ghi log.
+    """
+    old_capacity = _as_int((before or {}).get("capacity"))
+    new_capacity = _as_int(revision.get("capacity"))
+    if old_capacity is None:
+        return
+    if new_capacity is not None and new_capacity <= old_capacity:
+        return
+
+    event_id = str(revision.get("event_id") or "")
+    if not event_id:
+        return
+    try:
+        registration_service.promote_waitlisted(
+            event_id,
+            new_capacity,
+            event_title=_revision_title(revision, before),
+        )
+    except Exception:  # noqa: BLE001
+        logger.exception(
+            "Không đôn được danh sách chờ sau khi duyệt bản sửa sự kiện %s.",
+            event_id,
+        )
 
 
 def reject_revision(revision_id: str) -> EventRevisionOut:
@@ -249,7 +292,127 @@ def reject_revision(revision_id: str) -> EventRevisionOut:
     revision = _get_pending_by_id(revision_id)
     before = _event_row(str(revision["event_id"]))
     row = _finish_review(revision_id, REJECTED)
-    return to_out(row, _category_map(), current_event=before)
+    out = to_out(row, _category_map(), current_event=before)
+    _notify_revision_rejected(revision, before)
+    return out
+
+
+# ─── Thông báo kết quả xét duyệt ─────────────────────────────────────────────
+#
+# Kết quả duyệt phải đi tới HAI phía:
+#   * Ban tổ chức gửi bản sửa — biết bản sửa được áp dụng hay bị từ chối.
+#   * Sinh viên ĐÃ ĐĂNG KÝ — nội dung sự kiện họ đăng ký vừa đổi thật sự.
+# Thông báo không được làm hỏng việc duyệt: mọi lỗi ở đây chỉ ghi log.
+
+
+def _revision_title(
+    revision: dict[str, Any],
+    before: Optional[dict[str, Any]],
+) -> str:
+    return str(
+        revision.get("title") or (before or {}).get("title") or "Sự kiện"
+    )
+
+
+def _revision_changed_fields(
+    revision: dict[str, Any],
+    before: Optional[dict[str, Any]],
+) -> list[str]:
+    """Những trường bản sửa thực sự làm đổi so với dòng `events` trước khi ghi."""
+    new_data = {f: revision.get(f) for f in REVISION_FIELDS if f in revision}
+    return changed_fields(new_data, before or {})
+
+
+def _participant_notification_type(changed: list[str]) -> NotificationType:
+    """Loại thông báo sát nhất với thứ vừa đổi, để sinh viên đọc lướt là biết."""
+    fields = set(changed)
+    if fields == {"location"}:
+        return NotificationType.EVENT_LOCATION_CHANGED
+    if fields and fields <= {"start_time", "end_time", "registration_deadline"}:
+        return NotificationType.EVENT_TIME_CHANGED
+    return NotificationType.EVENT_UPDATED
+
+
+def _notify_revision_approved(
+    revision: dict[str, Any],
+    before: Optional[dict[str, Any]],
+) -> None:
+    event_id = str(revision.get("event_id") or "")
+    title = _revision_title(revision, before)
+    changed = _revision_changed_fields(revision, before)
+    labels = [REVISION_FIELDS[field] for field in changed]
+
+    _notify_organizer(
+        revision,
+        event_id=event_id,
+        notification_type=NotificationType.EVENT_APPROVED,
+        title="Thay đổi sự kiện đã được duyệt",
+        content=(
+            f'Yêu cầu chỉnh sửa sự kiện "{title}" đã được duyệt và áp dụng'
+            + (f" ({', '.join(labels)})." if labels else ".")
+        ),
+    )
+
+    if not event_id or not changed:
+        return
+    try:
+        notification_service.notify_event_participants(
+            event_id=event_id,
+            notification_type=_participant_notification_type(changed),
+            title=f"Cập nhật sự kiện: {title}",
+            content=(
+                f'Sự kiện "{title}" bạn đã đăng ký vừa được cập nhật: '
+                f"{', '.join(labels)}. Vui lòng xem lại thông tin mới nhất."
+            ),
+        )
+    except Exception:  # noqa: BLE001
+        logger.exception(
+            "Không gửi được thông báo cập nhật sự kiện %s cho sinh viên.",
+            event_id,
+        )
+
+
+def _notify_revision_rejected(
+    revision: dict[str, Any],
+    before: Optional[dict[str, Any]],
+) -> None:
+    title = _revision_title(revision, before)
+    _notify_organizer(
+        revision,
+        event_id=str(revision.get("event_id") or ""),
+        notification_type=NotificationType.EVENT_REJECTED,
+        title="Thay đổi sự kiện chưa được duyệt",
+        content=(
+            f'Yêu cầu chỉnh sửa sự kiện "{title}" đã bị từ chối. '
+            "Sự kiện vẫn giữ nguyên nội dung đang công khai."
+        ),
+    )
+
+
+def _notify_organizer(
+    revision: dict[str, Any],
+    *,
+    event_id: str,
+    notification_type: NotificationType,
+    title: str,
+    content: str,
+) -> None:
+    organizer_id = revision.get("submitted_by")
+    if not organizer_id:
+        return
+    try:
+        notification_service.create_notification(
+            user_id=str(organizer_id),
+            event_id=event_id or None,
+            notification_type=notification_type,
+            title=title,
+            content=content,
+        )
+    except Exception:  # noqa: BLE001
+        logger.exception(
+            "Không gửi được thông báo kết quả duyệt bản sửa %s.",
+            revision.get("revision_id"),
+        )
 
 
 # ─── So sánh cũ / mới ─────────────────────────────────────────────────────────

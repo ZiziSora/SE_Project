@@ -15,6 +15,7 @@ export function RegisterActionBar({
   count = 0,
   registered = false,
   waitlisted = false,
+  waitlistOpen = true,
   registerLoading = false,
   dataLoading = false,
   onRegister,
@@ -27,6 +28,9 @@ export function RegisterActionBar({
   // nên con số hiển thị không bao giờ được vượt sức chứa ("4/3 đã đăng ký").
   const displayCount = hasCapacityLimit ? Math.min(count, maxCapacity) : count;
   const isFull = hasCapacityLimit && count >= maxCapacity;
+  // Quá hạn huỷ đăng ký (trước ngày diễn ra 5 ngày) thì không còn ai nhả chỗ,
+  // nên đã đầy là đóng hẳn — không mời người mới vào danh sách chờ nữa.
+  const waitlistClosed = isFull && !waitlistOpen && !registered;
   const capacityLabel = dataLoading
     ? "Đang tải thông tin đăng ký"
     : hasCapacityLimit
@@ -40,9 +44,11 @@ export function RegisterActionBar({
       ? waitlisted
         ? "Bạn đang trong danh sách chờ"
         : "Bạn đã đăng ký"
-      : isFull
-        ? "Tham gia danh sách chờ"
-        : `Đăng ký ngay · ${capacityLabel}`;
+      : waitlistClosed
+        ? "Đã đủ số lượng · quá hạn huỷ nên không nhận danh sách chờ"
+        : isFull
+          ? "Tham gia danh sách chờ"
+          : `Đăng ký ngay · ${capacityLabel}`;
 
   return (
     <section
@@ -67,7 +73,7 @@ export function RegisterActionBar({
       <button
         type="button"
         onClick={onRegister}
-        disabled={registered || registerLoading || dataLoading}
+        disabled={registered || waitlistClosed || registerLoading || dataLoading}
         aria-label={actionLabel}
         aria-describedby={floating ? "event-registration-tooltip" : undefined}
         className={`${
@@ -79,11 +85,13 @@ export function RegisterActionBar({
             ? waitlisted
               ? "cursor-not-allowed border-amber-200 bg-amber-100 text-amber-900"
               : "cursor-not-allowed border-emerald-200 bg-emerald-100 text-emerald-800"
-            : isFull
-              ? "border-amber-600 bg-amber-600 text-white hover:-translate-y-1 hover:scale-105 hover:bg-amber-700 active:translate-y-0 active:scale-95"
-              : registerLoading
-                ? "cursor-wait border-violet-300 bg-violet-400 text-white"
-                : "border-violet-600 bg-violet-700 text-white hover:-translate-y-1 hover:scale-105 hover:bg-violet-800 active:translate-y-0 active:scale-95"
+            : waitlistClosed
+              ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-500"
+              : isFull
+                ? "border-amber-600 bg-amber-600 text-white hover:-translate-y-1 hover:scale-105 hover:bg-amber-700 active:translate-y-0 active:scale-95"
+                : registerLoading
+                  ? "cursor-wait border-violet-300 bg-violet-400 text-white"
+                  : "border-violet-600 bg-violet-700 text-white hover:-translate-y-1 hover:scale-105 hover:bg-violet-800 active:translate-y-0 active:scale-95"
         }`}
       >
         {registerLoading ? (
@@ -117,6 +125,15 @@ export function RegisterActionBar({
             <>
               <CheckCircle2 className="size-4" />
               Đã đăng ký
+            </>
+          )
+        ) : waitlistClosed ? (
+          floating ? (
+            <Users className="size-5" />
+          ) : (
+            <>
+              <Users className="size-4" />
+              Đã đủ số lượng
             </>
           )
         ) : isFull ? (

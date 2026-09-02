@@ -14,6 +14,7 @@ import { toast } from "react-toastify";
 
 import { publicEventApi } from "../api/eventApi.js";
 import {
+  isWaitlistOpen,
   resolveCategoryName,
   resolveOrganizerName,
 } from "../utils/eventFormat.js";
@@ -38,7 +39,12 @@ function formatEventDate(raw) {
   return `${time} · ${date}`;
 }
 
-function getRegistrationSignal(capacity, registeredCount, registrationDeadline) {
+function getRegistrationSignal(
+  capacity,
+  registeredCount,
+  registrationDeadline,
+  startTime,
+) {
   if (registrationDeadline && new Date(registrationDeadline) < new Date()) {
     return {
       kind: "closed",
@@ -56,7 +62,14 @@ function getRegistrationSignal(capacity, registeredCount, registrationDeadline) 
 
   const remaining = Math.max(maximum - registered, 0);
   if (remaining === 0) {
-    return { kind: "full", label: "Đã đầy", className: "text-rose-600" };
+    // Quá hạn huỷ đăng ký thì không còn ai nhả chỗ — danh sách chờ vô nghĩa.
+    const waitlistClosed = !isWaitlistOpen(startTime);
+    return {
+      kind: "full",
+      label: waitlistClosed ? "Đã đầy · ngừng nhận đăng ký" : "Đã đầy",
+      className: "text-rose-600",
+      waitlistClosed,
+    };
   }
 
   if (registered / maximum >= 0.85) {
@@ -230,13 +243,18 @@ export default function EventCard({
     resolvedCapacity,
     count,
     resolvedDeadline,
+    resolvedDate,
   );
+  // Đã đầy + quá hạn huỷ: giấu luôn nút, chỉ giữ lại cho người đã có tên trong
+  // danh sách để họ còn thấy trạng thái của mình.
+  const waitlistClosed = Boolean(registrationSignal?.waitlistClosed);
   const showRegistrationButton =
     role !== "organizer" &&
     canRegister &&
     allowRegister &&
     isRegistrationOpen &&
-    registrationSignal?.kind !== "closed";
+    registrationSignal?.kind !== "closed" &&
+    (!waitlistClosed || registered);
   const highlightSignal = getHighlightSignal(
     isRecommended,
     registrationSignal,

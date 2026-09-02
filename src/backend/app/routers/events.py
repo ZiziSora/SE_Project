@@ -3,6 +3,7 @@ from typing import Any, Dict, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from supabase_auth.types import User
 
+from app.core.app_time import is_waitlist_open
 from app.core.security import get_current_user, require_current_user
 from app.schemas.event import EventOut
 from app.schemas.registration import RegisterResponseOut, RegistrationStatusOut
@@ -122,6 +123,19 @@ def register_for_event(
     already_registered = active_reg is not None
 
     is_full = event.capacity is not None and count >= event.capacity
+
+    # Sinh viên chính thức chỉ huỷ được khi sự kiện còn cách ít nhất 5 ngày.
+    # Qua mốc đó không ai nhả chỗ nữa, nên nhận thêm người vào danh sách chờ
+    # là hứa suông — họ không bao giờ được đôn lên chính thức.
+    if is_full and not already_registered and not is_waitlist_open(event.start_time):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Sự kiện đã đủ số lượng và đã quá hạn huỷ đăng ký "
+                "(trước ngày diễn ra 5 ngày) nên không còn nhận danh sách chờ."
+            ),
+        )
+
     target_status = "WAITLISTED" if is_full else "REGISTERED"
 
     was_already_registered = registration_service.register_user(

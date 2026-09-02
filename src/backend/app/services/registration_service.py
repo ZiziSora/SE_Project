@@ -1,10 +1,17 @@
+import logging
 import uuid
 
 from app.core.supabase_client import get_supabase
 from app.models.enum import NotificationType
 from app.services import notification_service
 
+logger = logging.getLogger(__name__)
+
 TABLE = "event_registrations"
+
+# Trạng thái danh sách chờ từng được ghi bằng nhiều cách khác nhau, phải tra
+# đủ cả ba để không bỏ sót người đang xếp hàng.
+WAITLIST_STATUSES = ["WAITLISTED", "waitlisted", "WAITLIST"]
 
 
 def get_registration_count(event_id: str) -> int:
@@ -126,3 +133,94 @@ def register_user(
             content=organizer_content,
         )
     return False
+
+
+def list_waitlisted(event_id: str) -> list[dict]:
+    """Danh sách chờ của sự kiện, ai xếp hàng trước đứng trước."""
+    supabase = get_supabase()
+    response = (
+        supabase.table(TABLE)
+        .select("registration_id, user_id")
+        .eq("event_id", event_id)
+        .in_("registration_status", WAITLIST_STATUSES)
+        .order("created_at", desc=False)
+        .execute()
+    )
+    return response.data or []
+
+
+def promote_waitlisted(
+    event_id: str,
+    capacity: int | None,
+    event_title: str | None = None,
+) -> list[str]:
+    """Đôn người trong danh sách chờ lên chính thức cho tới khi kín sức chứa.
+
+    Gọi mỗi khi sức chứa của sự kiện TĂNG (Ban tổ chức sửa sự kiện chưa công
+    khai, hoặc Admin duyệt bản sửa có sức chứa lớn hơn). Không có bước này thì
+    ghế vừa mở thêm nằm trống trong khi vẫn còn người xếp hàng — đúng thứ mà
+    danh sách chờ sinh ra để tránh.
+
+    `capacity is None` nghĩa là không giới hạn nữa → đôn hết danh sách chờ.
+    Trả về danh sách `registration_id` đã được đôn lên.
+    """
+    seats: int | None = None
+    if capacity is not None:
+        # Số ghế trống tính theo đúng cách `get_registration_count` đếm: bỏ
+        # người đã huỷ và người đang chờ, nếu không sẽ đôn thiếu hoặc đôn thừa.
+        seats = int(capacity) - get_registration_count(event_id)
+        if seats <= 0:
+            return []
+
+    waiting = list_waitlisted(event_id)
+    if seats is not None:
+        waiting = waiting[:seats]
+    if not waiting:
+        return []
+
+    supabase = get_supabase()
+    display_title = event_title or "Sự kiện"
+    promoted: list[str] = []
+
+    for row in waiting:
+        registration_id = row.get("registration_id")
+        if not registration_id:
+            continue
+        try:
+            (
+                supabase.table(TABLE)
+                .update({"registration_status": "REGISTERED"})
+                .eq("registration_id", registration_id)
+                .execute()
+            )
+        except Exception:  # noqa: BLE001
+            logger.exception(
+                "Không đôn được đăng ký %s lên chính thức.", registration_id
+            )
+            continue
+
+        promoted.append(str(registration_id))
+
+        # Thông báo hỏng thì người đó VẪN đã được đôn lên — chỉ ghi log, không
+        # để lỗi gửi tin làm hỏng cả vòng lặp.
+        user_id = row.get("user_id")
+        if not user_id:
+            continue
+        try:
+            notification_service.create_notification(
+                user_id=str(user_id),
+                event_id=event_id,
+                notification_type=NotificationType.WAITLIST_PROMOTED,
+                title="Bạn đã được nhận suất tham gia chính thức!",
+                content=(
+                    f'Ban tổ chức vừa tăng số lượng tham gia của sự kiện '
+                    f'"{display_title}". Bạn đã được chuyển từ Danh sách chờ '
+                    "sang Danh sách chính thức."
+                ),
+            )
+        except Exception:  # noqa: BLE001
+            logger.exception(
+                "Không gửi được thông báo đôn danh sách chờ cho %s.", user_id
+            )
+
+    return promoted
