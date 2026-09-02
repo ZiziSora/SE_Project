@@ -170,7 +170,11 @@ def get_filtered_events_service(
         # Nhiều người đăng ký nhất lên đầu
         events.sort(key=lambda x: x.get('registered_count', 0), reverse=True)
     elif sort_by == 'Mới nhất':
-        events.sort(key=lambda x: x.get('created_at') or '', reverse=True)
+        # Sự kiện tạo gần đây nhất lên đầu; thiếu created_at thì xếp cuối.
+        events.sort(
+            key=lambda x: _parse_db_datetime(x.get('created_at')) or datetime.min,
+            reverse=True,
+        )
     else:
         # Mặc định 'Sắp diễn ra': gần nhất lên đầu, thiếu giờ bắt đầu xếp cuối
         events.sort(key=lambda x: _parse_db_datetime(x.get('start_time')) or datetime.max)

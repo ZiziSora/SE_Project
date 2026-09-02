@@ -6,6 +6,7 @@ from sqlalchemy import (
     ForeignKey,
     Text,
     Enum,
+    func,
 )
 
 from sqlalchemy.dialects.postgresql import UUID
@@ -54,6 +55,8 @@ class Event(Base):
 
     banner_url = Column(String)
     file_url = Column(Text)
+
+    created_at = Column(DateTime, server_default=func.now())
 
     organizer = relationship(
         "User",
