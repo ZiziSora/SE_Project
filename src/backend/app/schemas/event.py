@@ -28,4 +28,5 @@ class EventOut(BaseModel):
     approval_status: Optional[str] = None
     banner_url: Optional[str] = None
     category_name: Optional[str] = None
+    created_at: Optional[datetime] = None
     organizer: Optional[EventOrganizerOut] = None

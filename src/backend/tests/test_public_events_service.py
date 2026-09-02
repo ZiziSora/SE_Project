@@ -82,6 +82,49 @@ def test_explore_list_drops_events_past_their_registration_deadline(mock_supabas
 
 
 @patch("app.services.event_services.supabase")
+def test_explore_list_sort_moi_nhat_orders_by_created_at_desc(mock_supabase):
+    """Bộ lọc "Mới nhất" phải xếp sự kiện tạo gần đây nhất lên đầu, và sự kiện
+    thiếu created_at xuống cuối (không phải giữ nguyên thứ tự DB trả về)."""
+    now = now_naive_local()
+    older = {
+        "event_id": EVENT_ID,
+        "title": "Tạo trước",
+        "organizer_id": None,
+        "category_id": None,
+        "registration_deadline": None,
+        "created_at": (now - timedelta(days=10)).isoformat(),
+    }
+    newer = {
+        "event_id": OTHER_EVENT_ID,
+        "title": "Tạo sau",
+        "organizer_id": None,
+        "category_id": None,
+        "registration_deadline": None,
+        "created_at": (now - timedelta(days=1)).isoformat(),
+    }
+    no_timestamp = {
+        "event_id": "33333333-3333-3333-3333-333333333333",
+        "title": "Thiếu created_at",
+        "organizer_id": None,
+        "category_id": None,
+        "registration_deadline": None,
+        "created_at": None,
+    }
+    # Truyền vào theo thứ tự lộn xộn để chắc chắn kết quả là do sort, không phải
+    # do trùng thứ tự đầu vào.
+    _client, query = _query_client([older, no_timestamp, newer])
+    mock_supabase.table.return_value = query
+
+    result = get_filtered_events_service(sort_by="Mới nhất")
+
+    assert [e["event_id"] for e in result["events"]] == [
+        OTHER_EVENT_ID,
+        EVENT_ID,
+        "33333333-3333-3333-3333-333333333333",
+    ]
+
+
+@patch("app.services.event_services.supabase")
 def test_explore_list_keeps_events_without_a_registration_deadline(mock_supabase):
     """registration_deadline = NULL nghĩa là không đặt hạn, không phải hết hạn."""
     event = {
