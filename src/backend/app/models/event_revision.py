@@ -2,7 +2,7 @@
 
 Sự kiện đang công khai thì không ghi đè thẳng lên bảng `events` nữa: dữ liệu mới
 nằm ở đây chờ Admin duyệt, còn `events` vẫn giữ bản đang chạy cho sinh viên xem.
-Xem `backend/sql/2026_08_19_event_revisions.sql` để biết DDL tương ứng.
+Bảng này được tạo và chỉnh trực tiếp trên Supabase.
 """
 
 from sqlalchemy import (
