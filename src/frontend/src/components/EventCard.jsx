@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   ArrowRight,
   Building2,
@@ -186,10 +186,19 @@ export default function EventCard({
   onUnsave,
   onRegistered,
 }) {
+  const navigate = useNavigate();
   const [imageFailed, setImageFailed] = useState(false);
   const [countOverride, setCountOverride] = useState(null);
   const [registrationOverride, setRegistrationOverride] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+
+  const targetId = eventId || event.event_id;
+  const handleCardClick = () => {
+    if (targetId) {
+      navigate(`/events/${targetId}`);
+    }
+  };
+
   const count =
     countOverride ?? (Number(registeredCount ?? event.registered_count) || 0);
   const registeredFromProps =
@@ -251,7 +260,7 @@ export default function EventCard({
 
     setSubmitting(true);
     try {
-      const result = await publicEventApi.registerForEvent(eventId);
+      const result = await publicEventApi.registerForEvent(targetId);
       const nextCount = Number(result.count);
 
       if (Number.isFinite(nextCount)) setCountOverride(nextCount);
@@ -270,7 +279,7 @@ export default function EventCard({
         toast.success("Đăng ký thành công! Bạn đã giữ được chỗ.");
       }
 
-      onRegistered?.(eventId, result);
+      onRegistered?.(targetId, result);
     } catch (error) {
       const status = error.response?.status;
       if (status === 401 || status === 403) {
@@ -296,7 +305,7 @@ export default function EventCard({
 
   /* Article wrapper */
   const articleClasses = [
-    "event-discovery-card group h-full overflow-hidden rounded-2xl border bg-white",
+    "event-discovery-card group h-full overflow-hidden rounded-2xl border bg-white cursor-pointer hover:border-violet-300 hover:shadow-md transition-all",
     isRecommended
       ? "event-discovery-card--recommended border-violet-200/70"
       : "border-slate-200/80",
@@ -325,10 +334,11 @@ export default function EventCard({
   ].join(" ");
 
   return (
-    <article className={articleClasses}>
+    <article className={articleClasses} onClick={handleCardClick}>
       {/* ── Image / Placeholder ── */}
       <Link
-        to={`/events/${eventId}`}
+        to={`/events/${targetId}`}
+        onClick={(e) => e.stopPropagation()}
         className={`${imageClasses} focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-violet-600`}
         aria-label={`Xem chi tiết ${displayTitle}`}
         tabIndex={-1}
@@ -402,7 +412,8 @@ export default function EventCard({
 
         {/* Title */}
         <Link
-          to={`/events/${eventId}`}
+          to={`/events/${targetId}`}
+          onClick={(e) => e.stopPropagation()}
           className="block rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-600 focus-visible:ring-offset-2"
         >
           <h3
@@ -546,7 +557,8 @@ export default function EventCard({
             /* Two-button layout */
             <div className="flex items-center gap-2">
               <Link
-                to={`/events/${eventId}`}
+                to={`/events/${targetId}`}
+                onClick={(e) => e.stopPropagation()}
                 className={`event-detail-action inline-flex items-center gap-1 text-sm font-semibold text-slate-500 hover:text-violet-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-600 focus-visible:ring-offset-2 ${
                   isCompactRecommendation ? "text-xs" : ""
                 }`}
@@ -561,7 +573,10 @@ export default function EventCard({
 
               <button
                 type="button"
-                onClick={handleRegister}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleRegister();
+                }}
                 disabled={registered || submitting}
                 className={`event-register-action ml-auto inline-flex items-center justify-center gap-1.5 rounded-xl font-semibold shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-600 focus-visible:ring-offset-2 disabled:cursor-default ${
                   registered
@@ -586,14 +601,18 @@ export default function EventCard({
           ) : onUnsave ? (
             <div className="flex items-center gap-2">
               <Link
-                to={`/events/${eventId}`}
+                to={`/events/${targetId}`}
+                onClick={(e) => e.stopPropagation()}
                 className="event-detail-action inline-flex min-h-10 flex-1 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-slate-700 transition-all hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-600 focus-visible:ring-offset-2"
               >
                 Xem chi tiết
               </Link>
               <button
                 type="button"
-                onClick={() => onUnsave(eventId)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onUnsave(targetId);
+                }}
                 className="inline-flex min-h-10 flex-1 items-center justify-center rounded-xl border border-red-200 bg-white px-3 text-sm font-semibold text-red-600 transition-all hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-2"
               >
                 Bỏ lưu
@@ -602,7 +621,8 @@ export default function EventCard({
           ) : (
             /* Single "Xem chi tiết" — full width pill */
             <Link
-              to={`/events/${eventId}`}
+              to={`/events/${targetId}`}
+              onClick={(e) => e.stopPropagation()}
               className="event-detail-action group/link inline-flex w-full items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-700 transition-all hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-600 focus-visible:ring-offset-2"
             >
               Xem chi tiết
@@ -617,3 +637,4 @@ export default function EventCard({
     </article>
   );
 }
+
