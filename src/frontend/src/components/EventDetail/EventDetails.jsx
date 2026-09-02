@@ -1,5 +1,4 @@
 import { DetailItem } from "./DetailItem.jsx";
-import { Calendar } from "lucide-react";
 
 /* =========================================================
    Event Details Grid Component

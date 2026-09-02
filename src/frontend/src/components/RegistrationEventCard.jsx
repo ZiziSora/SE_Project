@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   AlertTriangle,
   CalendarDays,
@@ -27,6 +28,7 @@ export default function RegistrationEventCard({
   formatEventDate,
   onSelectCancel,
 }) {
+  const navigate = useNavigate();
   const [isQrModalOpen, setIsQrModalOpen] = useState(false);
 
   const event = item.events || {};
@@ -44,9 +46,18 @@ export default function RegistrationEventCard({
   const isUpcoming = effectiveStatus === "REGISTERED" && !isEventCancelled;
   const canCancel = canCancelRegistration(event.start_time);
 
+  const handleCardClick = () => {
+    if (event.event_id) {
+      navigate(`/events/${event.event_id}`);
+    }
+  };
+
   return (
     <>
-      <div className="bg-white rounded-2xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-md transition flex flex-col justify-between relative group">
+      <div
+        onClick={handleCardClick}
+        className="bg-white rounded-2xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-md hover:border-purple-200 transition flex flex-col justify-between relative group cursor-pointer"
+      >
         <div>
           <div className="relative h-52 w-full bg-gray-100">
             <img
@@ -146,6 +157,7 @@ export default function RegistrationEventCard({
           {isEventCancelled ? (
             <button
               disabled
+              onClick={(e) => e.stopPropagation()}
               className="w-full text-sm font-semibold py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 transition bg-red-50 text-red-600 border border-red-200 cursor-not-allowed"
             >
               <AlertTriangle className="w-4 h-4 text-red-500" />
@@ -153,7 +165,10 @@ export default function RegistrationEventCard({
             </button>
           ) : isAttended ? (
             <button
-              onClick={() => setIsQrModalOpen(true)}
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsQrModalOpen(true);
+              }}
               className="w-full text-sm font-semibold py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 transition bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 cursor-pointer"
             >
               <CheckCircle2 className="w-4 h-4 text-emerald-600" />
@@ -163,6 +178,7 @@ export default function RegistrationEventCard({
             <>
               <button
                 disabled
+                onClick={(e) => e.stopPropagation()}
                 title="Bạn đang ở trong danh sách chờ. Vé và mã QR chỉ khả dụng khi bạn được xác nhận tham gia chính thức."
                 className="w-full text-sm font-semibold py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 transition bg-amber-50 text-amber-800 border border-amber-200 cursor-default opacity-90"
               >
@@ -172,7 +188,10 @@ export default function RegistrationEventCard({
 
               {canCancel ? (
                 <button
-                  onClick={() => onSelectCancel(item)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onSelectCancel(item);
+                  }}
                   title="Hủy đăng ký"
                   className="px-3 py-2.5 border border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 rounded-xl transition text-sm font-semibold flex items-center gap-1 shrink-0 active:scale-[0.98]"
                 >
@@ -181,6 +200,7 @@ export default function RegistrationEventCard({
               ) : (
                 <button
                   disabled
+                  onClick={(e) => e.stopPropagation()}
                   title="Thời hạn hủy đăng ký đã hết (phải trước 5 ngày khi sự kiện diễn ra)"
                   className="px-3 py-2.5 border border-gray-200 text-gray-400 bg-gray-100 rounded-xl transition text-sm font-semibold flex items-center gap-1 shrink-0 cursor-not-allowed whitespace-nowrap"
                 >
@@ -191,6 +211,7 @@ export default function RegistrationEventCard({
           ) : isAbsent ? (
             <button
               disabled
+              onClick={(e) => e.stopPropagation()}
               className="w-full text-sm font-semibold py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 transition bg-amber-50 text-amber-800 border border-amber-200 cursor-default"
             >
               <AlertTriangle className="w-4 h-4 text-amber-600" />
@@ -199,6 +220,7 @@ export default function RegistrationEventCard({
           ) : isCancelled ? (
             <button
               disabled
+              onClick={(e) => e.stopPropagation()}
               className="w-full text-sm font-semibold py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 transition bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200"
             >
               Đã hủy đăng ký
@@ -206,7 +228,10 @@ export default function RegistrationEventCard({
           ) : (
             <>
               <button
-                onClick={() => setIsQrModalOpen(true)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsQrModalOpen(true);
+                }}
                 className="w-full text-sm font-semibold py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 transition shadow-sm bg-[#6D28D9] hover:bg-[#7E22CE] text-white active:scale-[0.99] cursor-pointer"
               >
                 <QrCode className="w-4 h-4" />
@@ -215,7 +240,10 @@ export default function RegistrationEventCard({
 
               {canCancel ? (
                 <button
-                  onClick={() => onSelectCancel(item)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onSelectCancel(item);
+                  }}
                   title="Hủy đăng ký (yêu cầu trước 5 ngày)"
                   className="px-3 py-2.5 border border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300 rounded-xl transition text-sm font-semibold flex items-center gap-1 shrink-0 active:scale-[0.98]"
                 >
@@ -224,6 +252,7 @@ export default function RegistrationEventCard({
               ) : (
                 <button
                   disabled
+                  onClick={(e) => e.stopPropagation()}
                   title="Thời hạn hủy đăng ký đã hết (phải trước 5 ngày khi sự kiện diễn ra)"
                   className="px-3 py-2.5 border border-gray-200 text-gray-400 bg-gray-100 rounded-xl transition text-sm font-semibold flex items-center gap-1 shrink-0 cursor-not-allowed whitespace-nowrap"
                 >
@@ -244,4 +273,5 @@ export default function RegistrationEventCard({
     </>
   );
 }
+
 
