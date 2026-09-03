@@ -20,6 +20,10 @@ import {
   decideReviewItem,
   getReviewQueue,
 } from "../../api/adminEventReviewApi.js";
+import {
+  getAdminReviewSessionStats,
+  recordAdminReviewDecision,
+} from "../../utils/adminReviewSessionStats.js";
 
 const PAGE_SIZE = 4;
 
@@ -29,7 +33,7 @@ export default function AdminEventReviewsPage() {
   // Tách riêng để thẻ thống kê nói rõ trong hàng chờ có bao nhiêu sự kiện mới
   // và bao nhiêu yêu cầu chỉnh sửa.
   const [pendingChanges, setPendingChanges] = useState(0);
-  const [processed, setProcessed] = useState({ approved: 0, rejected: 0 });
+  const [processed, setProcessed] = useState(getAdminReviewSessionStats);
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [decision, setDecision] = useState(null);
@@ -107,7 +111,6 @@ export default function AdminEventReviewsPage() {
 
     setIsSubmitting(true);
     try {
-      const isApproving = decision.action === "approve";
       // Sự kiện mới và yêu cầu chỉnh sửa đi qua hai API khác nhau
       const result = await decideReviewItem(decision.event, decision.action);
 
@@ -118,11 +121,9 @@ export default function AdminEventReviewsPage() {
       if (decision.event.kind === "REVISION") {
         setPendingChanges((total) => Math.max(total - 1, 0));
       }
-      setProcessed((current) => ({
-        ...current,
-        [isApproving ? "approved" : "rejected"]:
-          current[isApproving ? "approved" : "rejected"] + 1,
-      }));
+      setProcessed((current) =>
+        recordAdminReviewDecision(decision.action, current),
+      );
       toast.success(result.message);
       setDecision(null);
     } catch (error) {

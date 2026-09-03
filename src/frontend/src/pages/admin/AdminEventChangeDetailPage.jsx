@@ -31,6 +31,9 @@ import {
   formatAdminReviewDate,
   formatAdminReviewTime,
 } from "../../utils/adminEventReviewUtils.js";
+import {
+  recordAdminReviewDecision,
+} from "../../utils/adminReviewSessionStats.js";
 
 /**
  * Trang Admin đối chiếu một YÊU CẦU CHỈNH SỬA trước khi áp dụng.
@@ -87,6 +90,7 @@ export default function AdminEventChangeDetailPage() {
     setIsSubmitting(true);
     try {
       const result = await decideReviewItem(revision, decisionAction);
+      recordAdminReviewDecision(decisionAction);
       toast.success(result.message);
       setDecisionAction(null);
       // Xử lý xong thì hồ sơ rời hàng chờ, ở lại trang này không còn ý nghĩa
