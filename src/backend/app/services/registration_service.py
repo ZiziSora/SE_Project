@@ -9,9 +9,18 @@ logger = logging.getLogger(__name__)
 
 TABLE = "event_registrations"
 
-# Trạng thái danh sách chờ từng được ghi bằng nhiều cách khác nhau, phải tra
-# đủ cả ba để không bỏ sót người đang xếp hàng.
-WAITLIST_STATUSES = ["WAITLISTED", "waitlisted", "WAITLIST"]
+# Các nhãn được coi là "đang xếp hàng chờ", so sánh SAU KHI `.upper()` phía
+# Python. Dữ liệu cũ từng ghi bằng nhiều cách khác nhau nên vẫn giữ cả biến thể
+# rút gọn "WAITLIST".
+#
+# QUAN TRỌNG: KHÔNG được đem danh sách này đi lọc phía server
+# (`.in_("registration_status", WAITLIST_STATUSES)`). Cột `registration_status`
+# là enum Postgres chỉ có 4 nhãn REGISTERED / CHECKED_IN / CANCELLED /
+# WAITLISTED, nên chỉ cần một giá trị lạ trong danh sách — kể cả chỉ khác
+# hoa-thường — là cả câu truy vấn hỏng:
+#     invalid input value for enum registration_status: "waitlisted"
+# Xem `list_waitlisted` để biết lỗi này từng gây ra chuyện gì.
+WAITLIST_STATUSES = ("WAITLISTED", "WAITLIST")
 
 
 def get_registration_count(event_id: str) -> int:
@@ -140,13 +149,21 @@ def list_waitlisted(event_id: str) -> list[dict]:
     supabase = get_supabase()
     response = (
         supabase.table(TABLE)
-        .select("registration_id, user_id")
+        .select("registration_id, user_id, registration_status")
         .eq("event_id", event_id)
-        .in_("registration_status", WAITLIST_STATUSES)
         .order("created_at", desc=False)
         .execute()
     )
-    return response.data or []
+    # Lọc bằng Python, KHÔNG lọc bằng `.in_(...)` — xem ghi chú ở
+    # `WAITLIST_STATUSES`. Cách này cũng đồng bộ với
+    # `event_service._registration_counts` và
+    # `event_services.get_filtered_events_service`, vốn đã lọc trạng thái phía
+    # Python từ trước.
+    return [
+        row
+        for row in (response.data or [])
+        if str(row.get("registration_status") or "").upper() in WAITLIST_STATUSES
+    ]
 
 
 def promote_waitlisted(
