@@ -1,0 +1,199 @@
+import {
+  AlertCircle,
+  CheckCircle2,
+  ChevronRight,
+  Clock,
+  Info,
+  Loader2,
+  LogIn,
+  UserPlus,
+  Users,
+} from "lucide-react";
+
+export function RegisterActionBar({
+  maxCapacity = null,
+  count = 0,
+  registered = false,
+  waitlisted = false,
+  waitlistOpen = true,
+  registerLoading = false,
+  dataLoading = false,
+  onRegister,
+  feedback = { type: null, message: "" },
+  user = null,
+  floating = false,
+}) {
+  const hasCapacityLimit = Number.isFinite(maxCapacity);
+  // Chặn trên ở sức chứa: người trong danh sách chờ không chiếm chỗ chính thức,
+  // nên con số hiển thị không bao giờ được vượt sức chứa ("4/3 đã đăng ký").
+  const displayCount = hasCapacityLimit ? Math.min(count, maxCapacity) : count;
+  const isFull = hasCapacityLimit && count >= maxCapacity;
+  // Quá hạn huỷ đăng ký (trước ngày diễn ra 5 ngày) thì không còn ai nhả chỗ,
+  // nên đã đầy là đóng hẳn — không mời người mới vào danh sách chờ nữa.
+  const waitlistClosed = isFull && !waitlistOpen && !registered;
+  const capacityLabel = dataLoading
+    ? "Đang tải thông tin đăng ký"
+    : hasCapacityLimit
+      ? `${displayCount}/${maxCapacity} đã đăng ký`
+      : `${displayCount} tham gia`;
+  // Đứng trong danh sách chờ KHÁC với đã có chỗ chính thức — nói "Bạn đã đăng
+  // ký" cho người đang chờ là sai, họ sẽ tưởng mình chắc suất tham dự.
+  const actionLabel = dataLoading
+    ? capacityLabel
+    : registered
+      ? waitlisted
+        ? "Bạn đang trong danh sách chờ"
+        : "Bạn đã đăng ký"
+      : waitlistClosed
+        ? "Đã đủ số lượng · quá hạn huỷ nên không nhận danh sách chờ"
+        : isFull
+          ? "Tham gia danh sách chờ"
+          : `Đăng ký ngay · ${capacityLabel}`;
+
+  return (
+    <section
+      className={`group pointer-events-auto relative transition-all duration-300 ${
+        floating
+          ? ""
+          : "rounded-full border border-violet-200 bg-white/95 p-2 shadow-[0_18px_48px_-24px_rgba(76,29,149,0.35)] backdrop-blur-xl"
+      }`}
+    >
+      <div className="flex items-center gap-2">
+        {!floating && (
+          <span className="flex min-w-0 items-center gap-2 pl-2 text-sm font-semibold text-slate-800">
+            {dataLoading ? (
+              <Loader2 className="size-4 animate-spin text-violet-600" />
+            ) : (
+              <Users className="size-4 text-violet-700" />
+            )}
+            {capacityLabel}
+          </span>
+        )}
+
+      <button
+        type="button"
+        onClick={onRegister}
+        disabled={registered || waitlistClosed || registerLoading || dataLoading}
+        aria-label={actionLabel}
+        aria-describedby={floating ? "event-registration-tooltip" : undefined}
+        className={`${
+          floating
+            ? "grid size-14 place-items-center rounded-full border shadow-[0_16px_40px_-14px_rgba(76,29,149,0.55)]"
+            : "flex min-h-11 items-center justify-center gap-2 rounded-full px-6 text-sm font-semibold shadow-sm"
+        } transition-all duration-300 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-violet-700 ${
+          registered
+            ? waitlisted
+              ? "cursor-not-allowed border-amber-200 bg-amber-100 text-amber-900"
+              : "cursor-not-allowed border-emerald-200 bg-emerald-100 text-emerald-800"
+            : waitlistClosed
+              ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-500"
+              : isFull
+                ? "border-amber-600 bg-amber-600 text-white hover:-translate-y-1 hover:scale-105 hover:bg-amber-700 active:translate-y-0 active:scale-95"
+                : registerLoading
+                  ? "cursor-wait border-violet-300 bg-violet-400 text-white"
+                  : "border-violet-600 bg-violet-700 text-white hover:-translate-y-1 hover:scale-105 hover:bg-violet-800 active:translate-y-0 active:scale-95"
+        }`}
+      >
+        {registerLoading ? (
+          floating ? (
+            <Loader2 className="size-5 animate-spin" />
+          ) : (
+            <>
+              <Loader2 className="size-4 animate-spin" />
+              Đang xử lý...
+            </>
+          )
+        ) : dataLoading ? (
+          floating ? (
+            <Loader2 className="size-5 animate-spin" />
+          ) : (
+            "Đăng ký ngay"
+          )
+        ) : registered ? (
+          waitlisted ? (
+            floating ? (
+              <Clock className="size-5" />
+            ) : (
+              <>
+                <Clock className="size-4" />
+                Đang trong danh sách chờ
+              </>
+            )
+          ) : floating ? (
+            <CheckCircle2 className="size-5" />
+          ) : (
+            <>
+              <CheckCircle2 className="size-4" />
+              Đã đăng ký
+            </>
+          )
+        ) : waitlistClosed ? (
+          floating ? (
+            <Users className="size-5" />
+          ) : (
+            <>
+              <Users className="size-4" />
+              Đã đủ số lượng
+            </>
+          )
+        ) : isFull ? (
+          floating ? (
+            <UserPlus className="size-5" />
+          ) : (
+            <>
+              <UserPlus className="size-4" />
+              Đăng ký danh sách chờ
+            </>
+          )
+        ) : floating ? (
+          <UserPlus className="size-5" />
+        ) : (
+          <>
+            Đăng ký ngay
+            <ChevronRight className="size-4 transition-transform group-hover:translate-x-0.5" />
+          </>
+        )}
+      </button>
+      </div>
+
+      {floating && (
+        <span
+          id="event-registration-tooltip"
+          role="tooltip"
+          className="pointer-events-none absolute right-full top-1/2 mr-3 w-max max-w-56 -translate-y-1/2 translate-x-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-800 opacity-0 shadow-lg transition duration-200 group-hover:translate-x-0 group-hover:opacity-100 group-focus-within:translate-x-0 group-focus-within:opacity-100"
+        >
+          {actionLabel}
+        </span>
+      )}
+
+      {feedback.message && (
+        <div
+          className={`absolute bottom-full right-0 mb-3 flex w-[min(22rem,calc(100vw-2.5rem))] items-start gap-2.5 rounded-xl p-3 text-xs font-medium shadow-lg lg:bottom-auto lg:top-full lg:mb-0 lg:mt-3 ${
+            feedback.type === "success"
+              ? "bg-emerald-50 text-emerald-800"
+              : feedback.type === "warning"
+                ? "bg-amber-50 text-amber-800"
+                : feedback.type === "info"
+                  ? "bg-blue-50 text-blue-800"
+                  : "bg-rose-50 text-rose-800"
+          }`}
+        >
+          {feedback.type === "success" && <CheckCircle2 className="size-4 shrink-0" />}
+          {feedback.type === "warning" && <LogIn className="size-4 shrink-0" />}
+          {feedback.type === "info" && <Info className="size-4 shrink-0" />}
+          {feedback.type === "error" && <AlertCircle className="size-4 shrink-0" />}
+          <div>
+            <span>{feedback.message}</span>
+            {!user && feedback.type === "warning" && (
+              <span className="mt-1 block font-normal text-amber-700">
+                Đăng nhập để tiếp tục đăng ký.
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+export default RegisterActionBar;

@@ -1,0 +1,252 @@
+"""Schemas for organizer-facing event management APIs."""
+
+from __future__ import annotations
+
+from datetime import datetime
+from enum import Enum
+from typing import Any, Optional
+
+from pydantic import BaseModel, Field, field_validator, model_validator
+
+from app.core.app_time import as_local, now_local
+from app.schemas.event_revision import EventRevisionOut
+
+
+class EventStatus(str, Enum):
+    DRAFT = "DRAFT"
+    PENDING = "PENDING"
+    PUBLISHED = "PUBLISHED"
+    ONGOING = "ONGOING"
+    ENDED = "ENDED"
+    CANCELLED = "CANCELLED"
+
+
+class EventBase(BaseModel):
+    title: Optional[str] = Field(None, max_length=255)
+    category_id: Optional[int] = None
+    location: Optional[str] = Field(None, max_length=255)
+    start_time: Optional[datetime] = None
+    end_time: Optional[datetime] = None
+    registration_deadline: Optional[datetime] = None
+    capacity: Optional[int] = Field(None, ge=1, le=1_000_000)
+    description: Optional[str] = None
+    banner_url: Optional[str] = None
+    file_url: Optional[str] = None
+
+    @field_validator("title", "location", "description", mode="before")
+    @classmethod
+    def _strip_blank(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            value = value.strip()
+            return value or None
+        return value
+
+    @field_validator("banner_url", "file_url", mode="before")
+    @classmethod
+    def _normalize_url(cls, value: Any) -> Any:
+        if not isinstance(value, str):
+            return value
+
+        value = value.strip()
+        if (
+            len(value) >= 2
+            and value[0] in ("'", '"')
+            and value[-1] == value[0]
+        ):
+            value = value[1:-1].strip()
+        return value or None
+
+    @field_validator("category_id", "capacity", mode="before")
+    @classmethod
+    def _empty_str_to_none(cls, value: Any) -> Any:
+        return None if value in ("", None) else value
+
+
+class EventCreate(EventBase):
+    event_status: EventStatus = EventStatus.PENDING
+
+    @model_validator(mode="after")
+    def _validate_business_rules(self) -> "EventCreate":
+        if self.event_status not in (EventStatus.DRAFT, EventStatus.PENDING):
+            raise ValueError(
+                "Sự kiện mới chỉ được tạo ở trạng thái DRAFT hoặc PENDING."
+            )
+        _check_dates(self.start_time, self.end_time, self.registration_deadline)
+        # Sự kiện MỚI thì mọi mốc thời gian phải còn ở tương lai. Khi cập nhật thì
+        # không kiểm tra ở đây được — sự kiện đang diễn ra vốn có start_time trong
+        # quá khứ (xem `_validate_changed_dates_not_past` bên event_service).
+        _check_not_past(self.start_time, self.registration_deadline)
+        if self.event_status == EventStatus.PENDING:
+            missing = missing_required_fields(self)
+            if missing:
+                raise ValueError(
+                    "Thiếu thông tin bắt buộc: " + ", ".join(missing)
+                )
+        return self
+
+
+class EventUpdate(EventBase):
+    event_status: Optional[EventStatus] = None
+
+    @model_validator(mode="after")
+    def _validate_business_rules(self) -> "EventUpdate":
+        _check_dates(self.start_time, self.end_time, self.registration_deadline)
+        return self
+
+
+class EventStatusUpdate(BaseModel):
+    event_status: EventStatus
+
+
+class EventCancelIn(BaseModel):
+    """Yêu cầu huỷ sự kiện của Ban tổ chức.
+
+    Lý do KHÔNG bắt buộc ở tầng schema vì còn tuỳ trạng thái: sự kiện đang mở
+    đăng ký thì bắt buộc (còn sinh viên để thông báo), sự kiện mới chờ duyệt thì
+    không. Ràng buộc đó nằm ở `event_service.cancel_event`.
+    """
+
+    reason: Optional[str] = Field(default=None, max_length=500)
+
+    @field_validator("reason", mode="before")
+    @classmethod
+    def _strip_blank(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            return value.strip() or None
+        return value
+
+
+class AIDescriptionIn(BaseModel):
+    """Ngữ cảnh gửi lên để AI viết / hoàn thiện mô tả sự kiện.
+
+    `current_description` trống  -> viết mới.
+    `current_description` có chữ -> hoàn thiện đoạn đang có.
+    """
+
+    title: str = Field(..., min_length=1, max_length=255)
+    category_name: Optional[str] = Field(None, max_length=255)
+    location: Optional[str] = Field(None, max_length=255)
+    start_time: Optional[datetime] = None
+    end_time: Optional[datetime] = None
+    capacity: Optional[int] = Field(None, ge=1, le=1_000_000)
+    current_description: Optional[str] = Field(None, max_length=5000)
+
+    @field_validator(
+        "title", "category_name", "location", "current_description", mode="before"
+    )
+    @classmethod
+    def _strip_text(cls, value: Any) -> Any:
+        if isinstance(value, str):
+            value = value.strip()
+            return value or None
+        return value
+
+
+class AIDescriptionOut(BaseModel):
+    description: str
+    # "generate" khi viết mới, "refine" khi hoàn thiện đoạn có sẵn — tiện cho
+    # frontend hiển thị đúng thông báo.
+    mode: str
+
+
+class OrganizerEventOut(BaseModel):
+    event_id: Optional[str] = None
+    title: Optional[str] = None
+    category_id: Optional[int] = None
+    category_name: Optional[str] = None
+    location: Optional[str] = None
+    start_time: Optional[datetime] = None
+    end_time: Optional[datetime] = None
+    registration_deadline: Optional[datetime] = None
+    capacity: Optional[int] = None
+    registered_count: int = 0
+    seats_left: Optional[int] = None
+    is_full: bool = False
+    is_registration_open: bool = False
+    description: Optional[str] = None
+    banner_url: Optional[str] = None
+    file_url: Optional[str] = None
+    event_status: str = EventStatus.DRAFT.value
+    can_edit: bool = False
+    can_delete: bool = True
+    requires_reapproval: bool = False
+
+    # Sự kiện đã duyệt mà Ban tổ chức vừa sửa: dữ liệu mới nằm ở bảng
+    # `event_revisions` chờ Admin duyệt, bản ghi này vẫn là bản đang công khai.
+    has_pending_revision: bool = False
+    # Chỉ điền ở API chi tiết (kèm bảng so sánh cũ → mới); API danh sách chỉ trả
+    # cờ `has_pending_revision` cho nhẹ.
+    pending_revision: Optional[EventRevisionOut] = None
+
+    created_at: Optional[datetime] = None
+
+    model_config = {"extra": "ignore"}
+
+
+class EventListOut(BaseModel):
+    items: list[OrganizerEventOut]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
+
+
+class StatsOut(BaseModel):
+    total: int = 0
+    published: int = 0
+    draft: int = 0
+    pending: int = 0
+    ongoing: int = 0
+    ended: int = 0
+    cancelled: int = 0
+
+
+REQUIRED_FOR_SUBMIT: list[tuple[str, str]] = [
+    ("title", "Tên sự kiện"),
+    ("category_id", "Lĩnh vực / Danh mục"),
+    ("location", "Địa điểm"),
+    ("start_time", "Ngày và giờ bắt đầu"),
+    ("end_time", "Ngày và giờ kết thúc"),
+    ("registration_deadline", "Hạn chót đăng ký"),
+    ("file_url", "Tệp kế hoạch sự kiện"),
+]
+
+
+def missing_required_fields(data: Any) -> list[str]:
+    getter = data.get if isinstance(data, dict) else lambda key: getattr(data, key, None)
+    return [
+        label
+        for field, label in REQUIRED_FOR_SUBMIT
+        if (value := getter(field)) is None
+        or (isinstance(value, str) and not value.strip())
+    ]
+
+
+def _as_local(value: datetime) -> datetime:
+    """Giá trị naive là giờ VN — đúng quy ước ở `app.core.app_time`."""
+    return as_local(value)
+
+
+def _check_not_past(
+    start: Optional[datetime],
+    deadline: Optional[datetime],
+) -> None:
+    """Chặn sự kiện đặt thời gian bắt đầu / hạn đăng ký đã trôi qua."""
+    now = now_local()
+    if start and _as_local(start) <= now:
+        raise ValueError("Thời gian bắt đầu sự kiện không được ở trong quá khứ.")
+    if deadline and _as_local(deadline) <= now:
+        raise ValueError("Hạn chót đăng ký không được ở trong quá khứ.")
+
+
+def _check_dates(
+    start: Optional[datetime],
+    end: Optional[datetime],
+    deadline: Optional[datetime],
+) -> None:
+    if start and end and end <= start:
+        raise ValueError("Thời gian kết thúc phải sau thời gian bắt đầu.")
+    if start and deadline and deadline > start:
+        raise ValueError(
+            "Hạn chót đăng ký phải trước thời điểm sự kiện bắt đầu."
+        )

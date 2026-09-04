@@ -1,122 +1,305 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
-import heroImg from './assets/hero.png'
-import './App.css'
+import { BrowserRouter, Link, Navigate, Route, Routes } from "react-router-dom";
+import { ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
-function App() {
-  const [count, setCount] = useState(0)
-
+import { EventDetailPage } from "./pages/EventDetailPage.jsx";
+import ProtectedRoute from "./components/ProtectedRoute.jsx";
+import AllEvents from "./pages/AllEventsPage.jsx";
+import AuthCallbackPage from "./pages/AuthCallbackPage.jsx";
+import CreateEvent from "./pages/CreateEventPage.jsx";
+import EditEvent from "./pages/EditEventPage.jsx";
+import ForgotPasswordPage from "./pages/auth/ForgotPasswordPage.jsx";
+import LoginPage from "./pages/auth/LoginPage.jsx";
+import LandingPage from "./pages/LandingPage.jsx";
+import ManageEvents from "./pages/ManageEventsPage.jsx";
+import MyEventsPage from "./pages/MyEventsPage.jsx";
+import ParticipantDetailPage from "./pages/ParticipantDetailPage.jsx";
+import ParticipantEventsPage from "./pages/ParticipantEventsPage.jsx";
+import OrganizerProfile from "./pages/profile/OrganizerProfile.jsx";
+import StudentProfile from "./pages/profile/StudentProfile.jsx";
+import ResetPasswordPage from "./pages/ResetPasswordPage.jsx";
+import AdminStatisticsPage from "./pages/admin/AdminStatisticsPage.jsx";
+import ReviewOrganizerRequest from "./pages/admin/ReviewOrganizerRequest.jsx";
+import SelectRolePage from "./pages/auth/SelectRolePage.jsx";
+import SignupOrganizerPage from "./pages/auth/SignupOrganizerPage.jsx";
+import OrganizerResubmitWorkspacePage from "./pages/organizer/OrganizerResubmitWorkspacePage.jsx";
+import OrganizerAccountStatusPage from "./pages/organizer/OrganizerAccountStatusPage.jsx";
+import OrganizerSignupCompletePage from "./pages/OrganizerSignupCompletePage.jsx";
+import SignupStudentPage from "./pages/auth/SignupStudentPage.jsx";
+import StudentSignupCompletePage from "./pages/StudentSignupCompletePage.jsx";
+import ViewEvent from "./pages/ViewEventPage.jsx";
+import AdminEventReviewsPage from "./pages/admin/AdminEventReviewsPage.jsx";
+import AdminEventReviewDetailPage from "./pages/admin/AdminEventReviewDetailPage.jsx";
+import ExploreEventsPage from "./pages/ExploreEventsPage.jsx";
+import OrganizerHomePage from "./pages/OrganizerHomePage.jsx";
+import AdminEventChangeDetailPage from "./pages/admin/AdminEventChangeDetailPage.jsx";
+import OrganizerCheckinPage from "./pages/organizer/OrganizerCheckinPage.jsx";
+import OrganizerHeader from "./components/common/OrganizerHeader.jsx";
+import StudentHeader from "./components/common/StudentHeader.jsx";
+function PlaceholderPage({ title, description, role = "student" }) {
   return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
+    <div className="min-h-screen bg-[#f8f9fa] text-gray-900">
+      {role === "organizer" ? <OrganizerHeader /> : <StudentHeader />}
+      <main className="px-6 py-16 text-center">
+        <div className="mx-auto max-w-md rounded-3xl border border-gray-100 bg-white p-10 shadow-sm">
+          <h1 className="text-2xl font-bold text-gray-800">{title}</h1>
+          <p className="mt-2 text-sm text-gray-500">{description}</p>
         </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+      </main>
+    </div>
+  );
 }
 
-export default App
+function NotFoundPage() {
+  return (
+    <main className="min-h-screen bg-[#f8f9fa] px-6 py-16 text-center text-gray-900">
+      <div className="mx-auto max-w-md rounded-3xl border border-gray-100 bg-white p-10 shadow-sm">
+        <h1 className="text-2xl font-bold text-gray-800">
+          Không tìm thấy trang
+        </h1>
+        <p className="mt-2 text-sm text-gray-500">
+          Đường dẫn này chưa được khai báo trong hệ thống.
+        </p>
+        <Link
+          to="/"
+          className="mt-4 inline-block text-sm font-semibold text-purple-700 hover:text-purple-800"
+        >
+          Quay lại Dashboard
+        </Link>
+      </div>
+    </main>
+  );
+}
+
+function HomePage() {
+  const canManageEvents = localStorage.getItem("can_manage_events") === "true";
+
+  return canManageEvents ? (
+    <ManageEvents />
+  ) : (
+    <Navigate to="/organizer/status" replace />
+  );
+}
+
+function EventsIndexPage() {
+  const canManageEvents = localStorage.getItem("can_manage_events") === "true";
+
+  return canManageEvents ? (
+    <Navigate to="/organizer" replace />
+  ) : (
+    <Navigate to="/explore" replace />
+  );
+}
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<LandingPage />} />
+        <Route
+          path="/organizer"
+          element={
+            <ProtectedRoute requireEventManagement>
+              <HomePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/organizer/home"
+          element={
+            <ProtectedRoute requireEventManagement>
+              <OrganizerHomePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/organizer/create-event"
+          element={
+            <ProtectedRoute requireEventManagement>
+              <CreateEvent />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/organizer/all-events"
+          element={
+            <ProtectedRoute requireEventManagement>
+              <AllEvents />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/organizer/edit-event/:eventId"
+          element={
+            <ProtectedRoute requireEventManagement>
+              <EditEvent />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/organizer/events/:eventId/checkin"
+          element={
+            <ProtectedRoute requireEventManagement>
+              <OrganizerCheckinPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/edit-event/:eventId"
+          element={
+            <ProtectedRoute requireEventManagement>
+              <EditEvent />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/organizer/events/:eventId"
+          element={
+            <ProtectedRoute requireEventManagement>
+              <ViewEvent />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/organizer/status"
+          element={
+            <ProtectedRoute>
+              <OrganizerAccountStatusPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/events"
+          element={
+            <ProtectedRoute>
+              <EventsIndexPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/events/:eventId"
+          element={
+            <ProtectedRoute>
+              <EventDetailPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route path="/auth">
+          <Route path="login" element={<LoginPage />} />
+          <Route path="callback" element={<AuthCallbackPage />} />
+          <Route path="forgot-password" element={<ForgotPasswordPage />} />
+          <Route path="reset-password" element={<ResetPasswordPage />} />
+          <Route
+            path="organizer/resubmit"
+            element={<OrganizerResubmitWorkspacePage />}
+          />
+          <Route path="signup">
+            <Route index element={<SelectRolePage />} />
+            <Route path="student" element={<SignupStudentPage />} />
+            <Route
+              path="student/complete"
+              element={<StudentSignupCompletePage />}
+            />
+            <Route path="organizer" element={<SignupOrganizerPage />} />
+            <Route
+              path="organizer/complete"
+              element={<OrganizerSignupCompletePage />}
+            />
+          </Route>
+        </Route>
+
+        <Route path="/account">
+          <Route path="student/profile" element={<StudentProfile />} />
+          <Route path="organizer/profile" element={<OrganizerProfile />} />
+        </Route>
+
+        <Route
+          path="/my-events"
+          element={
+            <ProtectedRoute>
+              <MyEventsPage />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Quản lý người tham gia: chọn sự kiện rồi vào danh sách chi tiết */}
+        <Route
+          path="/organizer/participants"
+          element={
+            <ProtectedRoute requireEventManagement>
+              <ParticipantEventsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/organizer/participants/:eventId"
+          element={
+            <ProtectedRoute requireEventManagement>
+              <ParticipantDetailPage />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route path="/admin">
+          <Route
+            path="organizer-requests"
+            element={
+              <ProtectedRoute>
+                <ReviewOrganizerRequest />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="statistics"
+            element={
+              <ProtectedRoute>
+                <AdminStatisticsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="manage-events"
+            element={
+              <ProtectedRoute>
+                <AdminEventReviewsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="events/:eventId"
+            element={
+              <ProtectedRoute>
+                <AdminEventReviewDetailPage />
+              </ProtectedRoute>
+            }
+          />
+          {/* Duyệt YÊU CẦU CHỈNH SỬA một sự kiện đã công khai */}
+          <Route
+            path="event-changes/:revisionId"
+            element={
+              <ProtectedRoute>
+                <AdminEventChangeDetailPage />
+              </ProtectedRoute>
+            }
+          />
+        </Route>
+
+        <Route path="/explore" element={<ExploreEventsPage />} />
+        <Route
+          path="/history"
+          element={
+            <PlaceholderPage
+              title="Lịch sử tham gia"
+              description="Trang xem lại lịch sử các sự kiện bạn đã hoàn thành."
+            />
+          }
+        />
+
+        <Route path="*" element={<NotFoundPage />} />
+      </Routes>
+
+      <ToastContainer position="top-right" autoClose={2000} theme="light" />
+    </BrowserRouter>
+  );
+}
