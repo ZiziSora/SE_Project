@@ -178,6 +178,16 @@ def _derive_ui_status(row: dict[str, Any]) -> str:
     return EventStatus.DRAFT.value
 
 
+def get_ui_status(row: dict[str, Any]) -> str:
+    """Trạng thái hiển thị (1 trong 6) của một dòng `events`.
+
+    Bọc công khai để service khác (`event_revision_service`) dùng chung đúng
+    một cách suy trạng thái thay vì tự so cột `event_status` — xem
+    `_derive_ui_status`.
+    """
+    return _derive_ui_status(row)
+
+
 def _ui_status_to_db(ui_status: str) -> dict[str, Any]:
     """Dịch trạng thái API thành các cột DB tương ứng để ghi xuống."""
     mapping: dict[str, dict[str, Any]] = {
@@ -559,11 +569,11 @@ def update_event(
     # tránh coi "2026-08-20T07:20:00" khác "2026-08-20T07:20:00+00:00")
     changed = event_revision_service.changed_fields(data, current)
 
-    # Kiểm tra lại ràng buộc ngày tháng sau khi trộn dữ liệu cũ + mới
+    # Kiểm tra lại ràng buộc sau khi trộn dữ liệu cũ + mới. Với sự kiện đã công
+    # khai, đúng bộ kiểm tra này còn được chạy LẠI lúc Admin duyệt bản sửa —
+    # xem `validate_pending_changes`.
     merged = {**current, **data}
-    _validate_merged_dates(merged)
-    _validate_changed_dates_not_past(data, current)
-    _validate_capacity_against_registrations(event_id, merged.get("capacity"))
+    validate_pending_changes(event_id, data, current)
 
     # ── Sự kiện ĐÃ ĐƯỢC DUYỆT: KHÔNG ghi đè bảng `events` ────────────────────
     # Dữ liệu mới đi vào bảng `event_revisions` kèm ảnh chụp giá trị cũ, chờ
@@ -1031,6 +1041,38 @@ def _validate_capacity_against_registrations(
                 f"Sức chứa mới ({capacity}) nhỏ hơn số người đã đăng ký ({registered})."
             ),
         )
+
+
+def validate_pending_changes(
+    event_id: str,
+    changes: dict[str, Any],
+    current: dict[str, Any],
+) -> None:
+    """Kiểm tra một tập thay đổi có áp dụng được lên sự kiện `current` không.
+
+    Hàm này được gọi ở HAI thời điểm, và đó là toàn bộ lý do nó tồn tại:
+
+    1. Lúc Ban tổ chức GỬI thay đổi (`update_event`) — để báo lỗi ngay trên form.
+    2. Lúc Admin DUYỆT bản sửa (`event_revision_service.approve_revision`) — vì
+       với sự kiện đã công khai, dữ liệu chỉ thực sự được ghi vào bảng `events`
+       ở bước này, có thể là nhiều ngày sau bước (1).
+
+    Thiếu lần gọi thứ hai thì sinh ra lỗi TOCTOU (kiểm tra một đằng, ghi một
+    nẻo): Ban tổ chức hạ sức chứa xuống 1 lúc mới có 1 người đăng ký — hợp lệ;
+    trong lúc chờ duyệt có thêm người đăng ký (bảng `events` vẫn giữ sức chứa CŨ
+    nên không chặn); tới lúc Admin duyệt thì sự kiện có sức chứa 1 mà 2 người đã
+    đăng ký. Ràng buộc phải được kiểm tra ở điểm GHI, không chỉ ở điểm nhận
+    yêu cầu.
+    """
+    merged = {**current, **changes}
+    # Mốc thời gian phải hợp lệ trên dữ liệu ĐÃ TRỘN: đổi mỗi `start_time` vẫn
+    # phải so được với `end_time` cũ đang nằm trong DB.
+    _validate_merged_dates(merged)
+    _validate_changed_dates_not_past(changes, current)
+    # Sức chứa thì chỉ xét khi chính nó thay đổi — một sự kiện lỡ quá tải sẵn
+    # không được phép chặn luôn việc sửa mô tả hay địa điểm.
+    if "capacity" in changes:
+        _validate_capacity_against_registrations(event_id, changes["capacity"])
 
 
 def _int_or_none(value: Any) -> Optional[int]:

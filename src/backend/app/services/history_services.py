@@ -77,15 +77,22 @@ def promote_next_waitlisted_participant(
             sp = get_supabase()
             res = (
                 sp.table("event_registrations")
-                .select("registration_id, user_id")
+                .select("registration_id, user_id, registration_status")
                 .eq("event_id", str(event_id))
-                .in_("registration_status", ["WAITLISTED", "waitlisted", "WAITLIST"])
                 .order("created_at", desc=False)
-                .limit(1)
                 .execute()
             )
-            if res.data and len(res.data) > 0:
-                target_reg = res.data[0]
+            # Lọc phía Python: `.in_()` với nhãn không có trong enum
+            # `registration_status` làm hỏng cả câu truy vấn — xem
+            # `registration_service.WAITLIST_STATUSES`.
+            waiting = [
+                r
+                for r in (res.data or [])
+                if str(r.get("registration_status") or "").upper()
+                in ("WAITLISTED", "WAITLIST")
+            ]
+            if waiting:
+                target_reg = waiting[0]
                 promoted_reg_id = target_reg["registration_id"]
                 promoted_user_id = target_reg["user_id"]
                 sp.table("event_registrations").update({

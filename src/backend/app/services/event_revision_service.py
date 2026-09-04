@@ -64,6 +64,17 @@ SUPERSEDED = "SUPERSEDED"
 
 EMPTY_TEXT = "(để trống)"
 
+# Nhãn tiếng Việt của 6 trạng thái sự kiện — chỉ dùng để dựng câu thông báo lỗi
+# cho Admin khi bản sửa không còn áp dụng được.
+EVENT_STATUS_LABELS: dict[str, str] = {
+    "DRAFT": "Bản nháp",
+    "PENDING": "Chờ duyệt",
+    "PUBLISHED": "Đã công khai",
+    "ONGOING": "Đang diễn ra",
+    "ENDED": "Đã kết thúc",
+    "CANCELLED": "Đã huỷ",
+}
+
 
 # ─── Đọc ──────────────────────────────────────────────────────────────────────
 
@@ -237,6 +248,10 @@ def approve_revision(revision_id: str) -> EventRevisionOut:
     # nào để dựng bảng so sánh trả về cho giao diện nữa.
     before = _event_row(str(revision["event_id"]))
 
+    # Bản sửa được kiểm tra lúc GỬI, nhưng chỉ được GHI ở đây. Trạng thái hệ
+    # thống có thể đã đổi trong khoảng giữa, nên phải kiểm tra lại từ đầu.
+    _revalidate_before_apply(revision, before)
+
     updates = {field: revision.get(field) for field in REVISION_FIELDS}
     _run(
         get_supabase()
@@ -250,6 +265,72 @@ def approve_revision(revision_id: str) -> EventRevisionOut:
     _notify_revision_approved(revision, before)
     _promote_waitlist_if_capacity_raised(revision, before)
     return out
+
+
+def _revalidate_before_apply(
+    revision: dict[str, Any], before: Optional[dict[str, Any]]
+) -> None:
+    """Kiểm tra lại toàn bộ ràng buộc NGAY TRƯỚC KHI ghi đè bảng `events`.
+
+    Vì sao cần: bản sửa được kiểm tra ở thời điểm Ban tổ chức GỬI, nhưng chỉ
+    được ghi xuống ở thời điểm Admin DUYỆT — có thể là nhiều ngày sau. Giữa hai
+    mốc đó sinh viên vẫn đăng ký được (bảng `events` còn giữ nội dung CŨ nên
+    không có gì chặn) và thời gian vẫn trôi, nên kết quả kiểm tra cũ có thể đã
+    hết hiệu lực. Đây là lỗi TOCTOU (Time-Of-Check to Time-Of-Use); cách chữa là
+    đặt ràng buộc ở điểm GHI chứ không chỉ ở điểm nhận yêu cầu.
+
+    Ba tình huống bị chặn ở đây:
+
+    * Sức chứa mới nhỏ hơn số người ĐANG đăng ký (có người đăng ký thêm sau khi
+      bản sửa được gửi).
+    * Mốc thời gian mới đã trôi qua trong lúc chờ duyệt.
+    * Sự kiện đã bắt đầu / kết thúc / bị huỷ trong lúc chờ duyệt.
+
+    Không tự động từ chối bản sửa: quyền quyết định vẫn thuộc về Admin, hàm này
+    chỉ từ chối ÁP DỤNG và nói rõ lý do.
+    """
+    # Import cục bộ: `event_service` đã import module này ở đầu tệp nên import
+    # ngược lại ở top-level sẽ tạo vòng phụ thuộc.
+    from app.services import event_service
+
+    if not before:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Sự kiện của yêu cầu chỉnh sửa này không còn tồn tại.",
+        )
+
+    event_id = str(revision["event_id"])
+
+    # Chỉ sự kiện ĐÃ CÔNG KHAI VÀ CHƯA BẮT ĐẦU mới có bản sửa để áp dụng.
+    current_status = event_service.get_ui_status(before)
+    if current_status not in event_service.REAPPROVAL_STATUSES:
+        label = EVENT_STATUS_LABELS.get(current_status, current_status)
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Không thể áp dụng bản sửa vì sự kiện hiện ở trạng thái "
+                f"\u201c{label}\u201d. Hãy từ chối yêu cầu này."
+            ),
+        )
+
+    # Chỉ xét những trường thực sự khác dòng `events` hiện tại.
+    new_data = {field: revision.get(field) for field in REVISION_FIELDS}
+    changes = {field: new_data[field] for field in changed_fields(new_data, before)}
+    if not changes:
+        return
+
+    try:
+        event_service.validate_pending_changes(event_id, changes, before)
+    except HTTPException as exc:
+        detail = exc.detail if isinstance(exc.detail, str) else str(exc.detail)
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=(
+                "Không thể duyệt: dữ liệu sự kiện đã thay đổi kể từ lúc Ban tổ "
+                f"chức gửi yêu cầu. {detail} Hãy từ chối yêu cầu này và đề nghị "
+                "Ban tổ chức gửi lại bản sửa mới."
+            ),
+        ) from exc
 
 
 def _promote_waitlist_if_capacity_raised(

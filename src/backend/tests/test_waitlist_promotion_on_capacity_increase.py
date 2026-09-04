@@ -14,6 +14,20 @@ from app.services import event_revision_service, event_service, registration_ser
 EVENT_ID = "11111111-1111-1111-1111-111111111111"
 
 
+def _waiting_row(n, registration_status="WAITLISTED"):
+    """Một dòng `event_registrations` như Supabase trả về.
+
+    Bắt buộc có `registration_status`: `list_waitlisted` lọc trạng thái bằng
+    Python chứ không bằng `.in_()` phía server (nhãn lạ sẽ làm hỏng truy vấn
+    trên cột enum), nên dòng giả thiếu trường này là dòng giả sai.
+    """
+    return {
+        "registration_id": f"reg-{n}",
+        "user_id": f"user-{n}",
+        "registration_status": registration_status,
+    }
+
+
 def _client(registered_count, waiting):
     """Supabase giả: đếm đăng ký → đọc danh sách chờ → cập nhật từng người."""
     query = MagicMock()
@@ -33,11 +47,7 @@ def _client(registered_count, waiting):
 @patch("app.services.registration_service.get_supabase")
 def test_promote_fills_only_the_new_seats(mock_get_supabase, mock_notify):
     """Sức chứa 3 → 5 với 3 người chính thức: chỉ 2 người đầu hàng được đôn."""
-    waiting = [
-        {"registration_id": "reg-1", "user_id": "user-1"},
-        {"registration_id": "reg-2", "user_id": "user-2"},
-        {"registration_id": "reg-3", "user_id": "user-3"},
-    ]
+    waiting = [_waiting_row(1), _waiting_row(2), _waiting_row(3)]
     client, query = _client(3, waiting)
     mock_get_supabase.return_value = client
 
@@ -68,10 +78,7 @@ def test_promote_does_nothing_when_still_full(mock_get_supabase, mock_notify):
 @patch("app.services.registration_service.get_supabase")
 def test_promote_everyone_when_capacity_becomes_unlimited(mock_get_supabase):
     """Bỏ giới hạn sức chứa (None) thì đôn hết danh sách chờ."""
-    waiting = [
-        {"registration_id": "reg-1", "user_id": "user-1"},
-        {"registration_id": "reg-2", "user_id": "user-2"},
-    ]
+    waiting = [_waiting_row(1), _waiting_row(2)]
     client, _query = _client(9, waiting)
     # Không giới hạn thì bỏ qua bước đếm, execute đầu tiên là đọc danh sách chờ.
     _query.execute.side_effect = [MagicMock(data=waiting)] + [
@@ -129,3 +136,40 @@ def test_approved_revision_promotes_when_capacity_grows(mock_promote):
         {"event_id": EVENT_ID, "capacity": 3}, before
     )
     mock_promote.assert_not_called()
+
+
+# ── Bảo vệ nguyên nhân gốc: đừng lọc enum phía server ────────────────────────
+
+
+@patch("app.services.registration_service.get_supabase")
+def test_list_waitlisted_khong_loc_trang_thai_phia_server(mock_get_supabase):
+    """`registration_status` là enum Postgres: lọc phía server bằng một nhãn lạ
+    (kể cả chỉ khác hoa-thường) làm hỏng CẢ câu truy vấn —
+    `invalid input value for enum registration_status: "waitlisted"` — và lỗi đó
+    bị `except` ở tầng trên nuốt mất nên danh sách chờ đứng im không ai biết.
+    """
+    query = MagicMock()
+    for method in ("select", "eq", "order"):
+        getattr(query, method).return_value = query
+    query.execute.return_value = MagicMock(
+        data=[
+            _waiting_row(1),
+            {"registration_id": "reg-2", "user_id": "user-2", "registration_status": "REGISTERED"},
+            _waiting_row(3, "waitlisted"),  # dữ liệu cũ viết thường vẫn phải nhận ra
+            {"registration_id": "reg-4", "user_id": "user-4", "registration_status": "CANCELLED"},
+        ]
+    )
+    client = MagicMock()
+    client.table.return_value = query
+    mock_get_supabase.return_value = client
+
+    ket_qua = registration_service.list_waitlisted(EVENT_ID)
+
+    query.in_.assert_not_called()
+    assert [r["registration_id"] for r in ket_qua] == ["reg-1", "reg-3"]
+
+
+def test_waitlist_statuses_chi_chua_nhan_viet_hoa():
+    """Danh sách chỉ dùng để so sánh sau `.upper()` — có nhãn viết thường trong
+    đây là dấu hiệu ai đó lại định đem nó đi lọc phía server."""
+    assert all(s == s.upper() for s in registration_service.WAITLIST_STATUSES)
